@@ -12,11 +12,19 @@ namespace qjson {
         json_exception(const char * msg) : std::runtime_error(msg) {}
     };
 
+    template <typename T> struct Encoder {
+        using typename T::qjson_encoder_has_no_specialization_for_this_type; // Intentional compile error for unspecialized types
+    };
+
+    template <typename T> struct HexEncoder {
+        using typename T::qjson_encoder_has_no_specialization_for_this_type; // Intentional compile error for unspecialized types
+    };
+
     class Writer {
 
         public:
 
-        Writer(bool compact, int indentSize = 4);
+        Writer(bool compact = false, int indentSize = 4);
         Writer(const Writer & other) = delete;
         Writer(Writer && other);
 
@@ -29,16 +37,11 @@ namespace qjson {
         void startArray(std::string_view key, bool compact);
         void startArray(bool compact);
 
-        void put(std::string_view key, std::string_view val);
-        void put(std::string_view val);
-        void put(std::string_view key, int64_t val);
-        void put(int64_t val);
-        void put(std::string_view key, uint64_t val, bool hex = false);
-        void put(uint64_t val, bool hex = false);
-        void put(std::string_view key, double val);
-        void put(double val);
-        void put(std::string_view key, bool val);
-        void put(bool val);
+        template <typename T, typename E = Encoder<std::decay_t<T>>> void put(std::string_view key, const T & val);
+        template <typename T, typename E = Encoder<std::decay_t<T>>> void put(const T & val);
+        
+        template <typename T, typename E = HexEncoder<std::decay_t<T>>> void putHex(std::string_view key, const T & val) { put<T, E>(key, val); }
+        template <typename T, typename E = HexEncoder<std::decay_t<T>>> void putHex(const T & val) { put<T, E>(val); }
 
         void endObject();
 
@@ -57,14 +60,6 @@ namespace qjson {
         void m_putIndentation();
 
         void m_putKey(std::string_view key);
-
-        void m_put(std::string_view str);
-
-        void m_put(int64_t val);
-        void m_put(uint64_t val);
-        void m_putHex(uint64_t val);
-        void m_put(double val);
-
 
         void m_checkKey(std::string_view key) const;
         void m_checkKey() const;
@@ -89,6 +84,138 @@ namespace qjson {
     }
 
     using namespace detail;
+
+    template <>
+    struct Encoder<std::string_view> {
+        std::ostream & operator()(std::ostream & os, std::string_view val) const {
+            os << '"';
+
+            for (char c : val) {
+                if (std::isprint(c)) {
+                    if (c == '"' || c == '\\') {
+                        os << '\\';
+                    }
+                    os << c;
+                }
+                else {
+                    switch (c) {
+                        case '\b': os << '\\' << 'b'; break;
+                        case '\f': os << '\\' << 'f'; break;
+                        case '\n': os << '\\' << 'n'; break;
+                        case '\r': os << '\\' << 'r'; break;
+                        case '\t': os << '\\' << 't'; break;
+                        default:
+                            if (unsigned char(c) < 128) {
+                                os << '\\' << 'u' << '0' << '0' << k_hexChars[(c >> 4) & 0xF] << k_hexChars[c & 0xF];
+                            }
+                            else {
+                                throw json_exception("Non-ASCII unicode is unsupported");
+                            }
+                    }
+                }
+            }
+
+            return os << '"';
+        }
+    };
+    template <> struct Encoder<std::string> { std::ostream & operator()(std::ostream & os, const std::string & val) const { return Encoder<std::string_view>()(os, val); } };
+    template <> struct Encoder<const char *> { std::ostream & operator()(std::ostream & os, const char * val) const { return Encoder<std::string_view>()(os, val); } };
+    template <> struct Encoder<char *> { std::ostream & operator()(std::ostream & os, const char * val) const { return Encoder<std::string_view>()(os, val); } };
+    template <> struct Encoder<char> { std::ostream & operator()(std::ostream & os, char val) const { return Encoder<std::string_view>()(os, std::string_view(&val, 1)); } };
+
+    template <>
+    struct Encoder<uint64_t> {
+        std::ostream & operator()(std::ostream & os, uint64_t val) const {
+            char buffer[20];
+            int digits(0);
+
+            do {
+                uint64_t quotent(val / 10), remainder(val % 10); // Compiler should optimize this as one operation
+                buffer[digits] = char('0' + remainder);
+                ++digits;
+                val = quotent;
+            } while (val);
+
+            while (digits) {
+                os << buffer[--digits];
+            }
+            
+            return os;
+        }
+    };
+    template <> struct Encoder<uint32_t> { std::ostream & operator()(std::ostream & os, uint32_t val) const { return Encoder<uint64_t>()(os, val); } };
+    template <> struct Encoder<uint16_t> { std::ostream & operator()(std::ostream & os, uint16_t val) const { return Encoder<uint64_t>()(os, val); } };
+    template <> struct Encoder< uint8_t> { std::ostream & operator()(std::ostream & os,  uint8_t val) const { return Encoder<uint64_t>()(os, val); } };
+
+    template <>
+    struct Encoder<int64_t> {
+        std::ostream & operator()(std::ostream & os, int64_t val) const {
+            if (val < 0) {
+                os << '-';
+                val = -val;
+            }
+
+            return Encoder<uint64_t>()(os, uint64_t(val));
+        }
+    };
+    template <> struct Encoder<int32_t> { std::ostream & operator()(std::ostream & os, int32_t val) const { return Encoder<int64_t>()(os, val); } };
+    template <> struct Encoder<int16_t> { std::ostream & operator()(std::ostream & os, int16_t val) const { return Encoder<int64_t>()(os, val); } };
+    template <> struct Encoder< int8_t> { std::ostream & operator()(std::ostream & os,  int8_t val) const { return Encoder<int64_t>()(os, val); } };
+
+    template <>
+    struct Encoder<double> {
+        std::ostream & operator()(std::ostream & os, double val) const {
+            if (std::isinf(val)) {
+                throw json_exception("The JSON standard does not support infinity");
+            }
+            if (std::isnan(val)) {
+                throw json_exception("The JSON standard does not support NaN");
+            }
+
+            char buffer[32];
+            int len(std::snprintf(buffer, sizeof(buffer), "%#.17g", val));
+            if (len < 0 || len >= sizeof(buffer)) {
+                throw json_exception("Error encoding float");
+            }
+
+            return os << std::string_view(buffer, len);
+        }
+    };
+    template <> struct Encoder<float> { std::ostream & operator()(std::ostream & os, float val) const { return Encoder<double>()(os, val); } };
+
+    template <>
+    struct Encoder<bool> {
+        std::ostream & operator()(std::ostream & os, bool val) const {
+            return os << (val ? "true"sv : "false"sv);
+        }
+    };
+
+    template <>
+    struct Encoder<nullptr_t> {
+        std::ostream & operator()(std::ostream & os, nullptr_t) const {
+            return os << "null"sv;
+        }
+    };
+    
+    template <>
+    struct HexEncoder<uint64_t> {
+        template <typename T = uint64_t, typename = std::enable_if_t<std::is_arithmetic_v<T>>>
+        std::ostream & operator()(std::ostream & os, T val) const {
+            os << "0x"sv;
+
+            char buffer[sizeof(T) * 2];
+
+            for (int i(sizeof(T) * 2 - 1); i >= 0; --i) {
+                buffer[i] = k_hexChars[val & 0xF];
+                val >>= 4;
+            };
+
+            return os << std::string_view(buffer, sizeof(buffer));
+        }
+    };
+    template <> struct HexEncoder<uint32_t> { std::ostream & operator()(std::ostream & os, uint32_t val) const { return HexEncoder<uint64_t>()(os, val); } };
+    template <> struct HexEncoder<uint16_t> { std::ostream & operator()(std::ostream & os, uint16_t val) const { return HexEncoder<uint64_t>()(os, val); } };
+    template <> struct HexEncoder< uint8_t> { std::ostream & operator()(std::ostream & os,  uint8_t val) const { return HexEncoder<uint64_t>()(os, val); } };
 
     inline Writer::Writer(bool compact, int indentSize) :
         m_ss(),
@@ -141,65 +268,20 @@ namespace qjson {
         m_start(compact, '[');
     }
 
-    inline void Writer::put(std::string_view key, std::string_view val) {
+    template <typename T, typename E>
+    inline void Writer::put(std::string_view key, const T & val) {
         m_checkKey(key);
         m_putPrefix();
         m_putKey(key);
-        m_put(val);
+        E()(m_ss, val);
         m_state.back().content = true;
     }
 
-    inline void Writer::put(std::string_view val) {
+    template <typename T, typename E>
+    inline void Writer::put(const T & val) {
         m_checkKey();
         m_putPrefix();
-        m_put(val);
-        m_state.back().content = true;
-    }
-
-    inline void Writer::put(std::string_view key, int64_t val) {
-        m_checkKey(key);
-        m_putPrefix();
-        m_putKey(key);
-        m_put(val);
-        m_state.back().content = true;
-    }
-
-    inline void Writer::put(int64_t val) {
-        m_checkKey();
-        m_putPrefix();
-        m_put(val);
-        m_state.back().content = true;
-    }
-
-    inline void Writer::put(std::string_view key, uint64_t val, bool hex) {
-        m_checkKey(key);
-        m_putPrefix();
-        m_putKey(key);
-        if (hex) m_putHex(val);
-        else m_put(val);
-        m_state.back().content = true;
-    }
-
-    inline void Writer::put(uint64_t val, bool hex) {
-        m_checkKey();
-        m_putPrefix();
-        if (hex) m_putHex(val);
-        else m_put(val);
-        m_state.back().content = true;
-    }
-
-    inline void Writer::put(std::string_view key, double val) {
-        m_checkKey(key);
-        m_putPrefix();
-        m_putKey(key);
-        m_put(val);
-        m_state.back().content = true;
-    }
-
-    inline void Writer::put(double val) {
-        m_checkKey();
-        m_putPrefix();
-        m_put(val);
+        E()(m_ss, val);
         m_state.back().content = true;
     }
 
@@ -234,15 +316,15 @@ namespace qjson {
 
     inline void Writer::m_end() {
         const State & state(m_state.back());
-        if (state.compact) {
-            if (state.content) {
+        if (state.content) {
+            if (state.compact) {
                 m_ss << ' ';
             }
-        }
-        else {
-            m_ss << '\n';
-            --m_indentation;
-            m_putIndentation();
+            else {
+                m_ss << '\n';
+                --m_indentation;
+                m_putIndentation();
+            }
         }
         m_ss << (state.array ? ']' : '}');
         m_state.pop_back();
@@ -270,89 +352,7 @@ namespace qjson {
     }
 
     inline void Writer::m_putKey(std::string_view key) {
-        m_put(key);
-        m_ss << ": "sv;
-    }
-
-    inline void Writer::m_put(std::string_view str) {
-        m_ss << '"';
-
-        for (char c : str) {
-            if (std::isprint(c)) {
-                if (c == '"' || c == '\\') {
-                    m_ss << '\\';
-                }
-                m_ss << c;
-            }
-            else {
-                switch (c) {
-                    case '\b': m_ss << '\\' << 'b'; break;
-                    case '\f': m_ss << '\\' << 'f'; break;
-                    case '\n': m_ss << '\\' << 'n'; break;
-                    case '\r': m_ss << '\\' << 'r'; break;
-                    case '\t': m_ss << '\\' << 't'; break;
-                    default:
-                        if (unsigned char(c) < 128) {
-                            m_ss << '\\' << 'u' << '0' << '0' << k_hexChars[c & 0xF] << k_hexChars[(c >> 4) & 0xF];
-                        }
-                        else {
-                            throw json_exception("Non-ASCII unicode is currently unsupported");
-                        }
-                }
-            }
-        }
-        
-        m_ss << '"';
-    }
-
-    inline void Writer::m_put(int64_t val) {
-        if (val < 0) {
-            m_ss << '-';
-            val = -val;
-        }
-
-        m_put(uint64_t(val));
-    }
-
-    inline void Writer::m_put(uint64_t val) {
-        char buffer[20];
-        int digits(0);
-
-        do {
-            uint64_t quotent(val / 10), remainder(val % 10); // Compiler should optimize this as one operation
-            buffer[digits] = '0' + remainder;
-            ++digits;
-            val = quotent;
-        } while (val);
-
-        while (digits) {
-            m_ss << buffer[--digits];
-        }
-    }
-
-    inline void Writer::m_putHex(uint64_t val) {
-        m_ss << "0x"sv;
-        do {
-            m_ss << k_hexChars[val & 0xF];
-            val >>= 4;
-        } while (val);        
-    }
-
-    inline void Writer::m_put(double val) {
-        if (std::isinf(val)) {
-            throw json_exception("The JSON standard does not support infinity");
-        }
-        if (std::isnan(val)) {
-            throw json_exception("The JSON standard does not support NaN");
-        }
-
-        char buffer[32];
-        int len(std::snprintf(buffer, sizeof(buffer), "%#.17g", val));
-        if (len < 0 || len >= sizeof(buffer)) {
-            throw json_exception("Error encoding float");
-        }
-
-        m_ss << std::string_view(buffer, len);
+        Encoder<std::string_view>()(m_ss, key) << ": "sv;
     }
 
     inline void Writer::m_checkKey(std::string_view key) const {
