@@ -2,102 +2,124 @@
 #include <iostream>
 #include <sstream>
 
-static std::ostream & do0(std::ostream & os, uint64_t v) {
-    return os << v;
-}
+static double fastPow(double val, int exponent) {
+    if (exponent < 0) {
+        val = 1.0 / val;
+        exponent = -exponent - 1;
+    }
 
-static std::ostream & do3(std::ostream & os, uint64_t v) {
-    static constexpr char k_hexChars[16]{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
+    double result(1.0), currVal(val);
+    int currValExp(1), remainingExp(exponent - 1);
 
-    char buffer[16];
-
-    for (int i(15); i >= 0; --i) {
-        buffer[i] = k_hexChars[v & 0xF];
-        v >>= 4;
+    while (remainingExp > 0) {
+        while (currValExp <= remainingExp) {
+            currVal *= currVal;
+            remainingExp -= currValExp;
+            currValExp *= 2;
+        }
+        result *= currVal;
+        currVal = val;
+        currValExp = 1;
+        --remainingExp;
     };
 
-    return os << std::string_view(buffer, 16);
+    return result;
 }
 
-static std::ostream & do1(std::ostream & os, uint64_t v) {
-    static constexpr char k_hexChars[16]{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
+static inline double fasterPow(double val, unsigned int exp) {
+    double currVal(val);
+    unsigned int currValExp(1), remainingExp(exp - 1);
 
-    char buffer[16]{
-        k_hexChars[(v >> 60) & 0xF],
-        k_hexChars[(v >> 56) & 0xF],
-        k_hexChars[(v >> 52) & 0xF],
-        k_hexChars[(v >> 48) & 0xF],
-        k_hexChars[(v >> 44) & 0xF],
-        k_hexChars[(v >> 40) & 0xF],
-        k_hexChars[(v >> 36) & 0xF],
-        k_hexChars[(v >> 32) & 0xF],
-        k_hexChars[(v >> 28) & 0xF],
-        k_hexChars[(v >> 24) & 0xF],
-        k_hexChars[(v >> 20) & 0xF],
-        k_hexChars[(v >> 16) & 0xF],
-        k_hexChars[(v >> 12) & 0xF],
-        k_hexChars[(v >>  8) & 0xF],
-        k_hexChars[(v >>  4) & 0xF],
-        k_hexChars[(v >>  0) & 0xF],
-    };
+    while (currValExp <= remainingExp) {
+        currVal *= currVal;
+        remainingExp -= currValExp;
+        currValExp *= 2;
+    }
 
-    return os << std::string_view(buffer, 16);
+    if (remainingExp) {
+        return currVal * fasterPow(val, remainingExp);
+    }
+    else {
+        return currVal;
+    }
 }
 
-static std::ostream & do2(std::ostream & os, uint64_t v) {
-    static constexpr char k_hexChars[16]{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
+static double fasterPow(double val, int exp) {
+    if (exp > 0) {
+        return fasterPow(val, unsigned int(exp));
+    }
+    else if (exp < 0) {
+        return 1.0 / fasterPow(val, unsigned int(-exp));
+    }
+    else {
+        return 1.0;
+    }
+}
 
-    char buffer[17]{
-        k_hexChars[(v >> 60) & 0xF],
-        k_hexChars[(v >> 56) & 0xF],
-        k_hexChars[(v >> 52) & 0xF],
-        k_hexChars[(v >> 48) & 0xF],
-        k_hexChars[(v >> 44) & 0xF],
-        k_hexChars[(v >> 40) & 0xF],
-        k_hexChars[(v >> 36) & 0xF],
-        k_hexChars[(v >> 32) & 0xF],
-        k_hexChars[(v >> 28) & 0xF],
-        k_hexChars[(v >> 24) & 0xF],
-        k_hexChars[(v >> 20) & 0xF],
-        k_hexChars[(v >> 16) & 0xF],
-        k_hexChars[(v >> 12) & 0xF],
-        k_hexChars[(v >>  8) & 0xF],
-        k_hexChars[(v >>  4) & 0xF],
-        k_hexChars[(v >>  0) & 0xF],
-        '\0'
-    };
+static inline double fastestPow(double val, unsigned int exp) {
+    double res(1.0);
 
-    return os << buffer;
+    do {
+        if (exp & 1) res *= val; // exponent is odd
+        exp >>= 1;
+        val *= val;
+    } while (exp);
+
+    return res;
+}
+
+static inline double fastestPow(double val, int exp) {
+    if (exp >= 0) {
+        return fastestPow(val, unsigned int(exp));
+    }
+    else {
+        return fastestPow(1.0 / val, unsigned int(-exp));
+    }
 }
 
 int main() {
     constexpr int k_sets(100), k_reps(100000);
-    uint64_t vals[k_reps];
+    double * vals = new double[k_reps];
+    int64_t * exponents = new int64_t[k_reps];
+    double * dexponents = new double[k_reps];
     for (int i(0); i < k_reps; ++i) {
-        vals[i] = (uint64_t(std::rand()) << 32) | std::rand();
+        vals[i] = double(std::rand() % 10000);
+        exponents[i] = std::rand() % 200 - 100;
+        dexponents[i] = double(exponents[i]);
     }
 
+    
+    double a(fastestPow(10.0, 1000000));
+    double b(fastestPow(1.0, 0));
+    double c(fastestPow(0.0, 0));
+
+    /*if (true) {
+        for (int i = 0; i < k_reps; ++i) {
+            double d1(std::pow(vals[i], dexponents[i]));
+            double d2(fastestPow(vals[i], int(exponents[i])));
+            int x = 9;
+        }
+    }*/
+
     double t1(0.0), t2(0.0);
+    volatile double v = 0.0;
     for (int i = 0; i < k_sets; ++i) {
         {
             auto then(std::chrono::high_resolution_clock::now());
-            std::ostringstream os;
             for (int j = 0; j < k_reps; ++j) {
-                do1(os, vals[j]);
+                v = std::pow(vals[j], dexponents[j]);
             }
-            volatile std::string s(os.str());
             t1 += (std::chrono::high_resolution_clock::now() - then).count() * 1.0e-9;
         }
         {
             auto then(std::chrono::high_resolution_clock::now());
-            std::ostringstream os;
             for (int j = 0; j < k_reps; ++j) {
-                do2(os, vals[j]);
+                v = fastestPow(vals[j], int(exponents[j]));
             }
-            volatile std::string s(os.str());
             t2 += (std::chrono::high_resolution_clock::now() - then).count() * 1.0e-9;
         }
     }
+    std::cout << v << std::endl;
     std::cout << t1 << " " << t2 << std::endl;
     std::cin.get();
 

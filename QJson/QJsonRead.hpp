@@ -16,13 +16,13 @@ namespace qjson {
 
     struct Value {
 
-        virtual      const Object & asObject() const;
-        virtual       const Array &  asArray() const;
-        virtual const std::string & asString() const;
-        virtual             int64_t    asInt() const;
-        virtual            uint64_t   asUInt() const;
-        virtual              double  asFloat() const;
-        virtual                bool   asBool() const;
+        virtual      const Object * asObject() const { return nullptr; }
+        virtual       const Array *  asArray() const { return nullptr; }
+        virtual const std::string * asString() const { return nullptr; }
+        virtual     const int64_t *    asInt() const { return nullptr; }
+        virtual    const uint64_t *   asUInt() const { return nullptr; }
+        virtual      const double *  asFloat() const { return nullptr; }
+        virtual        const bool *   asBool() const { return nullptr; }
 
     };
 
@@ -33,40 +33,50 @@ namespace qjson {
     namespace detail {
 
         struct ObjectWrapper : public Value, public Object {
-            virtual const Object & asObject() const override { return *this; }
+            virtual const Object * asObject() const override { return this; }
         };
 
         struct ArrayWrapper : public Value, public Array {
-            virtual const Array & asArray() const override { return *this; }
+            virtual const Array * asArray() const override { return this; }
         };
 
         struct StringWrapper : public Value, public std::string {
             StringWrapper(std::string && str) : std::string(move(str)) {}
-            virtual const std::string & asString() const override { return *this; }
+            virtual const std::string * asString() const override { return this; }
         };
 
         struct IntWrapper : public Value {
             int64_t val;
             IntWrapper(int64_t val) : val(val) {}
-            virtual int64_t asInt() const override { return val; }
+            virtual const int64_t * asInt() const override { return &val; }
+            virtual const uint64_t * asUInt() const override { return val >= 0 ? reinterpret_cast<const uint64_t *>(&val) : nullptr; }
         };
 
         struct UIntWrapper : public Value {
             uint64_t val;
             UIntWrapper(uint64_t val) : val(val) {}
-            virtual uint64_t asUInt() const override { return val; }
+            virtual const uint64_t * asUInt() const override { return &val; }
+            virtual const int64_t * asInt() const override { return val <= uint64_t(std::numeric_limits<int64_t>::max()) ? reinterpret_cast<const int64_t *>(&val) : nullptr; }
+        };
+
+        struct HexWrapper : public Value {
+            uint64_t val;
+            HexWrapper(uint64_t val) : val(val) {}
+            virtual const uint64_t * asUInt() const override { return &val; }
+            virtual const int64_t * asInt() const override { return reinterpret_cast<const int64_t *>(&val); }
+            virtual const double * asFloat() const override { return reinterpret_cast<const double *>(&val); }
         };
 
         struct FloatWrapper : public Value {
             double val;
             FloatWrapper(double val) : val(val) {}
-            virtual double asFloat() const override { return val; }
+            virtual const double * asFloat() const override { return &val; }
         };
 
         struct BoolWrapper : public Value {
             bool val;
             BoolWrapper(bool val) : val(val) {}
-            virtual bool asBool() const override { return val; }
+            virtual const bool * asBool() const override { return &val; }
         };
 
         static constexpr unsigned char hexTable[256]{
@@ -88,12 +98,12 @@ namespace qjson {
             -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1
         };
 
-        static signed char unicodeCodeToAscii(char d0, char d1, char d2, char d3) {
-            unsigned char v0(hexTable[d0]), v1(hexTable[d1]), v2(hexTable[d2]), v3(hexTable[d3]);
-
-            if ((v0 | v1 | v2 | v3) & 0xF0) {
+        static signed char unicodeCodeToAscii(char c0, char c1, char c2, char c3) {
+            if ((c0 | c1 | c2 | c3) & 0xF0) {
                 throw json_exception();
             }
+
+            unsigned char v0(hexTable[c0]), v1(hexTable[c1]), v2(hexTable[c2]), v3(hexTable[c3]);
 
             if ((v0 | v1) || (v2 & 0x8)) {
                 throw json_exception();
@@ -102,28 +112,25 @@ namespace qjson {
             return (v2 << 4) | v3;
         }
 
-        static double fastPow(double val, int exponent) {
-            if (exponent < 0) {
-                val = 1.0 / val;
-                exponent = -exponent - 1;
+        static double fastPow(double v, unsigned int e) {
+            double r(1.0);
+
+            do {
+                if (e & 1) r *= v; // exponent is odd
+                e >>= 1;
+                v *= v;
+            } while (e);
+
+            return r;
+        }
+
+        static double fastPow(double v, int e) {
+            if (e >= 0) {
+                return pow(v, unsigned int(e));
             }
-
-            double result(1.0), currVal(val);
-            int currValExp(1), remainingExp(exponent - 1);
-
-            while (remainingExp > 0) {
-                while (currValExp <= remainingExp) {
-                    currVal *= currVal;
-                    remainingExp -= currValExp;
-                    currValExp *= 2;
-                }
-                result *= currVal;
-                currVal = val;
-                currValExp = 1;
-                --remainingExp;
-            };
-
-            return result;
+            else {
+                return pow(1.0 / v, unsigned int(-e));
+            }
         }
 
         static void skipWhitespace(const char *& pos, const char * end) {
@@ -376,11 +383,13 @@ namespace qjson {
                 throw json_exception();
             }
 
+            // Hexadecimal
             if (end - pos >= 3 && pos[0] == '0' && pos[1] == 'x') {
                 pos += 2;
                 return std::unique_ptr<UIntWrapper>(new UIntWrapper(readHex(pos, end)));
             }
 
+            // Parse sign
             bool negative(false);
             if (*pos == '-') {
                 negative = true;
@@ -390,13 +399,12 @@ namespace qjson {
                 }
             }
 
+            // Parse whole part
             uint64_t integer(readUInt(pos, end));
+
+            // Parse fractional part
             uint64_t fraction(0);
             int fractionDigits(0);
-            uint64_t exponent(0);
-            bool exponentNegative(false);
-            int exponentDigits(0);
-
             if (pos < end && *pos == '.') {
                 ++pos;
                 if (pos >= end) {
@@ -408,7 +416,13 @@ namespace qjson {
                 fractionDigits = pos - start;
             }
 
+            // Parse exponent part
+            bool hasExponent(false);
+            int exponent(0);
+            bool exponentNegative(false);
             if (pos < end && (*pos == 'e' || *pos == 'E')) {
+                hasExponent = true;
+
                 ++pos;
                 if (pos >= end) {
                     throw json_exception();
@@ -429,33 +443,41 @@ namespace qjson {
                 }
 
                 const char * start(pos);
-                exponent = readUInt(pos, end);
-                exponentDigits = pos - start;
+                uint64_t exponent64(readUInt(pos, end));
+                if (exponent64 > std::numeric_limits<int>::max()) {
+                    throw json_exception();
+                }
+                exponent = int(exponent64);
             }
 
-            if (fractionDigits || exponentDigits) {
-                double val((double(integer) + double(fraction) * fastPow(10.0, -fractionDigits)) * fastPow(10.0, exponent));
+            // Assemble floating
+            if (fractionDigits || hasExponent) {
+                double val(double(integer) + double(fraction) * fastPow(10.0, -fractionDigits));
+                if (hasExponent) val *= fastPow(10.0, exponent); // TODO add faster pow for always 10
                 return std::unique_ptr<FloatWrapper>(new FloatWrapper(negative ? -val : val));
             }
+            // Assemble integral
             else {
                 if (negative && integer > uint64_t(std::numeric_limits<int64_t>::max())) {
                     throw json_exception();
                 }
-                return std::unique_ptr<IntWrapper>(new IntWrapper(negative ? -integer : integer));
+                // Unsigned
+                if (integer > uint64_t(std::numeric_limits<int64_t>::max())) {
+                    if (negative) {
+                        throw json_exception();
+                    }
+                    return std::unique_ptr<UIntWrapper>(new UIntWrapper(integer));
+                }
+                // Signed
+                else {
+                    return std::unique_ptr<IntWrapper>(new IntWrapper(negative ? -int64_t(integer) : int64_t(integer)));
+                }
             }
         }
 
     }
 
     using namespace detail;
-
-    inline      const Object & Value::asObject() const { throw json_exception(); }
-    inline       const Array & Value:: asArray() const { throw json_exception(); }
-    inline const std::string & Value::asString() const { throw json_exception(); }
-    inline             int64_t Value::   asInt() const { throw json_exception(); }
-    inline            uint64_t Value::  asUInt() const { throw json_exception(); }
-    inline              double Value:: asFloat() const { throw json_exception(); }
-    inline                bool Value::  asBool() const { throw json_exception(); }
 
     inline std::unique_ptr<Value> read(std::string_view str) {
         const char * pos(str.data()), * end(pos + str.length());
