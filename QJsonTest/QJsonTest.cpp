@@ -326,4 +326,96 @@ TEST_CLASS(TestWrite) {
         }
     }
 
+    TEST_METHOD(TestPutHexInt64) {
+        { // Zero
+            Writer writer(true);
+            writer.putHex("v", int64_t(0));
+            Assert::AreEqual(R"({ "v": 0x0000000000000000 })"s, writer.finish());
+        }
+        { // Max
+            Writer writer(true);
+            writer.putHex("v", std::numeric_limits<int64_t>::max());
+            Assert::AreEqual(R"({ "v": 0x7FFFFFFFFFFFFFFF })"s, writer.finish());
+        }
+        { // Min
+            Writer writer(true);
+            writer.putHex("v", std::numeric_limits<int64_t>::min());
+            Assert::AreEqual(R"({ "v": 0x8000000000000000 })"s, writer.finish());
+        }
+    }
+
+    TEST_METHOD(TestPutHexInt32) {
+        { // Zero
+            Writer writer(true);
+            writer.putHex("v", int32_t(0));
+            Assert::AreEqual(R"({ "v": 0x00000000 })"s, writer.finish());
+        }
+        { // Max
+            Writer writer(true);
+            writer.putHex("v", std::numeric_limits<int32_t>::max());
+            Assert::AreEqual(R"({ "v": 0x7FFFFFFF })"s, writer.finish());
+        }
+        { // Min
+            Writer writer(true);
+            writer.putHex("v", std::numeric_limits<int32_t>::min());
+            Assert::AreEqual(R"({ "v": 0x80000000 })"s, writer.finish());
+        }
+    }
+
+    TEST_METHOD(TestPutHexInt16) {
+        { // Zero
+            Writer writer(true);
+            writer.putHex("v", int16_t(0));
+            Assert::AreEqual(R"({ "v": 0x0000 })"s, writer.finish());
+        }
+        { // Max
+            Writer writer(true);
+            writer.putHex("v", std::numeric_limits<int16_t>::max());
+            Assert::AreEqual(R"({ "v": 0x7FFF })"s, writer.finish());
+        }
+        { // Min
+            Writer writer(true);
+            writer.putHex("v", std::numeric_limits<int16_t>::min());
+            Assert::AreEqual(R"({ "v": 0x8000 })"s, writer.finish());
+        }
+    }
+
+    TEST_METHOD(TestPutHexInt8) {
+        { // Zero
+            Writer writer(true);
+            writer.putHex("v", int8_t(0));
+            Assert::AreEqual(R"({ "v": 0x00 })"s, writer.finish());
+        }
+        { // Max
+            Writer writer(true);
+            writer.putHex("v", std::numeric_limits<int8_t>::max());
+            Assert::AreEqual(R"({ "v": 0x7F })"s, writer.finish());
+        }
+        { // Min
+            Writer writer(true);
+            writer.putHex("v", std::numeric_limits<int8_t>::min());
+            Assert::AreEqual(R"({ "v": 0x80 })"s, writer.finish());
+        }
+    }
+
+    TEST_METHOD(TestPutHexChar) {
+        Writer writer(true);
+        writer.putHex("v", 'A');
+        Assert::AreEqual(R"({ "v": 0x41 })"s, writer.finish());
+    }
+
+    TEST_METHOD(TestPutHexDouble) {
+        uint64_t val(0x1234567812345678ull);
+        Writer writer(true);
+        writer.putHex("v", reinterpret_cast<const double &>(val));
+        Assert::AreEqual(R"({ "v": 0x1234567812345678 })"s, writer.finish());
+    }
+
+    TEST_METHOD(TestPutHexFloat) {
+        uint64_t val(0x12345678ull);
+        Writer writer(true);
+        writer.putHex("v", reinterpret_cast<const float &>(val));
+        Assert::AreEqual(R"({ "v": 0x12345678 })"s, writer.finish());
+    }
+
 };

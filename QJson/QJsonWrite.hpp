@@ -217,6 +217,16 @@ namespace qjson {
     template <> struct HexEncoder<uint16_t> { std::ostream & operator()(std::ostream & os, uint16_t val) const { return HexEncoder<uint64_t>()(os, val); } };
     template <> struct HexEncoder< uint8_t> { std::ostream & operator()(std::ostream & os,  uint8_t val) const { return HexEncoder<uint64_t>()(os, val); } };
 
+    template <> struct HexEncoder<int64_t> { std::ostream & operator()(std::ostream & os, int64_t val) const { return HexEncoder<uint64_t>()(os, uint64_t(val)); } };
+    template <> struct HexEncoder<int32_t> { std::ostream & operator()(std::ostream & os, int32_t val) const { return HexEncoder<uint32_t>()(os, uint32_t(val)); } };
+    template <> struct HexEncoder<int16_t> { std::ostream & operator()(std::ostream & os, int16_t val) const { return HexEncoder<uint16_t>()(os, uint16_t(val)); } };
+    template <> struct HexEncoder< int8_t> { std::ostream & operator()(std::ostream & os,  int8_t val) const { return HexEncoder< uint8_t>()(os,  uint8_t(val)); } };
+
+    template <> struct HexEncoder<char> { std::ostream & operator()(std::ostream & os, char val) const { return HexEncoder<uint8_t>()(os, uint8_t(val)); } };
+
+    template <> struct HexEncoder<double> { std::ostream & operator()(std::ostream & os, double val) const { return HexEncoder<uint64_t>()(os, reinterpret_cast<const uint64_t &>(val)); } };
+    template <> struct HexEncoder< float> { std::ostream & operator()(std::ostream & os,  float val) const { return HexEncoder<uint32_t>()(os, reinterpret_cast<const uint32_t &>(val)); } };
+
     inline Writer::Writer(bool compact, int indentSize) :
         m_ss(),
         m_state(),
