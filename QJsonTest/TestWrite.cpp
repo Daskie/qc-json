@@ -8,6 +8,7 @@ using namespace std::string_literals;
 using namespace std::string_view_literals;
 
 using qjson::Writer;
+using qjson::json_exception;
 
 TEST_CLASS(TestWrite) {
 
@@ -72,7 +73,7 @@ TEST_CLASS(TestWrite) {
     TEST_METHOD(TestPutStringNonAsciiUnicode) {
         Writer writer(true);
         char str[]{char(128)};
-        Assert::ExpectException<qjson::json_exception>([&]() { writer.put("v", std::string_view(str, sizeof(str))); });
+        Assert::ExpectException<json_exception>([&]() { writer.put("v", std::string_view(str, sizeof(str))); });
     }
 
     TEST_METHOD(TestPutInt64) {
@@ -219,11 +220,11 @@ TEST_CLASS(TestWrite) {
         }
         { // Infinity
             Writer writer(true);
-            Assert::ExpectException<qjson::json_exception>([&]() { writer.put("v", std::numeric_limits<double>::infinity()); });
+            Assert::ExpectException<json_exception>([&]() { writer.put("v", std::numeric_limits<double>::infinity()); });
         }
         { // NaN
             Writer writer(true);
-            Assert::ExpectException<qjson::json_exception>([&]() { writer.put("v", std::numeric_limits<double>::quiet_NaN()); });
+            Assert::ExpectException<json_exception>([&]() { writer.put("v", std::numeric_limits<double>::quiet_NaN()); });
         }
     }
 
@@ -247,11 +248,11 @@ TEST_CLASS(TestWrite) {
         }
         { // Infinity
             Writer writer(true);
-            Assert::ExpectException<qjson::json_exception>([&]() { writer.put("v", std::numeric_limits<float>::infinity()); });
+            Assert::ExpectException<json_exception>([&]() { writer.put("v", std::numeric_limits<float>::infinity()); });
         }
         { // NaN
             Writer writer(true);
-            Assert::ExpectException<qjson::json_exception>([&]() { writer.put("v", std::numeric_limits<float>::quiet_NaN()); });
+            Assert::ExpectException<json_exception>([&]() { writer.put("v", std::numeric_limits<float>::quiet_NaN()); });
         }
     }
 
@@ -416,6 +417,228 @@ TEST_CLASS(TestWrite) {
         Writer writer(true);
         writer.putHex("v", reinterpret_cast<const float &>(val));
         Assert::AreEqual(R"({ "v": 0x12345678 })"s, writer.finish());
+    }
+
+    TEST_METHOD(TestObject) {
+        { // Empty
+            Writer writer(true);
+            writer.startObject("obj");
+            writer.endObject();
+            Assert::AreEqual(R"({ "obj": {} })"s, writer.finish());
+        }
+        { // Compact
+            Writer writer(false);
+            writer.startObject("obj", true);
+            writer.put("k1", "abc");
+            writer.put("k2", 123);
+            writer.put("k3", true);
+            writer.endObject();
+            Assert::AreEqual(
+R"({
+    "obj": { "k1": "abc", "k2": 123, "k3": true }
+})"s,
+                writer.finish());
+        }
+        { // Not compact
+            Writer writer(false);
+            writer.startObject("obj");
+            writer.put("k1", "abc");
+            writer.put("k2", 123);
+            writer.put("k3", true);
+            writer.endObject();
+            Assert::AreEqual(
+R"({
+    "obj": {
+        "k1": "abc",
+        "k2": 123,
+        "k3": true
+    }
+})"s,
+            writer.finish());
+        }
+    }
+
+    TEST_METHOD(TestArray) {
+        { // Empty
+            Writer writer(true);
+            writer.startArray("arr");
+            writer.endArray();
+            Assert::AreEqual(R"({ "arr": [] })"s, writer.finish());
+        }
+        { // Compact
+            Writer writer(false);
+            writer.startArray("arr", true);
+            writer.put("abc");
+            writer.put(123);
+            writer.put(true);
+            writer.endArray();
+            Assert::AreEqual(
+R"({
+    "arr": [ "abc", 123, true ]
+})"s,
+                writer.finish());
+        }
+        { // Not compact
+            Writer writer(false);
+            writer.startArray("arr");
+            writer.put("abc");
+            writer.put(123);
+            writer.put(true);
+            writer.endArray();
+            Assert::AreEqual(
+R"({
+    "arr": [
+        "abc",
+        123,
+        true
+    ]
+})"s,
+                writer.finish());
+        }
+    }
+
+    TEST_METHOD(TestNested) {
+        { // Compact
+            Writer writer(true);
+            writer.startObject("o");
+            writer.startObject("oo");
+            writer.endObject();
+            writer.startArray("oa");
+            writer.endArray();
+            writer.endObject();
+            writer.startArray("a");
+            writer.startObject(); // ao
+            writer.endObject();
+            writer.startArray(); // aa
+            writer.endArray();
+            writer.endArray();
+            Assert::AreEqual(R"({ "o": { "oo": {}, "oa": [] }, "a": [ {}, [] ] })"s, writer.finish());
+        }
+        { // Not compact
+            Writer writer(false);
+            writer.startObject("o");
+            writer.startObject("oo");
+            writer.endObject();
+            writer.startArray("oa");
+            writer.endArray();
+            writer.endObject();
+            writer.startArray("a");
+            writer.startObject(); // ao
+            writer.endObject();
+            writer.startArray(); // aa
+            writer.endArray();
+            writer.endArray();
+            Assert::AreEqual(
+R"({
+    "o": {
+        "oo": {},
+        "oa": []
+    },
+    "a": [
+        {},
+        []
+    ]
+})"s,
+            writer.finish());
+        }
+    }
+
+    TEST_METHOD(TestEarlyFinish) {
+        Writer writer(true);
+        writer.startArray("a");
+        writer.startObject();
+        writer.startArray("a");
+        Assert::AreEqual(R"({ "a": [ { "a": [] } ] })"s, writer.finish());
+    }
+
+    TEST_METHOD(TestFinishReset) {
+        Writer writer(true);
+        writer.put("val", 123);
+        Assert::AreEqual(R"({ "val": 123 })"s, writer.finish());
+        writer.put("lav", 321);
+        Assert::AreEqual(R"({ "lav": 321 })"s, writer.finish());
+    }
+
+    TEST_METHOD(TestIndentSize) {
+        { // 0 spaces
+            Writer writer(false, 0);
+            writer.startArray("a");
+            writer.put(123);
+            Assert::AreEqual(
+R"({
+"a": [
+123
+]
+})"s, 
+            writer.finish());
+        }
+        { // 3 spaces
+            Writer writer(false, 3);
+            writer.startArray("a");
+            writer.put(123);
+            Assert::AreEqual(
+R"({
+   "a": [
+      123
+   ]
+})"s,
+                writer.finish());
+        }
+        { // 8 spaces
+            Writer writer(false, 8);
+            writer.startArray("a");
+            writer.put(123);
+            Assert::AreEqual(
+R"({
+        "a": [
+                123
+        ]
+})"s,
+                writer.finish());
+        }
+    }
+
+    TEST_METHOD(TestExceptionsIndentSize) {
+        { // Indent size too small
+            Assert::ExpectException<json_exception>([]() { Writer(true, -1); });
+        }
+        { // Indent size too large
+            Assert::ExpectException<json_exception>([]() { Writer(true, 9); });
+        }
+    }
+
+    TEST_METHOD(TestExceptionsContainerMismatch) {
+        { // Ending array in object
+            Writer writer(true);
+            writer.startObject("o");
+            Assert::ExpectException<json_exception>([&]() { writer.endArray(); });
+        }
+        { // Ending object in array
+            Writer writer(true);
+            writer.startArray("a");
+            Assert::ExpectException<json_exception>([&]() { writer.endObject(); });
+        }
+        { // Ending at root
+            Writer writer(true);
+            Assert::ExpectException<json_exception>([&]() { writer.endObject(); });
+        }
+    }
+
+    TEST_METHOD(TestExceptionsInvalidKeying) {
+        { // Puting without key in object
+            Writer writer(true);
+            writer.startObject("o");
+            Assert::ExpectException<json_exception>([&]() { writer.put(123); });
+        }
+        { // Puting with key in array
+            Writer writer(true);
+            writer.startArray("a");
+            Assert::ExpectException<json_exception>([&]() { writer.put("k", 123); });
+        }
+        { // Empty key
+            Writer writer(true);
+            Assert::ExpectException<json_exception>([&]() { writer.put("", 123); });
+        }
     }
 
 };

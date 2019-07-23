@@ -31,11 +31,15 @@ namespace qjson {
         Writer & operator=(const Writer & other) = delete;
         Writer & operator=(Writer && other) = delete;
 
-        void startObject(std::string_view key, bool compact);
-        void startObject(bool compact);
+        void startObject(std::string_view key, bool compact = false);
+        void startObject(    const char * key, bool compact = false) { startObject(std::string_view(key), compact); }
+        void startObject(          char * key, bool compact = false) { startObject(std::string_view(key), compact); }
+        void startObject(bool compact = false);
 
-        void startArray(std::string_view key, bool compact);
-        void startArray(bool compact);
+        void startArray(std::string_view key, bool compact = false);
+        void startArray(    const char * key, bool compact = false) { startArray(std::string_view(key), compact); }
+        void startArray(          char * key, bool compact = false) { startArray(std::string_view(key), compact); }
+        void startArray(bool compact = false);
 
         template <typename T, typename E = Encoder<std::decay_t<T>>> void put(std::string_view key, const T & val);
         template <typename T, typename E = Encoder<std::decay_t<T>>> void put(const T & val);
@@ -296,7 +300,7 @@ namespace qjson {
     }
 
     inline void Writer::endObject() {
-        if (m_state.empty() || m_state.back().array) {
+        if (m_state.size() <= 1 || m_state.back().array) {
             throw json_exception("No object to end");
         }
 
@@ -304,7 +308,7 @@ namespace qjson {
     }
 
     inline void Writer::endArray() {
-        if (m_state.empty() || !m_state.back().array) {
+        if (m_state.size() <= 1 || !m_state.back().array) {
             throw json_exception("No array to end");
         }
 
@@ -312,10 +316,20 @@ namespace qjson {
     }
 
     inline std::string Writer::finish() {
+        bool compact(m_state.front().compact);
+
         while (!m_state.empty()) {
             m_end();
         }
-        return m_ss.str();
+        std::string str(m_ss.str());
+
+        // Reset state
+        m_ss.str("");
+        m_ss.clear();
+        m_ss << '{';
+        m_state.push_back(State{false, compact, false});
+
+        return std::move(str);
     }
 
     inline void Writer::m_start(bool compact, char bracket) {
