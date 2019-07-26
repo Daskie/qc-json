@@ -8,7 +8,7 @@ using namespace std::string_literals;
 using namespace std::string_view_literals;
 
 using qjson::Writer;
-using qjson::json_exception;
+using qjson::JsonWriteError;
 
 TEST_CLASS(TestWrite) {
 
@@ -67,7 +67,7 @@ TEST_CLASS(TestWrite) {
     TEST_METHOD(TestPutStringNonAsciiUnicode) {
         Writer writer(true);
         char str[]{char(128)};
-        Assert::ExpectException<json_exception>([&]() { writer.put("v", std::string_view(str, sizeof(str))); });
+        Assert::ExpectException<JsonWriteError>([&]() { writer.put("v", std::string_view(str, sizeof(str))); });
     }
 
     TEST_METHOD(TestPutChar) {
@@ -137,11 +137,11 @@ TEST_CLASS(TestWrite) {
         }
         { // Infinity
             Writer writer(true);
-            Assert::ExpectException<json_exception>([&]() { writer.put("v", std::numeric_limits<double>::infinity()); });
+            Assert::ExpectException<JsonWriteError>([&]() { writer.put("v", std::numeric_limits<double>::infinity()); });
         }
         { // NaN
             Writer writer(true);
-            Assert::ExpectException<json_exception>([&]() { writer.put("v", std::numeric_limits<double>::quiet_NaN()); });
+            Assert::ExpectException<JsonWriteError>([&]() { writer.put("v", std::numeric_limits<double>::quiet_NaN()); });
         }
     }
 
@@ -165,11 +165,11 @@ TEST_CLASS(TestWrite) {
         }
         { // Infinity
             Writer writer(true);
-            Assert::ExpectException<json_exception>([&]() { writer.put("v", std::numeric_limits<float>::infinity()); });
+            Assert::ExpectException<JsonWriteError>([&]() { writer.put("v", std::numeric_limits<float>::infinity()); });
         }
         { // NaN
             Writer writer(true);
-            Assert::ExpectException<json_exception>([&]() { writer.put("v", std::numeric_limits<float>::quiet_NaN()); });
+            Assert::ExpectException<JsonWriteError>([&]() { writer.put("v", std::numeric_limits<float>::quiet_NaN()); });
         }
     }
 
@@ -373,10 +373,10 @@ R"({
 
     TEST_METHOD(TestExceptionsIndentSize) {
         { // Indent size too small
-            Assert::ExpectException<json_exception>([]() { Writer(true, -1); });
+            Assert::ExpectException<JsonWriteError>([]() { Writer(true, -1); });
         }
         { // Indent size too large
-            Assert::ExpectException<json_exception>([]() { Writer(true, 9); });
+            Assert::ExpectException<JsonWriteError>([]() { Writer(true, 9); });
         }
     }
 
@@ -384,16 +384,16 @@ R"({
         { // Ending array in object
             Writer writer(true);
             writer.startObject("o");
-            Assert::ExpectException<json_exception>([&]() { writer.endArray(); });
+            Assert::ExpectException<JsonWriteError>([&]() { writer.endArray(); });
         }
         { // Ending object in array
             Writer writer(true);
             writer.startArray("a");
-            Assert::ExpectException<json_exception>([&]() { writer.endObject(); });
+            Assert::ExpectException<JsonWriteError>([&]() { writer.endObject(); });
         }
         { // Ending at root
             Writer writer(true);
-            Assert::ExpectException<json_exception>([&]() { writer.endObject(); });
+            Assert::ExpectException<JsonWriteError>([&]() { writer.endObject(); });
         }
     }
 
@@ -401,16 +401,16 @@ R"({
         { // Puting without key in object
             Writer writer(true);
             writer.startObject("o");
-            Assert::ExpectException<json_exception>([&]() { writer.put(123); });
+            Assert::ExpectException<JsonWriteError>([&]() { writer.put(123); });
         }
         { // Puting with key in array
             Writer writer(true);
             writer.startArray("a");
-            Assert::ExpectException<json_exception>([&]() { writer.put("k", 123); });
+            Assert::ExpectException<JsonWriteError>([&]() { writer.put("k", 123); });
         }
         { // Empty key
             Writer writer(true);
-            Assert::ExpectException<json_exception>([&]() { writer.put("", 123); });
+            Assert::ExpectException<JsonWriteError>([&]() { writer.put("", 123); });
         }
     }
 

@@ -4,10 +4,17 @@
 #include <unordered_map>
 #include <vector>
 #include <memory>
+#include <stdexcept>
 
 namespace qjson {
 
-    struct json_exception : public std::exception {};
+    using namespace std::string_literals;
+    using namespace std::string_view_literals;
+
+    struct JsonReadError : public std::runtime_error {
+        size_t position;
+        JsonReadError(const std::string & msg, size_t position) : std::runtime_error(msg), position(position) {}
+    };
 
     struct Value;
 
@@ -24,9 +31,51 @@ namespace qjson {
         virtual      const double *  asFloat() const { return nullptr; }
         virtual        const bool *   asBool() const { return nullptr; }
 
-    };
+    };    
 
-    std::unique_ptr<Value> read(std::string_view str);
+    class Reader {
+
+      public:
+
+        std::unique_ptr<Value> operator()(std::string_view str);
+
+      private:
+
+        const char * m_start, * m_end, *m_pos;
+
+        bool m_isMore() const;
+
+        int64_t m_remaining() const;
+
+        size_t m_position() const;
+
+        void m_skipWhitespace();
+
+        void m_readChar(char c);
+
+        bool m_checkChar(char c);
+
+        bool m_checkString(std::string_view str);
+
+        std::unique_ptr<Value> m_readValue();
+
+        std::unique_ptr<ObjectWrapper> m_readObject();
+
+        std::unique_ptr<ArrayWrapper> m_readArray();
+
+        void m_readEscaped(std::string & str);
+
+        char m_readUnicode();
+
+        std::string m_readString();
+
+        uint64_t m_readHex();
+
+        uint64_t m_readUInt();
+
+        std::unique_ptr<Value> m_readNumber();
+
+    };
 
     // IMPLEMENTATION //////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -49,22 +98,12 @@ namespace qjson {
             int64_t val;
             IntWrapper(int64_t val) : val(val) {}
             virtual const int64_t * asInt() const override { return &val; }
-            virtual const uint64_t * asUInt() const override { return val >= 0 ? reinterpret_cast<const uint64_t *>(&val) : nullptr; }
         };
 
         struct UIntWrapper : public Value {
             uint64_t val;
             UIntWrapper(uint64_t val) : val(val) {}
             virtual const uint64_t * asUInt() const override { return &val; }
-            virtual const int64_t * asInt() const override { return val <= uint64_t(std::numeric_limits<int64_t>::max()) ? reinterpret_cast<const int64_t *>(&val) : nullptr; }
-        };
-
-        struct HexWrapper : public Value {
-            uint64_t val;
-            HexWrapper(uint64_t val) : val(val) {}
-            virtual const uint64_t * asUInt() const override { return &val; }
-            virtual const int64_t * asInt() const override { return reinterpret_cast<const int64_t *>(&val); }
-            virtual const double * asFloat() const override { return reinterpret_cast<const double *>(&val); }
         };
 
         struct FloatWrapper : public Value {
@@ -79,7 +118,7 @@ namespace qjson {
             virtual const bool * asBool() const override { return &val; }
         };
 
-        static constexpr unsigned char hexTable[256]{
+        constexpr unsigned char k_hexTable[256]{
             -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
             -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
             -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
@@ -98,21 +137,7 @@ namespace qjson {
             -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1
         };
 
-        static signed char unicodeCodeToAscii(char c0, char c1, char c2, char c3) {
-            if ((c0 | c1 | c2 | c3) & 0xF0) {
-                throw json_exception();
-            }
-
-            unsigned char v0(hexTable[c0]), v1(hexTable[c1]), v2(hexTable[c2]), v3(hexTable[c3]);
-
-            if ((v0 | v1) || (v2 & 0x8)) {
-                throw json_exception();
-            }
-
-            return (v2 << 4) | v3;
-        }
-
-        static double fastPow(double v, unsigned int e) {
+        inline double fastPow(double v, unsigned int e) {
             double r(1.0);
 
             do {
@@ -124,7 +149,7 @@ namespace qjson {
             return r;
         }
 
-        static double fastPow(double v, int e) {
+        inline double fastPow(double v, int e) {
             if (e >= 0) {
                 return pow(v, unsigned int(e));
             }
@@ -133,366 +158,388 @@ namespace qjson {
             }
         }
 
-        static void skipWhitespace(const char *& pos, const char * end) {
-            while (pos < end && std::isspace(*pos)) ++pos;
-        }
-
-        static void readChar(char c, const char *& pos, const char * end) {
-            if (!checkChar(c, pos, end)) {
-                throw json_exception();
-            }
-        }
-
-        static bool checkChar(char c, const char *& pos, const char * end) {
-            if (pos < end && *pos == c) {
-                ++pos;
-                return true;
-            }
-            else {
-                return false;
-            }
-        }
-
-        std::unique_ptr<Value> readValue(const char *& pos, const char * end) {
-            if (pos >= end) {
-                throw json_exception();
-            }
-
-            char c(*pos);
-            size_t length(end - pos);
-            if (c == '"') {
-                ++pos;
-                return std::unique_ptr<StringWrapper>(new StringWrapper(readString(pos, end)));
-            }
-            else if (std::isdigit(c)) {
-                return readNumber(pos, end);
-            }
-            else if (c == '{') {
-                ++pos;
-                return readObject(pos, end);
-            }
-            else if (c == '[') {
-                ++pos;
-                return readArray(pos, end);
-            }
-            else if (length >= 5 && pos[0] == 'f' && pos[1] == 'a' && pos[2] == 'l' && pos[3] == 's' && pos[4] == 'e') {
-                pos += 5;
-                return std::unique_ptr<BoolWrapper>(new BoolWrapper(false));
-            }
-            else if (length >= 4 && pos[0] == 't' && pos[1] == 'r' && pos[2] == 'u' && pos[3] == 'e') {
-                pos += 4;
-                return std::unique_ptr<BoolWrapper>(new BoolWrapper(true));
-            }
-            else if (length >= 4 && pos[0] == 'n' && pos[1] == 'u' && pos[2] == 'l' && pos[3] == 'l') {
-                pos += 4;
-                return {};
-            }
-            else {
-                throw json_exception();
-            }
-        }
-
-        std::unique_ptr<ObjectWrapper> readObject(const char *& pos, const char * end) {
-            std::unique_ptr<ObjectWrapper> obj(new ObjectWrapper());
-
-            skipWhitespace(pos, end);
-            if (checkChar('}', pos, end)) {
-                return std::move(obj);
-            }
-
-            readChar('"', pos, end);
-            std::string key(readString(pos, end));
-            skipWhitespace(pos, end);
-            readChar(':', pos, end);
-            skipWhitespace(pos, end);
-            (*obj)[std::move(key)] = readValue(pos, end);
-            skipWhitespace(pos, end);
-
-            while (!checkChar('}', pos, end)) {
-                readChar(',', pos, end);
-                skipWhitespace(pos, end);
-                readChar('"', pos, end);
-                key = readString(pos, end);
-                skipWhitespace(pos, end);
-                readChar(':', pos, end);
-                skipWhitespace(pos, end);
-                (*obj)[std::move(key)] = readValue(pos, end);
-                skipWhitespace(pos, end);
-            }
-
-            return std::move(obj);
-        }
-
-        std::unique_ptr<ArrayWrapper> readArray(const char *& pos, const char * end) {
-            std::unique_ptr<ArrayWrapper> arr(new ArrayWrapper());
-
-            skipWhitespace(pos, end);
-            if (checkChar(']', pos, end)) {
-                return std::move(arr);
-            }
-
-            skipWhitespace(pos, end);
-            arr->push_back(readValue(pos, end));
-            skipWhitespace(pos, end);
-
-            while (!checkChar('}', pos, end)) {
-                readChar(',', pos, end);
-                skipWhitespace(pos, end);
-                arr->push_back(readValue(pos, end));
-                skipWhitespace(pos, end);
-            }
-
-            return std::move(arr);
-        }
-
-        static void readEscaped(const char *& pos, const char * end, std::string & str) {
-            if (pos >= end) {
-                throw json_exception();
-            }
-
-            char c(*pos);
-            switch (c) {
-                case '"':
-                case '\\':
-                case '/':
-                    str.push_back(c);
-                    ++pos;
-                    return;
-                case 'b':
-                    str.push_back('\b');
-                    ++pos;
-                    return;
-                case 'f':
-                    str.push_back('\f');
-                    ++pos;
-                    return;
-                case 'n':
-                    str.push_back('\n');
-                    ++pos;
-                    return;
-                case 'r':
-                    str.push_back('\r');
-                    ++pos;
-                    return;
-                case 't':
-                    str.push_back('\t');
-                    ++pos;
-                    return;
-                case 'u':
-                    ++pos;
-                    if (end - pos >= 4) {
-                        signed char code(unicodeCodeToAscii(pos[0], pos[1], pos[2], pos[4]));
-                        str.push_back(code);
-                        pos += 4;
-                        return;
-                    }
-                    else {
-                        throw json_exception();
-                    }
-                default:
-                    throw json_exception();
-            }
-        }
-
-        static std::string readString(const char *& pos, const char * end) {
-            const char * start(pos);
-            std::string str;
-
-            while (true) {
-                if (pos >= end) {
-                    throw json_exception();
-                }
-
-                char c(*pos);
-                if (c == '"') {
-                    ++pos;
-                    return std::move(str);
-                }
-                else if (c == '\\') {
-                    ++pos;
-                    readEscaped(pos, end, str);
-                }
-                else if (std::isprint(c)) {
-                    str.push_back(c);
-                    ++pos;
-                }
-                else {
-                    throw json_exception();
-                }
-            }
-        }
-
-        static uint64_t readHex(const char *& pos, const char * end) {
-            if (pos >= end) {
-                throw json_exception();
-            }
-
-            unsigned char hexVal(hexTable[*pos]);
-            if (hexVal >= 16) {
-                throw json_exception();
-            }
-
-            uint64_t val(hexVal);
-            ++pos;
-
-            for (int digits(1); digits < 16 && pos < end && (hexVal = hexTable[*pos]) < 16; ++digits, ++pos) {
-                val = (val << 4) | hexVal;
-            }
-
-            if (pos < end && std::isxdigit(*pos)) {
-                throw json_exception();
-            }
-
-            return val;
-        }
-
-        static uint64_t readUInt(const char *& pos, const char * end) {
-            if (pos >= end) {
-                throw json_exception();
-            }
-
-            if (!std::isdigit(*pos)) {
-                throw json_exception();
-            }
-
-            uint64_t val(*pos - '0');
-            ++pos;
-
-            for (int digits(1); digits < 19 && pos < end && std::isdigit(*pos); ++digits) {
-                val = val * 10 + (*pos - '0');
-            }
-
-            if (pos < end && std::isdigit(*pos)) {
-                uint64_t potential(val * 10 + (*pos - '0'));
-                if (potential < val) {
-                    throw json_exception();
-                }
-                val = potential;
-                ++pos;
-            }
-
-            if (pos < end && std::isdigit(*pos)) {
-                throw json_exception();
-            }
-
-            return val;
-        }
-
-        static std::unique_ptr<Value> readNumber(const char *& pos, const char * end) {
-            if (pos >= end) {
-                throw json_exception();
-            }
-
-            // Hexadecimal
-            if (end - pos >= 3 && pos[0] == '0' && pos[1] == 'x') {
-                pos += 2;
-                return std::unique_ptr<UIntWrapper>(new UIntWrapper(readHex(pos, end)));
-            }
-
-            // Parse sign
-            bool negative(false);
-            if (*pos == '-') {
-                negative = true;
-                ++pos;
-                if (pos >= end) {
-                    throw json_exception();
-                }
-            }
-
-            // Parse whole part
-            uint64_t integer(readUInt(pos, end));
-
-            // Parse fractional part
-            uint64_t fraction(0);
-            int fractionDigits(0);
-            if (pos < end && *pos == '.') {
-                ++pos;
-                if (pos >= end) {
-                    throw json_exception();
-                }
-
-                const char * start(pos);
-                fraction = readUInt(pos, end);
-                fractionDigits = pos - start;
-            }
-
-            // Parse exponent part
-            bool hasExponent(false);
-            int exponent(0);
-            bool exponentNegative(false);
-            if (pos < end && (*pos == 'e' || *pos == 'E')) {
-                hasExponent = true;
-
-                ++pos;
-                if (pos >= end) {
-                    throw json_exception();
-                }
-
-                if (*pos == '-') {
-                    exponentNegative = true;
-                    ++pos;
-                    if (pos >= end) {
-                        throw json_exception();
-                    }
-                }
-                else if (*pos == '+') {
-                    ++pos;
-                    if (pos >= end) {
-                        throw json_exception();
-                    }
-                }
-
-                const char * start(pos);
-                uint64_t exponent64(readUInt(pos, end));
-                if (exponent64 > std::numeric_limits<int>::max()) {
-                    throw json_exception();
-                }
-                exponent = int(exponent64);
-            }
-
-            // Assemble floating
-            if (fractionDigits || hasExponent) {
-                double val(double(integer) + double(fraction) * fastPow(10.0, -fractionDigits));
-                if (hasExponent) val *= fastPow(10.0, exponent); // TODO add faster pow for always 10
-                return std::unique_ptr<FloatWrapper>(new FloatWrapper(negative ? -val : val));
-            }
-            // Assemble integral
-            else {
-                if (negative && integer > uint64_t(std::numeric_limits<int64_t>::max())) {
-                    throw json_exception();
-                }
-                // Unsigned
-                if (integer > uint64_t(std::numeric_limits<int64_t>::max())) {
-                    if (negative) {
-                        throw json_exception();
-                    }
-                    return std::unique_ptr<UIntWrapper>(new UIntWrapper(integer));
-                }
-                // Signed
-                else {
-                    return std::unique_ptr<IntWrapper>(new IntWrapper(negative ? -int64_t(integer) : int64_t(integer)));
-                }
-            }
-        }
-
     }
 
     using namespace detail;
 
-    inline std::unique_ptr<Value> read(std::string_view str) {
-        const char * pos(str.data()), * end(pos + str.length());
+    inline std::unique_ptr<Value> Reader::operator()(std::string_view str) {
+        m_start = str.data();
+        m_end = m_start + str.length();
+        m_pos = m_start;
 
-        skipWhitespace(pos, end);
-        readChar('{', pos, end);
+        m_skipWhitespace();
+        m_readChar('{');
 
-        std::unique_ptr<Value> val(readObject(pos, end));
+        std::unique_ptr<Value> val(m_readObject());
 
-        skipWhitespace(pos, end);
-        if (pos != end) {
-            throw json_exception();
+        m_skipWhitespace();
+        if (m_pos != m_end) {
+            throw JsonReadError("Content in string after root object", m_position());
         }
 
         return move(val);
+    }
+
+    inline bool Reader::m_isMore() const {
+        return m_pos < m_end;
+    }
+
+    inline int64_t Reader::m_remaining() const {
+        return m_end - m_pos;
+    }
+
+    inline size_t Reader::m_position() const {
+        return m_pos - m_start;
+    }
+
+    inline void Reader::m_skipWhitespace() {
+        while (m_isMore() && std::isspace(*m_pos)) ++m_pos;
+    }
+
+    inline void Reader::m_readChar(char c) {
+        if (!m_checkChar(c)) {
+            throw JsonReadError("Expected character `"s + c + "`"s, m_position());
+        }
+    }
+
+    inline bool Reader::m_checkChar(char c) {
+        if (m_isMore() && *m_pos == c) {
+            ++m_pos;
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+
+    inline bool Reader::m_checkString(std::string_view str) {
+        if (m_remaining() >= str.length()) {
+            for (size_t i(0); i < str.length(); ++i) {
+                if (m_pos[i] != str[i]) {
+                    return false;
+                }
+            }
+            m_pos += str.length();
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+
+    inline std::unique_ptr<Value> Reader::m_readValue() {
+        if (!m_isMore()) {
+            throw JsonReadError("Expected value", m_position());
+        }
+
+        char c(*m_pos);
+        if (c == '"') {
+            ++m_pos;
+            return std::unique_ptr<StringWrapper>(new StringWrapper(m_readString()));
+        }
+        else if (std::isdigit(c)) {
+            return m_readNumber();
+        }
+        else if (c == '{') {
+            ++m_pos;
+            return m_readObject();
+        }
+        else if (c == '[') {
+            ++m_pos;
+            return m_readArray();
+        }
+        else if (m_checkString("true"sv)) {
+            return std::unique_ptr<BoolWrapper>(new BoolWrapper(true));
+        }
+        else if (m_checkString("false"sv)) {
+            return std::unique_ptr<BoolWrapper>(new BoolWrapper(false));
+        }
+        else if (m_checkString("null"sv)) {
+            return {};
+        }
+        else {
+            throw JsonReadError("Unknown value", m_position());
+        }
+    }
+
+    inline std::unique_ptr<ObjectWrapper> Reader::m_readObject() {
+        std::unique_ptr<ObjectWrapper> obj(new ObjectWrapper());
+
+        m_skipWhitespace();
+        if (m_checkChar('}')) {
+            return std::move(obj);
+        }
+
+        m_readChar('"');
+        std::string key(m_readString());
+        m_skipWhitespace();
+        m_readChar(':');
+        m_skipWhitespace();
+        (*obj)[std::move(key)] = m_readValue();
+        m_skipWhitespace();
+
+        while (!m_checkChar('}')) {
+            m_readChar(',');
+            m_skipWhitespace();
+            m_readChar('"');
+            key = m_readString();
+            m_skipWhitespace();
+            m_readChar(':');
+            m_skipWhitespace();
+            (*obj)[std::move(key)] = m_readValue();
+            m_skipWhitespace();
+        }
+
+        return std::move(obj);
+    }
+
+    inline std::unique_ptr<ArrayWrapper> Reader::m_readArray() {
+        std::unique_ptr<ArrayWrapper> arr(new ArrayWrapper());
+
+        m_skipWhitespace();
+        if (m_checkChar(']')) {
+            return std::move(arr);
+        }
+
+        m_skipWhitespace();
+        arr->push_back(m_readValue());
+        m_skipWhitespace();
+
+        while (!m_checkChar('}')) {
+            m_readChar(',');
+            m_skipWhitespace();
+            arr->push_back(m_readValue());
+            m_skipWhitespace();
+        }
+
+        return std::move(arr);
+    }
+
+    inline void Reader::m_readEscaped(std::string & str) {
+        if (!m_isMore()) {
+            throw JsonReadError("Expected escape sequence", m_position());
+        }
+
+        char c(*m_pos);
+        switch (c) {
+            case '"':
+            case '\\':
+            case '/':
+                str.push_back(c);
+                ++m_pos;
+                return;
+            case 'b':
+                str.push_back('\b');
+                ++m_pos;
+                return;
+            case 'f':
+                str.push_back('\f');
+                ++m_pos;
+                return;
+            case 'n':
+                str.push_back('\n');
+                ++m_pos;
+                return;
+            case 'r':
+                str.push_back('\r');
+                ++m_pos;
+                return;
+            case 't':
+                str.push_back('\t');
+                ++m_pos;
+                return;
+            case 'u':
+                ++m_pos;
+                str.push_back(m_readUnicode());
+                return;
+            default:
+                throw JsonReadError("Unknown escape sequence", m_position());
+        }
+    }
+
+    inline char Reader::m_readUnicode() {
+        if (m_remaining() < 4) {
+            throw JsonReadError("Expected unicode", m_position());
+        }
+
+        unsigned char v3(k_hexTable[m_pos[2]]), v4(k_hexTable[m_pos[3]]);
+        if (m_pos[0] != '0' || m_pos[1] != '0' || (v3 & 0xF8) || (v4 & 0xF0)) {
+            throw JsonReadError("Non-ASCII unicode is unsupported", m_position());
+        }
+
+        return (v3 << 4) | v4;
+    }
+
+    inline std::string Reader::m_readString() {
+        const char * start(m_pos);
+        std::string str;
+
+        while (true) {
+            if (!m_isMore()) {
+                throw JsonReadError("Expected more string content", m_position());
+            }
+
+            char c(*m_pos);
+            if (c == '"') {
+                ++m_pos;
+                return std::move(str);
+            }
+            else if (c == '\\') {
+                ++m_pos;
+                m_readEscaped(str);
+            }
+            else if (std::isprint(c)) {
+                str.push_back(c);
+                ++m_pos;
+            }
+            else {
+                throw JsonReadError("Unknown string content", m_position());
+            }
+        }
+    }
+
+    inline uint64_t Reader::m_readHex() {
+        if (!m_isMore()) {
+            throw JsonReadError("Expected hex sequence", m_position());
+        }
+
+        unsigned char hexVal(k_hexTable[*m_pos]);
+        if (hexVal & 0xF0) {
+            throw JsonReadError("Invalid hex digit", m_position());
+        }
+
+        uint64_t val(hexVal);
+        ++m_pos;
+
+        for (int digits(1); digits < 16 && m_isMore() && (hexVal = k_hexTable[*m_pos]) < 16; ++digits, ++m_pos) {
+            val = (val << 4) | hexVal;
+        }
+
+        if (m_isMore() && std::isxdigit(*m_pos)) {
+            throw JsonReadError("Hex value is too large", m_position());
+        }
+
+        return val;
+    }
+
+    inline uint64_t Reader::m_readUInt() {
+        if (!m_isMore()) {
+            throw JsonReadError("Expected integer sequence", m_position());
+        }
+
+        if (!std::isdigit(*m_pos)) {
+            throw JsonReadError("Invalid digit", m_position());
+        }
+
+        uint64_t val(*m_pos - '0');
+        ++m_pos;
+
+        for (int digits(1); digits < 18 && m_isMore() && std::isdigit(*m_pos); ++digits) {
+            val = val * 10 + (*m_pos - '0');
+        }
+
+        if (m_isMore() && std::isdigit(*m_pos)) {
+            uint64_t potential(val * 10 + (*m_pos - '0'));
+            if (potential < val) {
+                throw JsonReadError("Integer value is too large", m_position());
+            }
+            val = potential;
+            ++m_pos;
+        }
+
+        if (m_isMore() && std::isdigit(*m_pos)) {
+            throw JsonReadError("Integer value is too large", m_position());
+        }
+
+        return val;
+    }
+
+    inline std::unique_ptr<Value> Reader::m_readNumber() {
+        if (!m_isMore()) {
+            throw JsonReadError("Expected number", m_position());
+        }
+
+        // Hexadecimal
+        if (m_remaining() >= 3 && m_pos[0] == '0' && m_pos[1] == 'x') {
+            m_pos += 2;
+            return std::unique_ptr<UIntWrapper>(new UIntWrapper(m_readHex()));
+        }
+
+        // Parse sign
+        bool negative(false);
+        if (*m_pos == '-') {
+            negative = true;
+            ++m_pos;
+            if (!m_isMore()) {
+                throw JsonReadError("Expected number", m_position());
+            }
+        }
+
+        // Parse whole part
+        uint64_t integer(m_readUInt());
+
+        // Parse fractional part
+        uint64_t fraction(0);
+        int fractionDigits(0);
+        if (m_isMore() && *m_pos == '.') {
+            ++m_pos;
+            if (!m_isMore()) {
+                throw JsonReadError("Expected fractional component", m_position());
+            }
+
+            const char * start(m_pos);
+            fraction = m_readUInt();
+            fractionDigits = m_pos - start;
+        }
+
+        // Parse exponent part
+        bool hasExponent(false);
+        int exponent(0);
+        bool exponentNegative(false);
+        if (m_isMore() && (*m_pos == 'e' || *m_pos == 'E')) {
+            hasExponent = true;
+
+            ++m_pos;
+            if (!m_isMore()) {
+                throw JsonReadError("Expected exponent", m_position());
+            }
+
+            if (*m_pos == '-') {
+                exponentNegative = true;
+                ++m_pos;
+                if (!m_isMore()) {
+                    throw JsonReadError("Expected exponent", m_position());
+                }
+            }
+            else if (*m_pos == '+') {
+                ++m_pos;
+                if (!m_isMore()) {
+                    throw JsonReadError("Expected exponent", m_position());
+                }
+            }
+
+            uint64_t exponent64(m_readUInt());
+            if (exponent64 > 0x7FFFFFFF) {
+                throw JsonReadError("Exponent is too large", m_position());
+            }
+            exponent = int(exponent64);
+        }
+
+        // Assemble floating
+        if (fractionDigits || hasExponent) {
+            double val(double(integer) + double(fraction) * fastPow(10.0, -fractionDigits));
+            if (hasExponent) val *= fastPow(10.0, exponent);
+            return std::unique_ptr<FloatWrapper>(new FloatWrapper(negative ? -val : val));
+        }
+        // Assemble integral
+        else {
+            int64_t sval(int64_t{integer});
+            if (sval < 0 && sval != std::numeric_limits<int64_t>::min()) {
+                throw JsonReadError("Integer is too large", m_position());
+            }
+            return std::unique_ptr<IntWrapper>(new IntWrapper(negative ? -sval : sval));
+        }
+
     }
 
 }

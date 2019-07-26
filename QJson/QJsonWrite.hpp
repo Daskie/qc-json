@@ -10,13 +10,13 @@ namespace qjson {
 
     using namespace std::string_view_literals;
 
-    struct json_exception : public std::runtime_error{
-        json_exception(const char * msg) : std::runtime_error(msg) {}
+    struct JsonWriteError : public std::runtime_error{
+        JsonWriteError(const std::string & msg) : std::runtime_error(msg) {}
     };
 
     class Writer {
 
-        public:
+      public:
 
         Writer(bool compact = false, int indentSize = 4);
         Writer(const Writer & other) = delete;
@@ -70,11 +70,14 @@ namespace qjson {
 
         std::string finish();
 
-        private:
+      private:
 
         struct State { bool array, compact, content; };
 
-        static constexpr char k_hexChars[16]{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
+        std::ostringstream m_ss;
+        std::vector<State> m_state;
+        int m_indentation;
+        std::string_view m_indent;
 
         void m_start(bool compact, char bracket);
 
@@ -96,14 +99,17 @@ namespace qjson {
         void m_encode(bool val);
         void m_encode(nullptr_t);
 
-        std::ostringstream m_ss;
-        std::vector<State> m_state;
-        int m_indentation;
-        std::string_view m_indent;
-
     };
 
     // IMPLEMENTATION //////////////////////////////////////////////////////////////////////////////////////////////////
+
+    namespace detail {
+
+        static constexpr char k_hexChars[16]{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
+
+    }
+
+    using namespace detail;
 
     inline Writer::Writer(bool compact, int indentSize) :
         m_ss(),
@@ -112,7 +118,7 @@ namespace qjson {
         m_indent("        ", indentSize)
     {
         if (indentSize < 0 || indentSize > 8) {
-            throw json_exception("Invalid indent size - must be in range [0, 8]");
+            throw JsonWriteError("Invalid indent size - must be in range [0, 8]");
         }
 
         m_ss << std::setprecision(15);
@@ -312,7 +318,7 @@ namespace qjson {
 
     inline void Writer::endObject() {
         if (m_state.size() <= 1 || m_state.back().array) {
-            throw json_exception("No object to end");
+            throw JsonWriteError("No object to end");
         }
 
         m_end();
@@ -320,7 +326,7 @@ namespace qjson {
 
     inline void Writer::endArray() {
         if (m_state.size() <= 1 || !m_state.back().array) {
-            throw json_exception("No array to end");
+            throw JsonWriteError("No array to end");
         }
 
         m_end();
@@ -393,16 +399,16 @@ namespace qjson {
 
     inline void Writer::m_checkKey(std::string_view key) const {
         if (m_state.back().array) {
-            throw json_exception("Array elements must not have keys");
+            throw JsonWriteError("Array elements must not have keys");
         }
         if (key.empty()) {
-            throw json_exception("Key must not be empty");
+            throw JsonWriteError("Key must not be empty");
         }
     }
 
     inline void Writer::m_checkKey() const {
         if (!m_state.back().array) {
-            throw json_exception("Object elements must have keys");
+            throw JsonWriteError("Object elements must have keys");
         }
     }
 
@@ -428,7 +434,7 @@ namespace qjson {
                             m_ss << '\\' << 'u' << '0' << '0' << k_hexChars[(c >> 4) & 0xF] << k_hexChars[c & 0xF];
                         }
                         else {
-                            throw json_exception("Non-ASCII unicode is unsupported");
+                            throw JsonWriteError("Non-ASCII unicode is unsupported");
                         }
                 }
             }
@@ -475,16 +481,16 @@ namespace qjson {
 
     inline void Writer::m_encode(double val) {
         if (std::isinf(val)) {
-            throw json_exception("The JSON standard does not support infinity");
+            throw JsonWriteError("The JSON standard does not support infinity");
         }
         if (std::isnan(val)) {
-            throw json_exception("The JSON standard does not support NaN");
+            throw JsonWriteError("The JSON standard does not support NaN");
         }
 
         char buffer[32];
         int len(std::snprintf(buffer, sizeof(buffer), "%#.17g", val));
         if (len < 0 || len >= sizeof(buffer)) {
-            throw json_exception("Error encoding float");
+            throw JsonWriteError("Error encoding float");
         }
 
         m_ss << std::string_view(buffer, len);
