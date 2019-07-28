@@ -8,8 +8,10 @@
 // Basic, lightweight JSON decoder.
 //
 // Example:
-//      Object root(qjson::read(myJsonString));
-//      double price(*root.at("Price")->asFloat());
+//      qjson::Object root(qjson::read(myJsonString));
+//      const std::string & name(*root["Price"]->asString());
+//      const qjson::Array & favoriteBooks(*root["Favorite Books"]->asArray());
+//      const std::string & bookTitle(*favoriteBooks[0]->asString());
 //      ...
 //------------------------------------------------------------------------------
 
