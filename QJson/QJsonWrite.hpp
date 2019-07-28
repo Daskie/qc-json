@@ -23,9 +23,19 @@
 
 namespace qjson {
 
+#ifndef QJSON_COMMON
+#define QJSON_COMMON
     // If anything goes wrong, this exception will be thrown
-    struct JsonWriteError : public std::runtime_error {
-        JsonWriteError(const std::string & msg) : std::runtime_error(msg) {}
+    struct JsonError : public std::exception {
+        JsonError() = default;
+        JsonError(const char * msg) : std::exception(msg) {}
+        virtual ~JsonError() = default;
+    };
+#endif
+
+    // This will be thrown if anything goes wrong during the encoding process
+    struct JsonWriteError : public JsonError {
+        JsonWriteError(const char * msg) : JsonError(msg) {}
     };
 
     class Writer {

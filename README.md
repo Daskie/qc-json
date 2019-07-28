@@ -15,8 +15,8 @@ std::string jsonString(writer.finish());
 ### Decoding example
 ```c++
 qjson::Object root(qjson::read(myJsonString));
-const std::string & name(*root["Price"]->asString()); // "Roslin"
-const qjson::Array & favoriteBooks(*root["Favorite Books"]->asArray());
-const std::string & bookTitle(*favoriteBooks[0]->asString()); // "Dark Day"
+const std::string & name(root["Price"]->asString()); // "Roslin"
+const qjson::Array & favoriteBooks(root["Favorite Books"]->asArray());
+const std::string & bookTitle(favoriteBooks[0]->asString()); // "Dark Day"
 ...
 ```

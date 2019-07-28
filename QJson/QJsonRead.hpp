@@ -9,9 +9,9 @@
 //
 // Example:
 //      qjson::Object root(qjson::read(myJsonString));
-//      const std::string & name(*root["Price"]->asString());
-//      const qjson::Array & favoriteBooks(*root["Favorite Books"]->asArray());
-//      const std::string & bookTitle(*favoriteBooks[0]->asString());
+//      const std::string & name(root["Price"]->asString());
+//      const qjson::Array & favoriteBooks(root["Favorite Books"]->asArray());
+//      const std::string & bookTitle(favoriteBooks[0]->asString());
 //      ...
 //------------------------------------------------------------------------------
 
@@ -23,29 +23,45 @@
 
 namespace qjson {
 
+#ifndef QJSON_COMMON
+#define QJSON_COMMON
     // If anything goes wrong, this exception will be thrown
-    // `position` is the index into the string where the error occured (roughly)
-    struct JsonReadError : public std::runtime_error {
-        size_t position;
-        JsonReadError(const std::string & msg, size_t position) : std::runtime_error(msg), position(position) {}
+    struct JsonError : public std::exception {
+        JsonError() = default;
+        JsonError(const char * msg) : std::exception(msg) {}
+        virtual ~JsonError() = default;
     };
+#endif
+
+    // This will be thrown if anything goes wrong during the decoding process
+    // `position` is the index into the string where the error occured (roughly)
+    struct JsonReadError : public JsonError {
+        size_t position;
+        JsonReadError(const char * msg, size_t position) : JsonError(msg), position(position) {}
+    };
+
+    // This will be thrown when attempting to access as value as the wrong type
+    struct JsonTypeError : public JsonError {};
+
+    enum class Type { object, array, string, integer, hex, floating, boolean, null };
 
     struct Value;
 
     using Object = std::unordered_map<std::string, std::unique_ptr<Value>>;
     using Array = std::vector<std::unique_ptr<Value>>;
 
-    // All values have type accessors. If a value is of a given type, the
-    // corresponding accessor will return a valid pointer. Otherwise, it
-    // returns `nullptr`.
     struct Value {
-        virtual const      Object * asObject() const { return nullptr; }
-        virtual const       Array *  asArray() const { return nullptr; }
-        virtual const std::string * asString() const { return nullptr; }
-        virtual const     int64_t *    asInt() const { return nullptr; }
-        virtual const    uint64_t *    asHex() const { return nullptr; }
-        virtual const      double *  asFloat() const { return nullptr; }
-        virtual const        bool *   asBool() const { return nullptr; }
+
+        virtual Type type() const = 0;
+
+        virtual const      Object &   asObject() const { throw JsonTypeError(); }
+        virtual const       Array &    asArray() const { throw JsonTypeError(); }
+        virtual const std::string &   asString() const { throw JsonTypeError(); }
+        virtual           int64_t    asInteger() const { throw JsonTypeError(); }
+        virtual          uint64_t        asHex() const { throw JsonTypeError(); }
+        virtual            double   asFloating() const { throw JsonTypeError(); }
+        virtual              bool    asBoolean() const { throw JsonTypeError(); }
+
     };
 
     // A helper class to keep track of state, only the `read` function is important
@@ -92,7 +108,7 @@ namespace qjson {
 
         uint64_t m_readHex();
 
-        int64_t m_readInt(bool negative);
+        int64_t m_readInteger(bool negative);
 
         std::unique_ptr<Value> m_readNumber();
 
@@ -111,42 +127,53 @@ namespace qjson {
 
         struct ObjectWrapper : public Value {
             Object val;
-            virtual const Object * asObject() const override { return &val; }
+            virtual Type type() const override { return Type::object; }
+            virtual const Object & asObject() const override { return val; }
         };
 
         struct ArrayWrapper : public Value {
             Array val;
-            virtual const Array * asArray() const override { return &val; }
+            virtual Type type() const override { return Type::array; }
+            virtual const Array & asArray() const override { return val; }
         };
 
         struct StringWrapper : public Value {
             std::string val;
             StringWrapper(std::string && str) : val(move(str)) {}
-            virtual const std::string * asString() const override { return &val; }
+            virtual Type type() const override { return Type::string; }
+            virtual const std::string & asString() const override { return val; }
         };
 
-        struct IntWrapper : public Value {
+        struct IntegerWrapper : public Value {
             int64_t val;
-            IntWrapper(int64_t val) : val(val) {}
-            virtual const int64_t * asInt() const override { return &val; }
+            virtual Type type() const override { return Type::integer; }
+            IntegerWrapper(int64_t val) : val(val) {}
+            virtual int64_t asInteger() const override { return val; }
         };
 
         struct HexWrapper : public Value {
             uint64_t val;
             HexWrapper(uint64_t val) : val(val) {}
-            virtual const uint64_t * asHex() const override { return &val; }
+            virtual Type type() const override { return Type::hex; }
+            virtual uint64_t asHex() const override { return val; }
         };
 
-        struct FloatWrapper : public Value {
+        struct FloatingWrapper : public Value {
             double val;
-            FloatWrapper(double val) : val(val) {}
-            virtual const double * asFloat() const override { return &val; }
+            FloatingWrapper(double val) : val(val) {}
+            virtual Type type() const override { return Type::floating; }
+            virtual double asFloating() const override { return val; }
         };
 
-        struct BoolWrapper : public Value {
+        struct BooleanWrapper : public Value {
             bool val;
-            BoolWrapper(bool val) : val(val) {}
-            virtual const bool * asBool() const override { return &val; }
+            BooleanWrapper(bool val) : val(val) {}
+            virtual Type type() const override { return Type::boolean; }
+            virtual bool asBoolean() const override { return val; }
+        };
+
+        struct NullWrapper : public Value {
+            virtual Type type() const override { return Type::null; }
         };
 
         constexpr unsigned char k_hexTable[256]{
@@ -235,7 +262,7 @@ namespace qjson {
 
     inline void Reader::m_readChar(char c) {
         if (!m_checkChar(c)) {
-            throw JsonReadError("Expected character `"s + c + "`"s, m_position());
+            throw JsonReadError(("Expected character `"s + c + "`"s).c_str(), m_position());
         }
     }
 
@@ -286,13 +313,13 @@ namespace qjson {
             return m_readArray();
         }
         else if (m_checkString("true"sv)) {
-            return std::make_unique<BoolWrapper>(true);
+            return std::make_unique<BooleanWrapper>(true);
         }
         else if (m_checkString("false"sv)) {
-            return std::make_unique<BoolWrapper>(false);
+            return std::make_unique<BooleanWrapper>(false);
         }
         else if (m_checkString("null"sv)) {
-            return {};
+            return std::make_unique<NullWrapper>();
         }
         else {
             throw JsonReadError("Unknown value", m_position());
@@ -461,7 +488,7 @@ namespace qjson {
         return val;
     }
 
-    inline int64_t Reader::m_readInt(bool negative) {
+    inline int64_t Reader::m_readInteger(bool negative) {
         if (!m_isMore()) {
             throw JsonReadError("Expected integer sequence", m_position());
         }
@@ -508,7 +535,7 @@ namespace qjson {
         }
 
         // Parse whole part
-        int64_t integer(m_readInt(negative));
+        int64_t integer(m_readInteger(negative));
 
         // Parse fractional part
         int64_t fraction(0);
@@ -520,7 +547,7 @@ namespace qjson {
             }
 
             const char * start(m_pos);
-            fraction = m_readInt(negative);
+            fraction = m_readInteger(negative);
             fractionDigits = int64_t(m_pos - start);
         }
 
@@ -550,18 +577,18 @@ namespace qjson {
                 }
             }
 
-            exponent = m_readInt(exponentNegative);
+            exponent = m_readInteger(exponentNegative);
         }
 
         // Assemble floating
         if (fractionDigits || hasExponent) {
             double val(double(integer) + double(fraction) * fastPow(10.0, -fractionDigits));
             if (hasExponent) val *= fastPow(10.0, exponent);
-            return std::make_unique<FloatWrapper>(val);
+            return std::make_unique<FloatingWrapper>(val);
         }
         // Assemble integral
         else {
-            return std::make_unique<IntWrapper>(integer);
+            return std::make_unique<IntegerWrapper>(integer);
         }
 
     }
