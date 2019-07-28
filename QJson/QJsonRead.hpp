@@ -1,5 +1,18 @@
 #pragma once
 
+//==============================================================================
+// QJsonRead 1.0.0
+// Austin Quick
+// July 2019
+//
+// Basic, lightweight JSON decoder.
+//
+// Example:
+//      Object root(qjson::read(myJsonString));
+//      double price(*root.at("Price")->asFloat());
+//      ...
+//------------------------------------------------------------------------------
+
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -8,9 +21,8 @@
 
 namespace qjson {
 
-    using namespace std::string_literals;
-    using namespace std::string_view_literals;
-
+    // If anything goes wrong, this exception will be thrown
+    // `position` is the index into the string where the error occured (roughly)
     struct JsonReadError : public std::runtime_error {
         size_t position;
         JsonReadError(const std::string & msg, size_t position) : std::runtime_error(msg), position(position) {}
@@ -21,23 +33,26 @@ namespace qjson {
     using Object = std::unordered_map<std::string, std::unique_ptr<Value>>;
     using Array = std::vector<std::unique_ptr<Value>>;
 
+    // All values have type accessors. If a value is of a given type, the
+    // corresponding accessor will return a valid pointer. Otherwise, it
+    // returns `nullptr`.
     struct Value {
-
-        virtual      const Object * asObject() const { return nullptr; }
-        virtual       const Array *  asArray() const { return nullptr; }
+        virtual const      Object * asObject() const { return nullptr; }
+        virtual const       Array *  asArray() const { return nullptr; }
         virtual const std::string * asString() const { return nullptr; }
-        virtual     const int64_t *    asInt() const { return nullptr; }
-        virtual    const uint64_t *    asHex() const { return nullptr; }
-        virtual      const double *  asFloat() const { return nullptr; }
-        virtual        const bool *   asBool() const { return nullptr; }
-
+        virtual const     int64_t *    asInt() const { return nullptr; }
+        virtual const    uint64_t *    asHex() const { return nullptr; }
+        virtual const      double *  asFloat() const { return nullptr; }
+        virtual const        bool *   asBool() const { return nullptr; }
     };
 
+    // A helper class to keep track of state, only the `read` function is important
     class Reader {
 
       public:
 
-        friend std::unique_ptr<Value> read(std::string_view str);
+        // This is the sole function the user invokes directly
+        friend Object read(std::string_view str);
 
       private:
 
@@ -45,7 +60,7 @@ namespace qjson {
 
         Reader(std::string_view str);
 
-        std::unique_ptr<Value> operator()();
+        Object operator()();
 
         bool m_isMore() const;
 
@@ -81,21 +96,31 @@ namespace qjson {
 
     };
 
-    // IMPLEMENTATION //////////////////////////////////////////////////////////////////////////////////////////////////
+}
+
+// IMPLEMENTATION //////////////////////////////////////////////////////////////////////////////////////////////////////
+
+namespace qjson {
+
+    using namespace std::string_literals;
+    using namespace std::string_view_literals;
 
     namespace detail {
 
-        struct ObjectWrapper : public Value, public Object {
-            virtual const Object * asObject() const override { return this; }
+        struct ObjectWrapper : public Value {
+            Object val;
+            virtual const Object * asObject() const override { return &val; }
         };
 
-        struct ArrayWrapper : public Value, public Array {
-            virtual const Array * asArray() const override { return this; }
+        struct ArrayWrapper : public Value {
+            Array val;
+            virtual const Array * asArray() const override { return &val; }
         };
 
-        struct StringWrapper : public Value, public std::string {
-            StringWrapper(std::string && str) : std::string(move(str)) {}
-            virtual const std::string * asString() const override { return this; }
+        struct StringWrapper : public Value {
+            std::string val;
+            StringWrapper(std::string && str) : val(move(str)) {}
+            virtual const std::string * asString() const override { return &val; }
         };
 
         struct IntWrapper : public Value {
@@ -166,7 +191,7 @@ namespace qjson {
 
     using namespace detail;
 
-    inline std::unique_ptr<Value> read(std::string_view str) {
+    inline Object read(std::string_view str) {
         return Reader(str)();
     }
 
@@ -176,7 +201,7 @@ namespace qjson {
         m_pos(m_start)
     {}
 
-    inline std::unique_ptr<Value> Reader::operator()() {
+    inline Object Reader::operator()() {
         m_skipWhitespace();
         m_readChar('{');
 
@@ -187,7 +212,7 @@ namespace qjson {
             throw JsonReadError("Content in string after root object", m_position());
         }
 
-        return move(val);
+        return std::move(static_cast<ObjectWrapper*>(val.get())->val);
     }
 
     inline bool Reader::m_isMore() const {
@@ -245,7 +270,7 @@ namespace qjson {
         char c(*m_pos);
         if (c == '"') {
             ++m_pos;
-            return std::unique_ptr<StringWrapper>(new StringWrapper(m_readString()));
+            return std::make_unique<StringWrapper>(m_readString());
         }
         else if (std::isdigit(c) || c == '-') {
             return m_readNumber();
@@ -259,10 +284,10 @@ namespace qjson {
             return m_readArray();
         }
         else if (m_checkString("true"sv)) {
-            return std::unique_ptr<BoolWrapper>(new BoolWrapper(true));
+            return std::make_unique<BoolWrapper>(true);
         }
         else if (m_checkString("false"sv)) {
-            return std::unique_ptr<BoolWrapper>(new BoolWrapper(false));
+            return std::make_unique<BoolWrapper>(false);
         }
         else if (m_checkString("null"sv)) {
             return {};
@@ -273,7 +298,7 @@ namespace qjson {
     }
 
     inline std::unique_ptr<Value> Reader::m_readObject() {
-        std::unique_ptr<ObjectWrapper> obj(new ObjectWrapper());
+        std::unique_ptr<ObjectWrapper> obj(std::make_unique<ObjectWrapper>());
 
         m_skipWhitespace();
         if (m_checkChar('}')) {
@@ -285,7 +310,7 @@ namespace qjson {
         m_skipWhitespace();
         m_readChar(':');
         m_skipWhitespace();
-        (*obj)[std::move(key)] = m_readValue();
+        obj->val[std::move(key)] = m_readValue();
         m_skipWhitespace();
 
         while (!m_checkChar('}')) {
@@ -296,7 +321,7 @@ namespace qjson {
             m_skipWhitespace();
             m_readChar(':');
             m_skipWhitespace();
-            (*obj)[std::move(key)] = m_readValue();
+            obj->val[std::move(key)] = m_readValue();
             m_skipWhitespace();
         }
 
@@ -304,7 +329,7 @@ namespace qjson {
     }
 
     inline std::unique_ptr<Value> Reader::m_readArray() {
-        std::unique_ptr<ArrayWrapper> arr(new ArrayWrapper());
+        std::unique_ptr<ArrayWrapper> arr(std::make_unique<ArrayWrapper>());
 
         m_skipWhitespace();
         if (m_checkChar(']')) {
@@ -312,13 +337,13 @@ namespace qjson {
         }
 
         m_skipWhitespace();
-        arr->push_back(m_readValue());
+        arr->val.push_back(m_readValue());
         m_skipWhitespace();
 
         while (!m_checkChar(']')) {
             m_readChar(',');
             m_skipWhitespace();
-            arr->push_back(m_readValue());
+            arr->val.push_back(m_readValue());
             m_skipWhitespace();
         }
 
@@ -467,7 +492,7 @@ namespace qjson {
         // Hexadecimal
         if (m_remaining() >= 3 && m_pos[0] == '0' && m_pos[1] == 'x') {
             m_pos += 2;
-            return std::unique_ptr<HexWrapper>(new HexWrapper(m_readHex()));
+            return std::make_unique<HexWrapper>(m_readHex());
         }
 
         // Parse sign
@@ -530,11 +555,11 @@ namespace qjson {
         if (fractionDigits || hasExponent) {
             double val(double(integer) + double(fraction) * fastPow(10.0, -fractionDigits));
             if (hasExponent) val *= fastPow(10.0, exponent);
-            return std::unique_ptr<FloatWrapper>(new FloatWrapper(val));
+            return std::make_unique<FloatWrapper>(val);
         }
         // Assemble integral
         else {
-            return std::unique_ptr<IntWrapper>(new IntWrapper(integer));
+            return std::make_unique<IntWrapper>(integer);
         }
 
     }

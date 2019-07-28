@@ -1,16 +1,30 @@
 #pragma once
 
+//==============================================================================
+// QJsonWrite 1.0.0
+// Austin Quick
+// July 2019
+//
+// Basic, lightweight JSON encoder.
+//
+// Example:
+//      qjson::Writer writer();
+//      writer.put("Name", "Roslin");
+//      writer.startArray("Favorite Books");
+//      writer.put("Dark Day");
+//      ...
+//      writer.endArray();
+//      std::string jsonString(writer.finish());
+//------------------------------------------------------------------------------
+
 #include <string>
-#include <fstream>
 #include <vector>
 #include <sstream>
-#include <iomanip>
 
 namespace qjson {
 
-    using namespace std::string_view_literals;
-
-    struct JsonWriteError : public std::runtime_error{
+    // If anything goes wrong, this exception will be thrown
+    struct JsonWriteError : public std::runtime_error {
         JsonWriteError(const std::string & msg) : std::runtime_error(msg) {}
     };
 
@@ -26,13 +40,13 @@ namespace qjson {
         Writer & operator=(Writer && other) = delete;
 
         void startObject(std::string_view key, bool compact = false);
-        void startObject(    const char * key, bool compact = false) { startObject(std::string_view(key), compact); }
-        void startObject(          char * key, bool compact = false) { startObject(std::string_view(key), compact); }
+        void startObject(const char * key, bool compact = false) { startObject(std::string_view(key), compact); }
+        void startObject(char * key, bool compact = false) { startObject(std::string_view(key), compact); }
         void startObject(bool compact = false);
 
         void startArray(std::string_view key, bool compact = false);
-        void startArray(    const char * key, bool compact = false) { startArray(std::string_view(key), compact); }
-        void startArray(          char * key, bool compact = false) { startArray(std::string_view(key), compact); }
+        void startArray(const char * key, bool compact = false) { startArray(std::string_view(key), compact); }
+        void startArray(char * key, bool compact = false) { startArray(std::string_view(key), compact); }
         void startArray(bool compact = false);
 
         void put(std::string_view key, std::string_view val);
@@ -101,7 +115,13 @@ namespace qjson {
 
     };
 
-    // IMPLEMENTATION //////////////////////////////////////////////////////////////////////////////////////////////////
+}
+
+// IMPLEMENTATION //////////////////////////////////////////////////////////////////////////////////////////////////////
+
+namespace qjson {
+
+    using namespace std::string_view_literals;
 
     namespace detail {
 
@@ -121,7 +141,6 @@ namespace qjson {
             throw JsonWriteError("Invalid indent size - must be in range [0, 8]");
         }
 
-        m_ss << std::setprecision(15);
         m_ss << '{';
         m_state.push_back(State{false, compact, false});
     }

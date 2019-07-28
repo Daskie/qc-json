@@ -17,26 +17,26 @@ TEST_CLASS(Read) {
     public:
 
     TEST_METHOD(Empty) {
-        auto val(qjson::read(R"({})"sv));
-        Assert::IsTrue(val->asObject()->empty());
+        Object val(qjson::read(R"({})"sv));
+        Assert::IsTrue(val.empty());
     }
 
     TEST_METHOD(String) {
         { // Empty string
-            auto val(qjson::read(R"({ "v": "" })"sv));
-            Assert::AreEqual(""s, *val->asObject()->at("v")->asString());
+            Object val(qjson::read(R"({ "v": "" })"sv));
+            Assert::AreEqual(""s, *val.at("v")->asString());
         }
         { // All printable
-            auto val(qjson::read(R"({ "v": " !\"#$%&'()*+,-./\/0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~" })"sv));
-            Assert::AreEqual(R"( !"#$%&'()*+,-.//0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~)"s, *val->asObject()->at("v")->asString());
+            Object val(qjson::read(R"({ "v": " !\"#$%&'()*+,-./\/0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~" })"sv));
+            Assert::AreEqual(R"( !"#$%&'()*+,-.//0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~)"s, *val.at("v")->asString());
         }
         { // Escape characters
-            auto val(qjson::read(R"({ "v": "\b\f\n\r\t" })"sv));
-            Assert::AreEqual("\b\f\n\r\t"s, *val->asObject()->at("v")->asString());
+            Object val(qjson::read(R"({ "v": "\b\f\n\r\t" })"sv));
+            Assert::AreEqual("\b\f\n\r\t"s, *val.at("v")->asString());
         }
         { // Unicode
-            auto val(qjson::read(R"({ "v": "\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\u000B\u000E\u000F\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001A\u001B\u001C\u001D\u001E\u001F\u007F" })"sv));
-            Assert::AreEqual("\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\u000B\u000E\u000F\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001A\u001B\u001C\u001D\u001E\u001F\u007F"s, *val->asObject()->at("v")->asString());
+            Object val(qjson::read(R"({ "v": "\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\u000B\u000E\u000F\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001A\u001B\u001C\u001D\u001E\u001F\u007F" })"sv));
+            Assert::AreEqual("\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\u000B\u000E\u000F\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001A\u001B\u001C\u001D\u001E\u001F\u007F"s, *val.at("v")->asString());
         }
         { // Non-ascii unicode
             Assert::ExpectException<JsonReadError>([]() { qjson::read(R"(\u0080)"); });
@@ -45,91 +45,91 @@ TEST_CLASS(Read) {
 
     TEST_METHOD(Integer) {
         { // Zero
-            auto val(qjson::read(R"({ "v": 0 })"sv));
-            Assert::AreEqual(0ll, *val->asObject()->at("v")->asInt());
+            Object val(qjson::read(R"({ "v": 0 })"sv));
+            Assert::AreEqual(0ll, *val.at("v")->asInt());
         }
         { // Normal
-            auto val(qjson::read(R"({ "v": 123 })"sv));
-            Assert::AreEqual(123ll, *val->asObject()->at("v")->asInt());
+            Object val(qjson::read(R"({ "v": 123 })"sv));
+            Assert::AreEqual(123ll, *val.at("v")->asInt());
         }
         { // Min
-            auto val(qjson::read(R"({ "v": -9223372036854775808 })"sv));
-            Assert::AreEqual(std::numeric_limits<int64_t>::min(), *val->asObject()->at("v")->asInt());
+            Object val(qjson::read(R"({ "v": -9223372036854775808 })"sv));
+            Assert::AreEqual(std::numeric_limits<int64_t>::min(), *val.at("v")->asInt());
         }
         { // Max
-            auto val(qjson::read(R"({ "v": 9223372036854775807 })"sv));
-            Assert::AreEqual(std::numeric_limits<int64_t>::max(), *val->asObject()->at("v")->asInt());
+            Object val(qjson::read(R"({ "v": 9223372036854775807 })"sv));
+            Assert::AreEqual(std::numeric_limits<int64_t>::max(), *val.at("v")->asInt());
         }
     }
 
     TEST_METHOD(Hex) {
         { // Zero
-            auto val(qjson::read(R"({ "v": 0x0 })"sv));
-            Assert::AreEqual(0x0ull, *val->asObject()->at("v")->asHex());
+            Object val(qjson::read(R"({ "v": 0x0 })"sv));
+            Assert::AreEqual(0x0ull, *val.at("v")->asHex());
         }
         { // Uppercase
-            auto val(qjson::read(R"({ "v": 0x0123456789ABCDEF })"sv));
-            Assert::AreEqual(0x0123456789ABCDEFull, *val->asObject()->at("v")->asHex());
+            Object val(qjson::read(R"({ "v": 0x0123456789ABCDEF })"sv));
+            Assert::AreEqual(0x0123456789ABCDEFull, *val.at("v")->asHex());
         }
         { // Lowercase
-            auto val(qjson::read(R"({ "v": 0x0123456789abcdef })"sv));
-            Assert::AreEqual(0x0123456789ABCDEFull, *val->asObject()->at("v")->asHex());
+            Object val(qjson::read(R"({ "v": 0x0123456789abcdef })"sv));
+            Assert::AreEqual(0x0123456789ABCDEFull, *val.at("v")->asHex());
         }
         { // Max
-            auto val(qjson::read(R"({ "v": 0xFFFFFFFFFFFFFFFF })"sv));
-            Assert::AreEqual(0xFFFFFFFFFFFFFFFFull, *val->asObject()->at("v")->asHex());
+            Object val(qjson::read(R"({ "v": 0xFFFFFFFFFFFFFFFF })"sv));
+            Assert::AreEqual(0xFFFFFFFFFFFFFFFFull, *val.at("v")->asHex());
         }
     }
 
     TEST_METHOD(Float) {
         { // Zero
-            auto val(qjson::read(R"({ "v": 0.0 })"));
-            Assert::AreEqual(0.0, *val->asObject()->at("v")->asFloat());
+            Object val(qjson::read(R"({ "v": 0.0 })"));
+            Assert::AreEqual(0.0, *val.at("v")->asFloat());
         }
         { // Whole
-            auto val(qjson::read(R"({ "v": 123.0 })"));
-            Assert::AreEqual(123.0, *val->asObject()->at("v")->asFloat(), 1.0e-6);
+            Object val(qjson::read(R"({ "v": 123.0 })"));
+            Assert::AreEqual(123.0, *val.at("v")->asFloat(), 1.0e-6);
         }
         { // Fractional
-            auto val(qjson::read(R"({ "v": 123.456 })"));
-            Assert::AreEqual(123.456, *val->asObject()->at("v")->asFloat(), 1.0e-6);
+            Object val(qjson::read(R"({ "v": 123.456 })"));
+            Assert::AreEqual(123.456, *val.at("v")->asFloat(), 1.0e-6);
         }
         { // Exponent
-            auto val(qjson::read(R"({ "v": 123.456e17 })"));
-            Assert::AreEqual(123.456e17, *val->asObject()->at("v")->asFloat(), 1.0e11);
+            Object val(qjson::read(R"({ "v": 123.456e17 })"));
+            Assert::AreEqual(123.456e17, *val.at("v")->asFloat(), 1.0e11);
         }
         { // Positive exponent
-            auto val(qjson::read(R"({ "v": 123.456e+17 })"));
-            Assert::AreEqual(123.456e17, *val->asObject()->at("v")->asFloat(), 1.0e11);
+            Object val(qjson::read(R"({ "v": 123.456e+17 })"));
+            Assert::AreEqual(123.456e17, *val.at("v")->asFloat(), 1.0e11);
         }
         { // Negative
-            auto val(qjson::read(R"({ "v": -123.456e-17 })"));
-            Assert::AreEqual(-123.456e-17, *val->asObject()->at("v")->asFloat(), 1.0e-23);
+            Object val(qjson::read(R"({ "v": -123.456e-17 })"));
+            Assert::AreEqual(-123.456e-17, *val.at("v")->asFloat(), 1.0e-23);
         }
         { // Uppercase exponent without fraction
-            auto val(qjson::read(R"({ "v": 123E34 })"));
-            Assert::AreEqual(123.0e34, *val->asObject()->at("v")->asFloat(), 1.0e28);
+            Object val(qjson::read(R"({ "v": 123E34 })"));
+            Assert::AreEqual(123.0e34, *val.at("v")->asFloat(), 1.0e28);
         }
     }
 
     TEST_METHOD(Bool) {
         { // True
-            auto val(qjson::read(R"({ "v": true })"sv));
-            Assert::IsTrue(*val->asObject()->at("v")->asBool());
+            Object val(qjson::read(R"({ "v": true })"sv));
+            Assert::IsTrue(*val.at("v")->asBool());
         }
         { // False
-            auto val(qjson::read(R"({ "v": false })"sv));
-            Assert::IsFalse(*val->asObject()->at("v")->asBool());
+            Object val(qjson::read(R"({ "v": false })"sv));
+            Assert::IsFalse(*val.at("v")->asBool());
         }
     }
 
     TEST_METHOD(Null) {
-        auto val(qjson::read(R"({ "v": null })"sv));
-        Assert::IsFalse(val->asObject()->at("v").get());
+        Object val(qjson::read(R"({ "v": null })"sv));
+        Assert::IsFalse(val.at("v").get());
     }
 
     TEST_METHOD(General) {
-        auto val(qjson::read(
+        Object val(qjson::read(
 R"({
     "Name": "Salt's Crust",
     "Founded": 1964,
@@ -157,12 +157,11 @@ R"({
     ]
 })"sv));
 
-        const Object * root(val->asObject());
-        Assert::AreEqual(4ull, root->size());
-        Assert::AreEqual("Salt's Crust"s, *root->at("Name")->asString());
-        Assert::AreEqual(1964ll, *root->at("Founded")->asInt());
+        Assert::AreEqual(4ull, val.size());
+        Assert::AreEqual("Salt's Crust"s, *val.at("Name")->asString());
+        Assert::AreEqual(1964ll, *val.at("Founded")->asInt());
         
-        const Array * employees(root->at("Employees")->asArray());
+        const Array * employees(val.at("Employees")->asArray());
         Assert::AreEqual(3ull, employees->size());
         {
             const Object * employee(employees->at(0)->asObject());
@@ -186,7 +185,7 @@ R"({
             Assert::AreEqual(19ll, *employee->at("Age")->asInt());
         }
 
-        const Array * dishes(root->at("Dishes")->asArray());
+        const Array * dishes(val.at("Dishes")->asArray());
         Assert::AreEqual(3ull, dishes->size());
         {
             const Object * dish(dishes->at(0)->asObject());
@@ -221,10 +220,9 @@ R"({
     }
 
     TEST_METHOD(NoWhitespace) {
-        auto val(qjson::read(R"({"a":["abc",-123,-123.456e-78,true,null]})"sv));
-        const Object * obj(val->asObject());
-        Assert::AreEqual(1ull, obj->size());
-        const Array * arr(obj->at("a")->asArray());
+        Object val(qjson::read(R"({"a":["abc",-123,-123.456e-78,true,null]})"sv));
+        Assert::AreEqual(1ull, val.size());
+        const Array * arr(val.at("a")->asArray());
         Assert::AreEqual(5ull, arr->size());
         Assert::AreEqual("abc"s, *arr->at(0)->asString());
         Assert::AreEqual(-123ll, *arr->at(1)->asInt());
