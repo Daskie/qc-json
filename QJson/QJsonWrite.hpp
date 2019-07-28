@@ -1,7 +1,7 @@
 #pragma once
 
 //==============================================================================
-// QJsonWrite 1.0.0
+// QJson 1.1.0
 // Austin Quick
 // July 2019
 //
@@ -21,17 +21,21 @@
 #include <vector>
 #include <sstream>
 
-namespace qjson {
-
 #ifndef QJSON_COMMON
 #define QJSON_COMMON
+namespace qjson {
+
     // If anything goes wrong, this exception will be thrown
     struct JsonError : public std::exception {
         JsonError() = default;
         JsonError(const char * msg) : std::exception(msg) {}
         virtual ~JsonError() = default;
     };
+
+}
 #endif
+
+namespace qjson {
 
     // This will be thrown if anything goes wrong during the encoding process
     struct JsonWriteError : public JsonError {
