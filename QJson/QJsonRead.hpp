@@ -27,25 +27,29 @@ namespace qjson {
         virtual       const Array *  asArray() const { return nullptr; }
         virtual const std::string * asString() const { return nullptr; }
         virtual     const int64_t *    asInt() const { return nullptr; }
-        virtual    const uint64_t *   asUInt() const { return nullptr; }
+        virtual    const uint64_t *    asHex() const { return nullptr; }
         virtual      const double *  asFloat() const { return nullptr; }
         virtual        const bool *   asBool() const { return nullptr; }
 
-    };    
+    };
 
     class Reader {
 
       public:
 
-        std::unique_ptr<Value> operator()(std::string_view str);
+        friend std::unique_ptr<Value> read(std::string_view str);
 
       private:
 
-        const char * m_start, * m_end, *m_pos;
+        const char * const m_start, * const m_end, * m_pos;
+
+        Reader(std::string_view str);
+
+        std::unique_ptr<Value> operator()();
 
         bool m_isMore() const;
 
-        int64_t m_remaining() const;
+        size_t m_remaining() const;
 
         size_t m_position() const;
 
@@ -59,9 +63,9 @@ namespace qjson {
 
         std::unique_ptr<Value> m_readValue();
 
-        std::unique_ptr<ObjectWrapper> m_readObject();
+        std::unique_ptr<Value> m_readObject();
 
-        std::unique_ptr<ArrayWrapper> m_readArray();
+        std::unique_ptr<Value> m_readArray();
 
         void m_readEscaped(std::string & str);
 
@@ -71,7 +75,7 @@ namespace qjson {
 
         uint64_t m_readHex();
 
-        uint64_t m_readUInt();
+        int64_t m_readInt(bool negative);
 
         std::unique_ptr<Value> m_readNumber();
 
@@ -100,10 +104,10 @@ namespace qjson {
             virtual const int64_t * asInt() const override { return &val; }
         };
 
-        struct UIntWrapper : public Value {
+        struct HexWrapper : public Value {
             uint64_t val;
-            UIntWrapper(uint64_t val) : val(val) {}
-            virtual const uint64_t * asUInt() const override { return &val; }
+            HexWrapper(uint64_t val) : val(val) {}
+            virtual const uint64_t * asHex() const override { return &val; }
         };
 
         struct FloatWrapper : public Value {
@@ -137,7 +141,7 @@ namespace qjson {
             -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1
         };
 
-        inline double fastPow(double v, unsigned int e) {
+        inline double fastPow(double v, uint64_t e) {
             double r(1.0);
 
             do {
@@ -149,12 +153,12 @@ namespace qjson {
             return r;
         }
 
-        inline double fastPow(double v, int e) {
+        inline double fastPow(double v, int64_t e) {
             if (e >= 0) {
-                return pow(v, unsigned int(e));
+                return pow(v, uint64_t(e));
             }
             else {
-                return pow(1.0 / v, unsigned int(-e));
+                return pow(1.0 / v, uint64_t(-e));
             }
         }
 
@@ -162,11 +166,17 @@ namespace qjson {
 
     using namespace detail;
 
-    inline std::unique_ptr<Value> Reader::operator()(std::string_view str) {
-        m_start = str.data();
-        m_end = m_start + str.length();
-        m_pos = m_start;
+    inline std::unique_ptr<Value> read(std::string_view str) {
+        return Reader(str)();
+    }
 
+    inline Reader::Reader(std::string_view str) :
+        m_start(str.data()),
+        m_end(m_start + str.length()),
+        m_pos(m_start)
+    {}
+
+    inline std::unique_ptr<Value> Reader::operator()() {
         m_skipWhitespace();
         m_readChar('{');
 
@@ -184,7 +194,7 @@ namespace qjson {
         return m_pos < m_end;
     }
 
-    inline int64_t Reader::m_remaining() const {
+    inline size_t Reader::m_remaining() const {
         return m_end - m_pos;
     }
 
@@ -237,7 +247,7 @@ namespace qjson {
             ++m_pos;
             return std::unique_ptr<StringWrapper>(new StringWrapper(m_readString()));
         }
-        else if (std::isdigit(c)) {
+        else if (std::isdigit(c) || c == '-') {
             return m_readNumber();
         }
         else if (c == '{') {
@@ -262,7 +272,7 @@ namespace qjson {
         }
     }
 
-    inline std::unique_ptr<ObjectWrapper> Reader::m_readObject() {
+    inline std::unique_ptr<Value> Reader::m_readObject() {
         std::unique_ptr<ObjectWrapper> obj(new ObjectWrapper());
 
         m_skipWhitespace();
@@ -293,7 +303,7 @@ namespace qjson {
         return std::move(obj);
     }
 
-    inline std::unique_ptr<ArrayWrapper> Reader::m_readArray() {
+    inline std::unique_ptr<Value> Reader::m_readArray() {
         std::unique_ptr<ArrayWrapper> arr(new ArrayWrapper());
 
         m_skipWhitespace();
@@ -305,7 +315,7 @@ namespace qjson {
         arr->push_back(m_readValue());
         m_skipWhitespace();
 
-        while (!m_checkChar('}')) {
+        while (!m_checkChar(']')) {
             m_readChar(',');
             m_skipWhitespace();
             arr->push_back(m_readValue());
@@ -367,6 +377,8 @@ namespace qjson {
             throw JsonReadError("Non-ASCII unicode is unsupported", m_position());
         }
 
+        m_pos += 4;
+
         return (v3 << 4) | v4;
     }
 
@@ -422,7 +434,7 @@ namespace qjson {
         return val;
     }
 
-    inline uint64_t Reader::m_readUInt() {
+    inline int64_t Reader::m_readInt(bool negative) {
         if (!m_isMore()) {
             throw JsonReadError("Expected integer sequence", m_position());
         }
@@ -431,27 +443,20 @@ namespace qjson {
             throw JsonReadError("Invalid digit", m_position());
         }
 
-        uint64_t val(*m_pos - '0');
+        uint64_t uval(*m_pos - '0');
         ++m_pos;
 
-        for (int digits(1); digits < 18 && m_isMore() && std::isdigit(*m_pos); ++digits) {
-            val = val * 10 + (*m_pos - '0');
+        for (int digits(1); digits < 19 && m_isMore() && std::isdigit(*m_pos); ++digits, ++m_pos) {
+            uval = uval * 10 + (*m_pos - '0');
         }
 
-        if (m_isMore() && std::isdigit(*m_pos)) {
-            uint64_t potential(val * 10 + (*m_pos - '0'));
-            if (potential < val) {
-                throw JsonReadError("Integer value is too large", m_position());
-            }
-            val = potential;
-            ++m_pos;
-        }
-
-        if (m_isMore() && std::isdigit(*m_pos)) {
+        bool inRange(uval < 0x8000000000000000ull || negative && uval == 0x8000000000000000ull);
+        if (!inRange || m_isMore() && std::isdigit(*m_pos)) {
             throw JsonReadError("Integer value is too large", m_position());
         }
 
-        return val;
+        int64_t sval{int64_t(uval)};
+        return negative ? -sval : sval;
     }
 
     inline std::unique_ptr<Value> Reader::m_readNumber() {
@@ -462,7 +467,7 @@ namespace qjson {
         // Hexadecimal
         if (m_remaining() >= 3 && m_pos[0] == '0' && m_pos[1] == 'x') {
             m_pos += 2;
-            return std::unique_ptr<UIntWrapper>(new UIntWrapper(m_readHex()));
+            return std::unique_ptr<HexWrapper>(new HexWrapper(m_readHex()));
         }
 
         // Parse sign
@@ -476,11 +481,11 @@ namespace qjson {
         }
 
         // Parse whole part
-        uint64_t integer(m_readUInt());
+        int64_t integer(m_readInt(negative));
 
         // Parse fractional part
-        uint64_t fraction(0);
-        int fractionDigits(0);
+        int64_t fraction(0);
+        int64_t fractionDigits(0);
         if (m_isMore() && *m_pos == '.') {
             ++m_pos;
             if (!m_isMore()) {
@@ -488,14 +493,13 @@ namespace qjson {
             }
 
             const char * start(m_pos);
-            fraction = m_readUInt();
-            fractionDigits = m_pos - start;
+            fraction = m_readInt(negative);
+            fractionDigits = int64_t(m_pos - start);
         }
 
         // Parse exponent part
         bool hasExponent(false);
-        int exponent(0);
-        bool exponentNegative(false);
+        int64_t exponent(0);
         if (m_isMore() && (*m_pos == 'e' || *m_pos == 'E')) {
             hasExponent = true;
 
@@ -504,6 +508,7 @@ namespace qjson {
                 throw JsonReadError("Expected exponent", m_position());
             }
 
+            bool exponentNegative(false);
             if (*m_pos == '-') {
                 exponentNegative = true;
                 ++m_pos;
@@ -518,26 +523,18 @@ namespace qjson {
                 }
             }
 
-            uint64_t exponent64(m_readUInt());
-            if (exponent64 > 0x7FFFFFFF) {
-                throw JsonReadError("Exponent is too large", m_position());
-            }
-            exponent = int(exponent64);
+            exponent = m_readInt(exponentNegative);
         }
 
         // Assemble floating
         if (fractionDigits || hasExponent) {
             double val(double(integer) + double(fraction) * fastPow(10.0, -fractionDigits));
             if (hasExponent) val *= fastPow(10.0, exponent);
-            return std::unique_ptr<FloatWrapper>(new FloatWrapper(negative ? -val : val));
+            return std::unique_ptr<FloatWrapper>(new FloatWrapper(val));
         }
         // Assemble integral
         else {
-            int64_t sval(int64_t{integer});
-            if (sval < 0 && sval != std::numeric_limits<int64_t>::min()) {
-                throw JsonReadError("Integer is too large", m_position());
-            }
-            return std::unique_ptr<IntWrapper>(new IntWrapper(negative ? -sval : sval));
+            return std::unique_ptr<IntWrapper>(new IntWrapper(integer));
         }
 
     }

@@ -10,73 +10,71 @@ using namespace std::string_view_literals;
 using qjson::Writer;
 using qjson::JsonWriteError;
 
-TEST_CLASS(TestWrite) {
+TEST_CLASS(Write) {
 
     public:
 	    
-    TEST_METHOD(TestEmpty) {
+    TEST_METHOD(Empty) {
         Assert::AreEqual("{}"s, Writer(false).finish());
         Assert::AreEqual("{}"s, Writer(true).finish());
     }
 
-    TEST_METHOD(TestPutStringView) {
-        Writer writer(true);
-        writer.put("v", "hello"sv);
-        Assert::AreEqual(R"({ "v": "hello" })"s, writer.finish());
-    }
-
-    TEST_METHOD(TestPutString) {
-        Writer writer(true);
-        writer.put("v", "hello"s);
-        Assert::AreEqual(R"({ "v": "hello" })"s, writer.finish());
-    }
-
-    TEST_METHOD(TestPutCString) {
-        { // const
+    TEST_METHOD(PutString) {
+        { // Empty
+            Writer writer(true);
+            writer.put("v", "");
+            Assert::AreEqual(R"({ "v": "" })"s, writer.finish());
+        }
+        { // String view
+            Writer writer(true);
+            writer.put("v", "hello"sv);
+            Assert::AreEqual(R"({ "v": "hello" })"s, writer.finish());
+        }
+        { // String
+            Writer writer(true);
+            writer.put("v", "hello"s);
+            Assert::AreEqual(R"({ "v": "hello" })"s, writer.finish());
+        }
+        { // Const C string
             Writer writer(true);
             const char str[]{"hello"};
             writer.put("v", str);
             Assert::AreEqual(R"({ "v": "hello" })"s, writer.finish());
         }
-        { // non-const
+        { // Mutable C string
             Writer writer(true);
             char str[]{"hello"};
             writer.put("v", str);
             Assert::AreEqual(R"({ "v": "hello" })"s, writer.finish());
         }
+        { // Printable characters
+            Writer writer(true);
+            writer.put("v", R"( !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~)");
+            Assert::AreEqual(R"({ "v": " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~" })"s, writer.finish());
+        }
+        { // Escape characters
+            Writer writer(true);
+            writer.put("v", "\b\f\n\r\t");
+            Assert::AreEqual(R"({ "v": "\b\f\n\r\t" })"s, writer.finish());
+        }
+        { // Unicode
+            Writer writer(true);
+            writer.put("v", "\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\u000B\u000E\u000F\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001A\u001B\u001C\u001D\u001E\u001F\u007F"sv);
+            Assert::AreEqual(R"({ "v": "\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\u000B\u000E\u000F\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001A\u001B\u001C\u001D\u001E\u001F\u007F" })"s, writer.finish());
+        }
+        { // Non-ASCII unicode
+            Writer writer(true);
+            char str[]{char(128)};
+            Assert::ExpectException<JsonWriteError>([&]() { writer.put("v", std::string_view(str, sizeof(str))); });
+        }
+        { // Single char
+            Writer writer(true);
+            writer.put("v", 'a');
+            Assert::AreEqual(R"({ "v": "a" })"s, writer.finish());
+        }
     }
 
-    TEST_METHOD(TestPutStringEmpty) {
-        Writer writer(true);
-        writer.put("v", "");
-        Assert::AreEqual(R"({ "v": "" })"s, writer.finish());
-    }
-
-    TEST_METHOD(TestPutStringAllPrintable) {
-        Writer writer(true);
-        writer.put("v", R"( !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~)");
-        Assert::AreEqual(R"({ "v": " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~" })"s, writer.finish());
-    }
-
-    TEST_METHOD(TestPutStringAsciiUnicode) {
-        Writer writer(true);
-        writer.put("v", "\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\u000B\u000E\u000F\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001A\u001B\u001C\u001D\u001E\u001F\u007F"sv);
-        Assert::AreEqual(R"({ "v": "\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\u000B\u000E\u000F\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001A\u001B\u001C\u001D\u001E\u001F\u007F" })"s, writer.finish());
-    }
-
-    TEST_METHOD(TestPutStringNonAsciiUnicode) {
-        Writer writer(true);
-        char str[]{char(128)};
-        Assert::ExpectException<JsonWriteError>([&]() { writer.put("v", std::string_view(str, sizeof(str))); });
-    }
-
-    TEST_METHOD(TestPutChar) {
-        Writer writer(true);
-        writer.put("v", 'a');
-        Assert::AreEqual(R"({ "v": "a" })"s, writer.finish());
-    }
-
-    TEST_METHOD(TestPutInt) {
+    TEST_METHOD(PutInt) {
         { // Zero
             Writer writer(true);
             writer.put("v", int64_t(0));
@@ -99,7 +97,7 @@ TEST_CLASS(TestWrite) {
         }
     }
 
-    TEST_METHOD(TestPutUInt) {
+    TEST_METHOD(PutUInt) {
         { // Zero
             Writer writer(true);
             writer.put("v", 0u);
@@ -117,7 +115,7 @@ TEST_CLASS(TestWrite) {
         }
     }
 
-    TEST_METHOD(TestPutDouble) {
+    TEST_METHOD(PutDouble) {
         { // Zero
             Writer writer(true);
             writer.put("v", 0.0);
@@ -145,7 +143,7 @@ TEST_CLASS(TestWrite) {
         }
     }
 
-    TEST_METHOD(TestPutFloat) {
+    TEST_METHOD(PutFloat) {
         { // Zero
             Writer writer(true);
             writer.put("v", 0.0f);
@@ -173,7 +171,7 @@ TEST_CLASS(TestWrite) {
         }
     }
 
-    TEST_METHOD(TestPutBool) {
+    TEST_METHOD(PutBool) {
         { // True
             Writer writer(true);
             writer.put("v", true);
@@ -186,13 +184,13 @@ TEST_CLASS(TestWrite) {
         }
     }
 
-    TEST_METHOD(TestPutNull) {
+    TEST_METHOD(PutNull) {
         Writer writer(true);
         writer.put("v", nullptr);
         Assert::AreEqual(R"({ "v": null })"s, writer.finish());
     }
 
-    TEST_METHOD(TestObject) {
+    TEST_METHOD(Object) {
         { // Empty
             Writer writer(true);
             writer.startObject("obj");
@@ -231,7 +229,7 @@ R"({
         }
     }
 
-    TEST_METHOD(TestArray) {
+    TEST_METHOD(Array) {
         { // Empty
             Writer writer(true);
             writer.startArray("arr");
@@ -270,7 +268,7 @@ R"({
         }
     }
 
-    TEST_METHOD(TestNested) {
+    TEST_METHOD(Nested) {
         { // Compact
             Writer writer(true);
             writer.startObject("o");
@@ -316,7 +314,7 @@ R"({
         }
     }
 
-    TEST_METHOD(TestEarlyFinish) {
+    TEST_METHOD(EarlyFinish) {
         Writer writer(true);
         writer.startArray("a");
         writer.startObject();
@@ -324,7 +322,7 @@ R"({
         Assert::AreEqual(R"({ "a": [ { "a": [] } ] })"s, writer.finish());
     }
 
-    TEST_METHOD(TestFinishReset) {
+    TEST_METHOD(FinishReset) {
         Writer writer(true);
         writer.put("val", 123);
         Assert::AreEqual(R"({ "val": 123 })"s, writer.finish());
@@ -332,7 +330,7 @@ R"({
         Assert::AreEqual(R"({ "lav": 321 })"s, writer.finish());
     }
 
-    TEST_METHOD(TestIndentSize) {
+    TEST_METHOD(IndentSize) {
         { // 0 spaces
             Writer writer(false, 0);
             writer.startArray("a");
@@ -371,16 +369,13 @@ R"({
         }
     }
 
-    TEST_METHOD(TestExceptionsIndentSize) {
+    TEST_METHOD(Exceptions) {
         { // Indent size too small
             Assert::ExpectException<JsonWriteError>([]() { Writer(true, -1); });
         }
         { // Indent size too large
             Assert::ExpectException<JsonWriteError>([]() { Writer(true, 9); });
         }
-    }
-
-    TEST_METHOD(TestExceptionsContainerMismatch) {
         { // Ending array in object
             Writer writer(true);
             writer.startObject("o");
@@ -395,9 +390,6 @@ R"({
             Writer writer(true);
             Assert::ExpectException<JsonWriteError>([&]() { writer.endObject(); });
         }
-    }
-
-    TEST_METHOD(TestExceptionsInvalidKeying) {
         { // Puting without key in object
             Writer writer(true);
             writer.startObject("o");
