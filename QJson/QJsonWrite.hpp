@@ -148,7 +148,7 @@ namespace qjson {
     inline Writer::Writer(bool compact, int indentSize) :
         m_ss(),
         m_state(),
-        m_indentation(0),
+        m_indentation(),
         m_indent("        ", indentSize)
     {
         if (indentSize < 0 || indentSize > 8) {
