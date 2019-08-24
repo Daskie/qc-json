@@ -4,11 +4,11 @@ Simple, lightweight JSON endoder/decoder for C++17
 ### Encoding example
 ```c++
 qjson::Writer writer();
-writer.put("Name", "Roslin");
-writer.array("Favorite Books");
+writer.key("Name").val("Roslin");
+writer.key("Favorite Books").array();
 writer.put("Dark Day");
 ...
-writer.endArray();
+writer.end();
 std::string jsonString(writer.finish());
 ```
 
