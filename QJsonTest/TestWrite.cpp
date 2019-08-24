@@ -10,6 +10,14 @@ using namespace std::string_view_literals;
 using qjson::Writer;
 using qjson::JsonWriteError;
 
+struct CustomVal { int x, y; };
+
+template <> struct QJsonEncoder<CustomVal> {
+    void operator()(qjson::Writer & writer, const CustomVal & v) {
+        writer.array(true).val(v.x).val(v.y).end();
+    }
+};
+
 TEST_CLASS(Write) {
 
     public:
@@ -216,9 +224,14 @@ TEST_CLASS(Write) {
 
     TEST_METHOD(ValNull) {
         Writer writer(true);
-        writer.key("v");
-        writer.val(nullptr);
+        writer.key("v").val(nullptr);
         Assert::AreEqual(R"({ "v": null })"s, writer.finish());
+    }
+
+    TEST_METHOD(ValCustom) {
+        Writer writer(true);
+        writer.key("v").val(CustomVal{1, 2});
+        Assert::AreEqual(R"({ "v": [ 1, 2 ] })"s, writer.finish());
     }
 
     TEST_METHOD(Object) {

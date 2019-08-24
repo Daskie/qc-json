@@ -9,11 +9,11 @@
 //
 // Example:
 //      qjson::Writer writer();
-//      writer.put("Name", "Roslin");
-//      writer.array("Favorite Books");
-//      writer.put("Dark Day");
+//      writer.key("Name").val("Roslin");
+//      writer.key("Favorite Books").array();
+//      writer.val("Dark Day");
 //      ...
-//      writer.endArray();
+//      writer.end();
 //      std::string jsonString(writer.finish());
 //------------------------------------------------------------------------------
 
@@ -34,6 +34,18 @@ namespace qjson {
 
 }
 #endif
+
+// Specialize `QJsonEncoder` to enable Writer::val for custom types.
+// Must have a function call operator with signature `void operator()(qjson::Writer &, const T &)`
+// Example specialization:
+//
+//      template <> struct QJsonEncoder<MyType> {
+//          void operator()(qjson::Writer & writer, const MyType & v) {
+//              writer.val(v.x).val(v.y);
+//          }
+//      };
+//
+template <typename T> struct QJsonEncoder;
 
 namespace qjson {
 
@@ -60,6 +72,7 @@ namespace qjson {
         Writer & key(std::string_view k);
 
         Writer & val(std::string_view v);
+        Writer & val(const std::string & v);
         Writer & val(const char * v);
         Writer & val(char v);
         Writer & val(int64_t v);
@@ -71,8 +84,10 @@ namespace qjson {
         Writer & val(uint16_t v);
         Writer & val(uint8_t v);
         Writer & val(double v);
+        Writer & val(float v);
         Writer & val(bool v);
         Writer & val(nullptr_t);
+        template <typename T> Writer & val(const T & v);
 
         Writer & end();
 
@@ -105,14 +120,6 @@ namespace qjson {
         void m_encode(bool val);
         void m_encode(nullptr_t);
 
-    };
-
-    template <typename T> struct Encoder;
-
-    template <> struct Encoder<int> {
-        void operator()(Writer & writer, int v) {
-
-        }
     };
 
 }
@@ -203,6 +210,10 @@ namespace qjson {
         return *this;
     }
 
+    inline Writer & Writer::val(const std::string & v) {
+        return val(std::string_view(v));
+    }
+
     inline Writer & Writer::val(const char * v) {
         return val(std::string_view(v));
     }
@@ -265,6 +276,10 @@ namespace qjson {
         return *this;
     }
 
+    inline Writer & Writer::val(float v) {
+        return val(double(v));
+    }
+
     inline Writer & Writer::val(bool v) {
         m_checkKey();
         if (!m_isKey) m_putPrefix();
@@ -282,6 +297,12 @@ namespace qjson {
         m_state.back().content = true;
         m_isKey = false;
 
+        return *this;
+    }
+
+    template <typename T>
+    inline Writer & Writer::val(const T & v) {
+        QJsonEncoder<T>()(*this, v);
         return *this;
     }
 
