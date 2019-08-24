@@ -53,32 +53,32 @@ namespace qjson {
         Writer & operator=(const Writer & other) = delete;
         Writer & operator=(Writer && other) = delete;
 
-        void startObject(bool compact = false);
+        Writer & startObject(bool compact = false);
 
-        void startArray(bool compact = false);
+        Writer & startArray(bool compact = false);
 
-        void putKey(std::string_view k);
-        void putKey(const char * k) { putKey(std::string_view(k)); }
-        void putKey(char * k) { putKey(std::string_view(k)); }
+        Writer & putKey(std::string_view k);
+        //Writer & putKey(const char * k);
+        //Writer & putKey(char * k);
 
-        void putVal(std::string_view val);
-        void putVal(const char * val);
-        void putVal(char val);
-        void putVal(int64_t val);
-        void putVal(int32_t val);
-        void putVal(int16_t val);
-        void putVal(int8_t val);
-        void putVal(uint64_t val);
-        void putVal(uint32_t val);
-        void putVal(uint16_t val);
-        void putVal(uint8_t val);
-        void putVal(double val);
-        void putVal(bool val);
-        void putVal(nullptr_t);
+        Writer & putVal(std::string_view val);
+        Writer & putVal(const char * val);
+        Writer & putVal(char val);
+        Writer & putVal(int64_t val);
+        Writer & putVal(int32_t val);
+        Writer & putVal(int16_t val);
+        Writer & putVal(int8_t val);
+        Writer & putVal(uint64_t val);
+        Writer & putVal(uint32_t val);
+        Writer & putVal(uint16_t val);
+        Writer & putVal(uint8_t val);
+        Writer & putVal(double val);
+        Writer & putVal(bool val);
+        Writer & putVal(nullptr_t);
 
-        void endObject();
+        Writer & endObject();
 
-        void endArray();
+        Writer & endArray();
 
         std::string finish();
 
@@ -160,21 +160,25 @@ namespace qjson {
         other.m_indent = {};
     }
 
-    inline void Writer::startObject(bool compact) {
+    inline Writer & Writer::startObject(bool compact) {
         m_checkKey();
         if (!m_isKey) m_putPrefix();
         m_start(compact, '{');
         m_isKey = false;
+
+        return *this;
     }
 
-    inline void Writer::startArray(bool compact) {
+    inline Writer & Writer::startArray(bool compact) {
         m_checkKey();
         if (!m_isKey) m_putPrefix();
         m_start(compact, '[');
         m_isKey = false;
+
+        return *this;
     }
 
-    inline void Writer::putKey(std::string_view key) {
+    inline Writer & Writer::putKey(std::string_view key) {
         if (m_isKey) {
             throw JsonWriteError("Expected value to follow key");
         }
@@ -189,89 +193,103 @@ namespace qjson {
         m_encode(key);
         m_ss << ": "sv;
         m_isKey = true;
+
+        return *this;
     }
 
-    inline void Writer::putVal(std::string_view val) {
+    inline Writer & Writer::putVal(std::string_view val) {
         m_checkKey();
         if (!m_isKey) m_putPrefix();
         m_encode(val);
         m_state.back().content = true;
         m_isKey = false;
+
+        return *this;
     }
 
-    inline void Writer::putVal(const char * val) {
-        putVal(std::string_view(val));
+    inline Writer & Writer::putVal(const char * val) {
+        return putVal(std::string_view(val));
     }
 
-    inline void Writer::putVal(char val) {
-        putVal(std::string_view(&val, 1));
+    inline Writer & Writer::putVal(char val) {
+        return putVal(std::string_view(&val, 1));
     }
 
-    inline void Writer::putVal(int64_t val) {
+    inline Writer & Writer::putVal(int64_t val) {
         m_checkKey();
         if (!m_isKey) m_putPrefix();
         m_encode(val);
         m_state.back().content = true;
         m_isKey = false;
+
+        return *this;
     }
 
-    inline void Writer::putVal(int32_t val) {
-        putVal(int64_t(val));
+    inline Writer & Writer::putVal(int32_t val) {
+        return putVal(int64_t(val));
     }
 
-    inline void Writer::putVal(int16_t val) {
-        putVal(int64_t(val));
+    inline Writer & Writer::putVal(int16_t val) {
+        return putVal(int64_t(val));
     }
 
-    inline void Writer::putVal(int8_t val) {
-        putVal(uint64_t(val));
+    inline Writer & Writer::putVal(int8_t val) {
+        return putVal(uint64_t(val));
     }
 
-    inline void Writer::putVal(uint64_t val) {
+    inline Writer & Writer::putVal(uint64_t val) {
         m_checkKey();
         if (!m_isKey) m_putPrefix();
         m_encode(val);
         m_state.back().content = true;
         m_isKey = false;
+
+        return *this;
     }
 
-    inline void Writer::putVal(uint32_t val) {
-        putVal(uint64_t(val));
+    inline Writer & Writer::putVal(uint32_t val) {
+        return putVal(uint64_t(val));
     }
 
-    inline void Writer::putVal(uint16_t val) {
-        putVal(uint64_t(val));
+    inline Writer & Writer::putVal(uint16_t val) {
+        return putVal(uint64_t(val));
     }
 
-    inline void Writer::putVal(uint8_t val) {
-        putVal(uint64_t(val));
+    inline Writer & Writer::putVal(uint8_t val) {
+        return putVal(uint64_t(val));
     }
 
-    inline void Writer::putVal(double val) {
+    inline Writer & Writer::putVal(double val) {
         m_checkKey();
         if (!m_isKey) m_putPrefix();
         m_encode(val);
         m_state.back().content = true;
         m_isKey = false;
+
+        return *this;
     }
 
-    inline void Writer::putVal(bool val) {
+    inline Writer & Writer::putVal(bool val) {
         m_checkKey();
         if (!m_isKey) m_putPrefix();
         m_encode(val);
         m_state.back().content = true;
         m_isKey = false;
+
+        return *this;
     }
 
-    inline void Writer::putVal(nullptr_t) {
+    inline Writer & Writer::putVal(nullptr_t) {
         m_checkKey();
         if (!m_isKey) m_putPrefix();
         m_encode(nullptr);
         m_state.back().content = true;
         m_isKey = false;
+
+        return *this;
     }
 
-    inline void Writer::endObject() {
+    inline Writer & Writer::endObject() {
         if (m_state.size() <= 1 || m_state.back().array) {
             throw JsonWriteError("No object to end");
         }
@@ -280,14 +298,18 @@ namespace qjson {
         }
 
         m_end();
+
+        return *this;
     }
 
-    inline void Writer::endArray() {
+    inline Writer & Writer::endArray() {
         if (m_state.size() <= 1 || !m_state.back().array) {
             throw JsonWriteError("No array to end");
         }
 
         m_end();
+
+        return *this;
     }
 
     inline std::string Writer::finish() {
