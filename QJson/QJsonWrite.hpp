@@ -53,44 +53,28 @@ namespace qjson {
         Writer & operator=(const Writer & other) = delete;
         Writer & operator=(Writer && other) = delete;
 
-        void startObject(std::string_view key, bool compact = false);
-        void startObject(const char * key, bool compact = false) { startObject(std::string_view(key), compact); }
-        void startObject(char * key, bool compact = false) { startObject(std::string_view(key), compact); }
         void startObject(bool compact = false);
 
-        void startArray(std::string_view key, bool compact = false);
-        void startArray(const char * key, bool compact = false) { startArray(std::string_view(key), compact); }
-        void startArray(char * key, bool compact = false) { startArray(std::string_view(key), compact); }
         void startArray(bool compact = false);
 
-        void put(std::string_view key, std::string_view val);
-        void put(std::string_view val);
-        void put(std::string_view key, const char * val);
-        void put(const char * val);
-        void put(std::string_view key, char val);
-        void put(char val);
-        void put(std::string_view key, int64_t val);
-        void put(int64_t val);
-        void put(std::string_view key, int32_t val);
-        void put(int32_t val);
-        void put(std::string_view key, int16_t val);
-        void put(int16_t val);
-        void put(std::string_view key, int8_t val);
-        void put(int8_t val);
-        void put(std::string_view key, uint64_t val);
-        void put(uint64_t val);
-        void put(std::string_view key, uint32_t val);
-        void put(uint32_t val);
-        void put(std::string_view key, uint16_t val);
-        void put(uint16_t val);
-        void put(std::string_view key, uint8_t val);
-        void put(uint8_t val);
-        void put(std::string_view key, double val);
-        void put(double val);
-        void put(std::string_view key, bool val);
-        void put(bool val);
-        void put(std::string_view key, nullptr_t);
-        void put(nullptr_t);
+        void putKey(std::string_view k);
+        void putKey(const char * k) { putKey(std::string_view(k)); }
+        void putKey(char * k) { putKey(std::string_view(k)); }
+
+        void putVal(std::string_view val);
+        void putVal(const char * val);
+        void putVal(char val);
+        void putVal(int64_t val);
+        void putVal(int32_t val);
+        void putVal(int16_t val);
+        void putVal(int8_t val);
+        void putVal(uint64_t val);
+        void putVal(uint32_t val);
+        void putVal(uint16_t val);
+        void putVal(uint8_t val);
+        void putVal(double val);
+        void putVal(bool val);
+        void putVal(nullptr_t);
 
         void endObject();
 
@@ -106,6 +90,7 @@ namespace qjson {
         std::vector<State> m_state;
         int m_indentation;
         std::string_view m_indent;
+        bool m_isKey;
 
         void m_start(bool compact, char bracket);
 
@@ -115,9 +100,6 @@ namespace qjson {
 
         void m_putIndentation();
 
-        void m_putKey(std::string_view key);
-
-        void m_checkKey(std::string_view key) const;
         void m_checkKey() const;
 
         void m_encode(std::string_view val);
@@ -127,6 +109,14 @@ namespace qjson {
         void m_encode(bool val);
         void m_encode(nullptr_t);
 
+    };
+
+    template <typename T> struct Encoder;
+
+    template <> struct Encoder<int> {
+        void operator()(Writer & writer, int v) {
+
+        }
     };
 
 }
@@ -149,7 +139,8 @@ namespace qjson {
         m_ss(),
         m_state(),
         m_indentation(),
-        m_indent("        ", indentSize)
+        m_indent("        ", indentSize),
+        m_isKey()
     {
         if (indentSize < 0 || indentSize > 8) {
             throw JsonWriteError("Invalid indent size - must be in range [0, 8]");
@@ -169,189 +160,123 @@ namespace qjson {
         other.m_indent = {};
     }
 
-    inline void Writer::startObject(std::string_view key, bool compact) {
-        m_checkKey(key);
-        m_putPrefix();
-        m_putKey(key);
-        m_start(compact, '{');
-    }
-
     inline void Writer::startObject(bool compact) {
         m_checkKey();
-        m_putPrefix();
+        if (!m_isKey) m_putPrefix();
         m_start(compact, '{');
-    }
-
-    inline void Writer::startArray(std::string_view key, bool compact) {
-        m_checkKey(key);
-        m_putPrefix();
-        m_putKey(key);
-        m_start(compact, '[');
+        m_isKey = false;
     }
 
     inline void Writer::startArray(bool compact) {
         m_checkKey();
-        m_putPrefix();
+        if (!m_isKey) m_putPrefix();
         m_start(compact, '[');
+        m_isKey = false;
     }
 
-    inline void Writer::put(std::string_view key, std::string_view val) {
-        m_checkKey(key);
+    inline void Writer::putKey(std::string_view key) {
+        if (m_isKey) {
+            throw JsonWriteError("Expected value to follow key");
+        }
+        if (m_state.back().array) {
+            throw JsonWriteError("Array elements must not have keys");
+        }
+        if (key.empty()) {
+            throw JsonWriteError("Key must not be empty");
+        }
+
         m_putPrefix();
-        m_putKey(key);
-        m_encode(val);
-        m_state.back().content = true;
+        m_encode(key);
+        m_ss << ": "sv;
+        m_isKey = true;
     }
 
-    inline void Writer::put(std::string_view val) {
+    inline void Writer::putVal(std::string_view val) {
         m_checkKey();
-        m_putPrefix();
+        if (!m_isKey) m_putPrefix();
         m_encode(val);
         m_state.back().content = true;
+        m_isKey = false;
     }
 
-    inline void Writer::put(std::string_view key, const char * val) {
-        put(key, std::string_view(val));
+    inline void Writer::putVal(const char * val) {
+        putVal(std::string_view(val));
     }
 
-    inline void Writer::put(const char * val) {
-        put(std::string_view(val));
+    inline void Writer::putVal(char val) {
+        putVal(std::string_view(&val, 1));
     }
 
-    inline void Writer::put(std::string_view key, char val) {
-        put(key, std::string_view(&val, 1));
-    }
-
-    inline void Writer::put(char val) {
-        put(std::string_view(&val, 1));
-    }
-
-    inline void Writer::put(std::string_view key, int64_t val) {
-        m_checkKey(key);
-        m_putPrefix();
-        m_putKey(key);
-        m_encode(val);
-        m_state.back().content = true;
-    }
-
-    inline void Writer::put(int64_t val) {
+    inline void Writer::putVal(int64_t val) {
         m_checkKey();
-        m_putPrefix();
+        if (!m_isKey) m_putPrefix();
         m_encode(val);
         m_state.back().content = true;
+        m_isKey = false;
     }
 
-    inline void Writer::put(std::string_view key, int32_t val) {
-        put(key, int64_t(val));
+    inline void Writer::putVal(int32_t val) {
+        putVal(int64_t(val));
     }
 
-    inline void Writer::put(int32_t val) {
-        put(int64_t(val));
+    inline void Writer::putVal(int16_t val) {
+        putVal(int64_t(val));
     }
 
-    inline void Writer::put(std::string_view key, int16_t val) {
-        put(key, int64_t(val));
+    inline void Writer::putVal(int8_t val) {
+        putVal(uint64_t(val));
     }
 
-    inline void Writer::put(int16_t val) {
-        put(int64_t(val));
-    }
-
-    inline void Writer::put(std::string_view key, int8_t val) {
-        put(key, int64_t(val));
-    }
-
-    inline void Writer::put(int8_t val) {
-        put(uint64_t(val));
-    }
-
-    inline void Writer::put(std::string_view key, uint64_t val) {
-        m_checkKey(key);
-        m_putPrefix();
-        m_putKey(key);
-        m_encode(val);
-        m_state.back().content = true;
-    }
-
-    inline void Writer::put(uint64_t val) {
+    inline void Writer::putVal(uint64_t val) {
         m_checkKey();
-        m_putPrefix();
+        if (!m_isKey) m_putPrefix();
         m_encode(val);
         m_state.back().content = true;
+        m_isKey = false;
     }
 
-    inline void Writer::put(std::string_view key, uint32_t val) {
-        put(key, uint64_t(val));
+    inline void Writer::putVal(uint32_t val) {
+        putVal(uint64_t(val));
     }
 
-    inline void Writer::put(uint32_t val) {
-        put(uint64_t(val));
+    inline void Writer::putVal(uint16_t val) {
+        putVal(uint64_t(val));
     }
 
-    inline void Writer::put(std::string_view key, uint16_t val) {
-        put(key, uint64_t(val));
+    inline void Writer::putVal(uint8_t val) {
+        putVal(uint64_t(val));
     }
 
-    inline void Writer::put(uint16_t val) {
-        put(uint64_t(val));
-    }
-
-    inline void Writer::put(std::string_view key, uint8_t val) {
-        put(key, uint64_t(val));
-    }
-
-    inline void Writer::put(uint8_t val) {
-        put(uint64_t(val));
-    }
-
-    inline void Writer::put(std::string_view key, double val) {
-        m_checkKey(key);
-        m_putPrefix();
-        m_putKey(key);
-        m_encode(val);
-        m_state.back().content = true;
-    }
-
-    inline void Writer::put(double val) {
+    inline void Writer::putVal(double val) {
         m_checkKey();
-        m_putPrefix();
+        if (!m_isKey) m_putPrefix();
         m_encode(val);
         m_state.back().content = true;
+        m_isKey = false;
     }
 
-    inline void Writer::put(std::string_view key, bool val) {
-        m_checkKey(key);
-        m_putPrefix();
-        m_putKey(key);
-        m_encode(val);
-        m_state.back().content = true;
-    }
-
-    inline void Writer::put(bool val) {
+    inline void Writer::putVal(bool val) {
         m_checkKey();
-        m_putPrefix();
+        if (!m_isKey) m_putPrefix();
         m_encode(val);
         m_state.back().content = true;
+        m_isKey = false;
     }
 
-    inline void Writer::put(std::string_view key, nullptr_t) {
-        m_checkKey(key);
-        m_putPrefix();
-        m_putKey(key);
+    inline void Writer::putVal(nullptr_t) {
+        m_checkKey();
+        if (!m_isKey) m_putPrefix();
         m_encode(nullptr);
         m_state.back().content = true;
-    }
-
-    inline void Writer::put(nullptr_t) {
-        m_checkKey();
-        m_putPrefix();
-        m_encode(nullptr);
-        m_state.back().content = true;
+        m_isKey = false;
     }
 
     inline void Writer::endObject() {
         if (m_state.size() <= 1 || m_state.back().array) {
             throw JsonWriteError("No object to end");
+        }
+        if (m_isKey) {
+            throw JsonWriteError("Expected value to follow key");
         }
 
         m_end();
@@ -366,6 +291,10 @@ namespace qjson {
     }
 
     inline std::string Writer::finish() {
+        if (m_isKey) {
+            throw JsonWriteError("Expected value");
+        }
+
         bool compact(m_state.front().compact);
 
         while (!m_state.empty()) {
@@ -425,22 +354,8 @@ namespace qjson {
         }
     }
 
-    inline void Writer::m_putKey(std::string_view key) {
-        m_encode(key);
-        m_ss << ": "sv;
-    }
-
-    inline void Writer::m_checkKey(std::string_view key) const {
-        if (m_state.back().array) {
-            throw JsonWriteError("Array elements must not have keys");
-        }
-        if (key.empty()) {
-            throw JsonWriteError("Key must not be empty");
-        }
-    }
-
     inline void Writer::m_checkKey() const {
-        if (!m_state.back().array) {
+        if (!m_isKey && !m_state.back().array) {
             throw JsonWriteError("Object elements must have keys");
         }
     }
