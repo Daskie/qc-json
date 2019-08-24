@@ -71,12 +71,12 @@ namespace qjson {
     // A helper class to keep track of state, only the `read` function is important
     class Reader {
 
-      public:
+        public:
 
         // This is the sole function the user invokes directly
         friend Object read(std::string_view str);
 
-      private:
+        private:
 
         const char * const m_start, * const m_end, * m_pos;
 

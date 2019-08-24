@@ -5,7 +5,7 @@ Simple, lightweight JSON endoder/decoder for C++17
 ```c++
 qjson::Writer writer();
 writer.put("Name", "Roslin");
-writer.startArray("Favorite Books");
+writer.array("Favorite Books");
 writer.put("Dark Day");
 ...
 writer.endArray();
