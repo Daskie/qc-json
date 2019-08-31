@@ -12,8 +12,7 @@ using qjson::JsonWriteError;
 
 struct CustomVal { int x, y; };
 
-template <>
-void qjson_encode<CustomVal>(qjson::Writer & writer, const CustomVal & v) {
+void qjson_encode(qjson::Writer & writer, const CustomVal & v) {
     writer.array(true).val(v.x).val(v.y).end();
 }
 

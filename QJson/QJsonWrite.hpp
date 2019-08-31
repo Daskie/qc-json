@@ -112,14 +112,12 @@ namespace qjson {
 
 }
 
-// Specialize `qjson_encode` to enable Writer::val for custom types.
-// Example specialization:
-//      template <>
+// Implement `qjson_encode` to enable Writer::val for custom types.
+// Example:
 //      void qjson_encode(qjson::Writer & writer, const MyType & v) {
 //          writer.val(v.x).val(v.y);
 //      }
 //
-template <typename T> void qjson_encode(qjson::Writer &, const T &);
 
 // IMPLEMENTATION //////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -299,7 +297,7 @@ namespace qjson {
 
     template <typename T>
     inline Writer & Writer::val(const T & v) {
-        qjson_encode<T>(*this, v);
+        qjson_encode(*this, v);
         return *this;
     }
 
