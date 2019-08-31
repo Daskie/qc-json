@@ -164,62 +164,62 @@ R"({
     ]
 })"sv));
 
-        Assert::AreEqual(4ull, val.size());
+        Assert::AreEqual(size_t(4), val.size());
         Assert::AreEqual("Salt's Crust"s, val.at("Name")->asString());
         Assert::AreEqual(1964ll, val.at("Founded")->asInteger());
         
         const Array & employees(val.at("Employees")->asArray());
-        Assert::AreEqual(3ull, employees.size());
+        Assert::AreEqual(size_t(3), employees.size());
         {
             const Object & employee(employees.at(0)->asObject());
-            Assert::AreEqual(3ull, employee.size());
+            Assert::AreEqual(size_t(3), employee.size());
             Assert::AreEqual("Ol' Joe Fisher"s, employee.at("Name")->asString());
             Assert::AreEqual("Fisherman"s, employee.at("Title")->asString());
             Assert::AreEqual(69ll, employee.at("Age")->asInteger());
         }
         {
             const Object & employee(employees.at(1)->asObject());
-            Assert::AreEqual(3ull, employee.size());
+            Assert::AreEqual(size_t(3), employee.size());
             Assert::AreEqual("Mark Rower"s, employee.at("Name")->asString());
             Assert::AreEqual("Cook"s, employee.at("Title")->asString());
             Assert::AreEqual(41ll, employee.at("Age")->asInteger());
         }
         {
             const Object & employee(employees.at(2)->asObject());
-            Assert::AreEqual(3ull, employee.size());
+            Assert::AreEqual(size_t(3), employee.size());
             Assert::AreEqual("Phineas"s, employee.at("Name")->asString());
             Assert::AreEqual("Server Boy"s, employee.at("Title")->asString());
             Assert::AreEqual(19ll, employee.at("Age")->asInteger());
         }
 
         const Array & dishes(val.at("Dishes")->asArray());
-        Assert::AreEqual(3ull, dishes.size());
+        Assert::AreEqual(size_t(3), dishes.size());
         {
             const Object & dish(dishes.at(0)->asObject());
-            Assert::AreEqual(3ull, dish.size());
+            Assert::AreEqual(size_t(3), dish.size());
             Assert::AreEqual("Basket o' Barnacles"s, dish.at("Name")->asString());
             Assert::AreEqual(5.45, dish.at("Price")->asFloating(), 0.001);
             const Array & ingredients(dish.at("Ingredients")->asArray());
-            Assert::AreEqual(2ull, ingredients.size());
+            Assert::AreEqual(size_t(2), ingredients.size());
             Assert::AreEqual("Salt"s, ingredients.at(0)->asString());
             Assert::AreEqual("Barnacles"s, ingredients.at(1)->asString());
         }
         {
             const Object & dish(dishes.at(1)->asObject());
-            Assert::AreEqual(3ull, dish.size());
+            Assert::AreEqual(size_t(3), dish.size());
             Assert::AreEqual("Two Tuna"s, dish.at("Name")->asString());
             Assert::AreEqual(14.99, dish.at("Price")->asFloating(), 0.001);
             const Array & ingredients(dish.at("Ingredients")->asArray());
-            Assert::AreEqual(1ull, ingredients.size());
+            Assert::AreEqual(size_t(1), ingredients.size());
             Assert::AreEqual("Tuna"s, ingredients.at(0)->asString());
         }
         {
             const Object & dish(dishes.at(2)->asObject());
-            Assert::AreEqual(3ull, dish.size());
+            Assert::AreEqual(size_t(3), dish.size());
             Assert::AreEqual("18 Leg Bouquet"s, dish.at("Name")->asString());
             Assert::AreEqual(18.0, dish.at("Price")->asFloating(), 0.001);
             const Array & ingredients(dish.at("Ingredients")->asArray());
-            Assert::AreEqual(3ull, ingredients.size());
+            Assert::AreEqual(size_t(3), ingredients.size());
             Assert::AreEqual("Salt"s, ingredients.at(0)->asString());
             Assert::AreEqual("Octopus"s, ingredients.at(1)->asString());
             Assert::AreEqual("Crab"s, ingredients.at(2)->asString());
@@ -228,9 +228,9 @@ R"({
 
     TEST_METHOD(NoWhitespace) {
         Object val(qjson::read(R"({"a":["abc",-123,-123.456e-78,true,null]})"sv));
-        Assert::AreEqual(1ull, val.size());
+        Assert::AreEqual(size_t(1), val.size());
         const Array & arr(val.at("a")->asArray());
-        Assert::AreEqual(5ull, arr.size());
+        Assert::AreEqual(size_t(5), arr.size());
         Assert::AreEqual("abc"s, arr.at(0)->asString());
         Assert::AreEqual(-123ll, arr.at(1)->asInteger());
         Assert::AreEqual(-123.456e-78, arr.at(2)->asFloating(), 1.0e-82);

@@ -35,18 +35,6 @@ namespace qjson {
 }
 #endif
 
-// Specialize `QJsonEncoder` to enable Writer::val for custom types.
-// Must have a function call operator with signature `void operator()(qjson::Writer &, const T &)`
-// Example specialization:
-//
-//      template <> struct QJsonEncoder<MyType> {
-//          void operator()(qjson::Writer & writer, const MyType & v) {
-//              writer.val(v.x).val(v.y);
-//          }
-//      };
-//
-template <typename T> struct QJsonEncoder;
-
 namespace qjson {
 
     // This will be thrown if anything goes wrong during the encoding process
@@ -123,6 +111,15 @@ namespace qjson {
     };
 
 }
+
+// Specialize `qjson_encode` to enable Writer::val for custom types.
+// Example specialization:
+//      template <>
+//      void qjson_encode(qjson::Writer & writer, const MyType & v) {
+//          writer.val(v.x).val(v.y);
+//      }
+//
+template <typename T> void qjson_encode(qjson::Writer &, const T &);
 
 // IMPLEMENTATION //////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -302,7 +299,7 @@ namespace qjson {
 
     template <typename T>
     inline Writer & Writer::val(const T & v) {
-        QJsonEncoder<T>()(*this, v);
+        qjson_encode<T>(*this, v);
         return *this;
     }
 

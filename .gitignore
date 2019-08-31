@@ -4,4 +4,7 @@
 *.sln
 
 .vs/
-x64/
+Debug/
+Release/
+x64/Debug/
+x64/Release/
