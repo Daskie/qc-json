@@ -297,7 +297,7 @@ namespace qjson {
 
     template <typename T>
     inline Writer & Writer::val(const T & v) {
-        qjson_encode(*this, v);
+        ::qjson_encode(*this, v);
         return *this;
     }
 
