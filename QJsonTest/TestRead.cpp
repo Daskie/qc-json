@@ -19,6 +19,14 @@ namespace Microsoft { namespace VisualStudio { namespace CppUnitTestFramework {
     template <> static std::wstring ToString<Type>(const Type & type) { return std::to_wstring(std::underlying_type_t<Type>(type)); }
 }}}
 
+struct CustomVal { int x, y; };
+
+template <>
+CustomVal qjson_decode<CustomVal>(const Value & val) {
+    const Array & arr(val.asArray());
+    return {int(arr.at(0)->asInteger()), int(arr.at(1)->asInteger())};
+}
+
 TEST_CLASS(Read) {
 
     public:
@@ -137,6 +145,13 @@ TEST_CLASS(Read) {
     TEST_METHOD(Null) {
         Object val(qjson::read(R"({ "v": null })"sv));
         Assert::AreEqual(Type::null, val.at("v")->type());
+    }
+
+    TEST_METHOD(Custom) {
+        Object val(qjson::read(R"({ "v": [ 1, 2 ] })"sv));
+        CustomVal customVal(val.at("v")->as<CustomVal>());
+        Assert::AreEqual(1, customVal.x);
+        Assert::AreEqual(2, customVal.y);
     }
 
     TEST_METHOD(General) {

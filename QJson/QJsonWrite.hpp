@@ -112,10 +112,10 @@ namespace qjson {
 
 }
 
-// Implement `qjson_encode` to enable Writer::val for custom types.
+// Implement `qjson_encode` to enable Writer::val for custom types
 // Example:
-//      void qjson_encode(qjson::Writer & writer, const MyType & v) {
-//          writer.val(v.x).val(v.y);
+//      void qjson_encode(qjson::Writer & writer, const std::pair<int, int> & v) {
+//          writer.val(v.first).val(v.second);
 //      }
 //
 
