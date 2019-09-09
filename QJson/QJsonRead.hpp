@@ -37,6 +37,12 @@ namespace qjson {
 
 namespace qjson {
 
+    using std::string;
+    using std::string_view;
+    using std::unique_ptr;
+    using namespace std::string_literals;
+    using namespace std::string_view_literals;
+
     // This will be thrown if anything goes wrong during the decoding process
     // `position` is the index into the string where the error occured (roughly)
     struct JsonReadError : public JsonError {
@@ -51,45 +57,57 @@ namespace qjson {
 
     struct Value;
 
-    using Object = std::unordered_map<std::string, std::unique_ptr<Value>>;
-    using Array = std::vector<std::unique_ptr<Value>>;
+    using Object = std::unordered_map<string, unique_ptr<Value>>;
+    using Array = std::vector<unique_ptr<Value>>;
 
     struct Value {
 
         virtual Type type() const = 0;
 
-        virtual const      Object &   asObject() const { throw JsonTypeError(); }
-        virtual const       Array &    asArray() const { throw JsonTypeError(); }
-        virtual const std::string &   asString() const { throw JsonTypeError(); }
-        virtual           int64_t    asInteger() const { throw JsonTypeError(); }
-        virtual            double   asFloating() const { throw JsonTypeError(); }
-        virtual              bool    asBoolean() const { throw JsonTypeError(); }
-        template <typename T> T as() const {
-            return qjson_decode<T>(*this);
-        }
+        virtual const  Object &   asObject() const { throw JsonTypeError(); }
+        virtual const   Array &    asArray() const { throw JsonTypeError(); }
+        virtual const  string &   asString() const { throw JsonTypeError(); }
+        virtual       int64_t    asInteger() const { throw JsonTypeError(); }
+        virtual        double   asFloating() const { throw JsonTypeError(); }
+        virtual          bool    asBoolean() const { throw JsonTypeError(); }
+
+        template <typename T> T as() const { return qjson_decode<T>()(*this); }
+
+        template <> string_view as<string_view>() const { return asString(); }
+        template <>        char as<       char>() const { const string & s(asString()); if (s.length() > 1) throw JsonTypeError(); return s.front(); };
+        template <>     int64_t as<    int64_t>() const { return          asInteger() ; }
+        template <>     int32_t as<    int32_t>() const { return  int32_t(asInteger()); }
+        template <>     int16_t as<    int16_t>() const { return  int16_t(asInteger()); }
+        template <>      int8_t as<     int8_t>() const { return   int8_t(asInteger()); }
+        template <>    uint64_t as<   uint64_t>() const { return uint64_t(asInteger()); }
+        template <>    uint32_t as<   uint32_t>() const { return uint32_t(asInteger()); }
+        template <>    uint16_t as<   uint16_t>() const { return uint16_t(asInteger()); }
+        template <>     uint8_t as<    uint8_t>() const { return  uint8_t(asInteger()); }
+        template <>      double as<     double>() const { return       asFloating() ; }
+        template <>       float as<      float>() const { return float(asFloating()); }
+        template <>        bool as<       bool>() const { return asBoolean(); }
 
     };
 
-    Object read(std::string_view str);
+    Object read(string_view str);
 
 }
 
-// Specialize `qjson_dencode` to enable Value::as for custom types
+// Specialize `qjson_decode` to enable Value::as for custom types
 // Example:
 //      template <>
-//      std::pair<int, int> qjson_dencode<std::pair<int, int>>(qjson::Value & v) {
-//          const Array & arr(v.asArray());
-//          return {arr.at(0)->asInteger(), arr.at(1)->asInteger()};
-//      }
+//      struct qjson_decode<std::pair<int, int>> {
+//          std::pair<int, int> operator()(const qjson::Value & v) {
+//              const Array & arr(v.asArray());
+//              return {arr.at(0)->asInteger(), arr.at(1)->asInteger()};
+//          }
+//      };
 //
-template <typename T> T qjson_decode(const qjson::Value & v);
+template <typename T> struct qjson_decode;
 
 // IMPLEMENTATION //////////////////////////////////////////////////////////////////////////////////////////////////////
 
 namespace qjson {
-
-    using namespace std::string_literals;
-    using namespace std::string_view_literals;
 
     namespace detail {
 
@@ -106,10 +124,10 @@ namespace qjson {
         };
 
         struct StringWrapper : public Value {
-            std::string val;
-            StringWrapper(std::string && str) : val(move(str)) {}
+            string val;
+            StringWrapper(string && str) : val(move(str)) {}
             virtual Type type() const override { return Type::string; }
-            virtual const std::string & asString() const override { return val; }
+            virtual const string & asString() const override { return val; }
         };
 
         struct IntegerWrapper : public Value {
@@ -184,7 +202,7 @@ namespace qjson {
 
             const char * const m_start, * const m_end, * m_pos;
 
-            Reader(std::string_view str) :
+            Reader(string_view str) :
                 m_start(str.data()),
                 m_end(m_start + str.length()),
                 m_pos(m_start)
@@ -194,7 +212,7 @@ namespace qjson {
                 m_skipWhitespace();
                 m_readChar('{');
 
-                std::unique_ptr<Value> val(m_readObject());
+                unique_ptr<Value> val(m_readObject());
 
                 m_skipWhitespace();
                 if (m_pos != m_end) {
@@ -236,7 +254,7 @@ namespace qjson {
                 }
             }
 
-            bool m_checkString(std::string_view str) {
+            bool m_checkString(string_view str) {
                 if (m_remaining() >= str.length()) {
                     for (size_t i(0); i < str.length(); ++i) {
                         if (m_pos[i] != str[i]) {
@@ -251,7 +269,7 @@ namespace qjson {
                 }
             }
 
-            std::unique_ptr<Value> m_readValue() {
+            unique_ptr<Value> m_readValue() {
                 if (!m_isMore()) {
                     throw JsonReadError("Expected value", m_position());
                 }
@@ -286,8 +304,8 @@ namespace qjson {
                 }
             }
 
-            std::unique_ptr<Value> m_readObject() {
-                std::unique_ptr<ObjectWrapper> obj(std::make_unique<ObjectWrapper>());
+            unique_ptr<Value> m_readObject() {
+                unique_ptr<ObjectWrapper> obj(std::make_unique<ObjectWrapper>());
 
                 m_skipWhitespace();
                 if (m_checkChar('}')) {
@@ -295,7 +313,7 @@ namespace qjson {
                 }
 
                 m_readChar('"');
-                std::string key(m_readString());
+                string key(m_readString());
                 m_skipWhitespace();
                 m_readChar(':');
                 m_skipWhitespace();
@@ -317,8 +335,8 @@ namespace qjson {
                 return std::move(obj);
             }
 
-            std::unique_ptr<Value> m_readArray() {
-                std::unique_ptr<ArrayWrapper> arr(std::make_unique<ArrayWrapper>());
+            unique_ptr<Value> m_readArray() {
+                unique_ptr<ArrayWrapper> arr(std::make_unique<ArrayWrapper>());
 
                 m_skipWhitespace();
                 if (m_checkChar(']')) {
@@ -339,7 +357,7 @@ namespace qjson {
                 return std::move(arr);
             }
 
-            void m_readEscaped(std::string & str) {
+            void m_readEscaped(string & str) {
                 if (!m_isMore()) {
                     throw JsonReadError("Expected escape sequence", m_position());
                 }
@@ -396,9 +414,9 @@ namespace qjson {
                 return (v3 << 4) | v4;
             }
 
-            std::string m_readString() {
+            string m_readString() {
                 const char * start(m_pos);
-                std::string str;
+                string str;
 
                 while (true) {
                     if (!m_isMore()) {
@@ -480,7 +498,7 @@ namespace qjson {
                 return val;
             }
 
-            std::unique_ptr<Value> m_readNumber() {
+            unique_ptr<Value> m_readNumber() {
                 if (!m_isMore()) {
                     throw JsonReadError("Expected number", m_position());
                 }
@@ -570,7 +588,7 @@ namespace qjson {
 
     using namespace detail;
 
-    inline Object read(std::string_view str) {
+    inline Object read(string_view str) {
         return Reader(str)();
     }
 

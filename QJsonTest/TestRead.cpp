@@ -17,15 +17,18 @@ using qjson::Type;
 
 namespace Microsoft { namespace VisualStudio { namespace CppUnitTestFramework {
     template <> static std::wstring ToString<Type>(const Type & type) { return std::to_wstring(std::underlying_type_t<Type>(type)); }
+    template <> static std::wstring ToString<uint16_t>(const uint16_t & v) { return std::to_wstring(v); }
 }}}
 
 struct CustomVal { int x, y; };
 
 template <>
-CustomVal qjson_decode<CustomVal>(const Value & val) {
-    const Array & arr(val.asArray());
-    return {int(arr.at(0)->asInteger()), int(arr.at(1)->asInteger())};
-}
+struct qjson_decode<CustomVal> {
+    CustomVal operator()(const Value & val) {
+        const Array & arr(val.asArray());
+        return {int(arr.at(0)->asInteger()), int(arr.at(1)->asInteger())};
+    }
+};
 
 TEST_CLASS(Read) {
 
@@ -145,6 +148,23 @@ TEST_CLASS(Read) {
     TEST_METHOD(Null) {
         Object val(qjson::read(R"({ "v": null })"sv));
         Assert::AreEqual(Type::null, val.at("v")->type());
+    }
+
+    TEST_METHOD(As) {
+        Object val(qjson::read(R"({ "s": "!", "i": 0, "f": 0.0, "b": true })"));
+        Assert::AreEqual("!"sv, val.at("s")->as<std::string_view>());
+        Assert::AreEqual('!', val.at("s")->as<char>());
+        Assert::AreEqual(int64_t(0), val.at("i")->as<int64_t>());
+        Assert::AreEqual(int32_t(0), val.at("i")->as<int32_t>());
+        Assert::AreEqual(int16_t(0), val.at("i")->as<int16_t>());
+        Assert::AreEqual(int8_t(0), val.at("i")->as<int8_t>());
+        Assert::AreEqual(uint64_t(0), val.at("i")->as<uint64_t>());
+        Assert::AreEqual(uint32_t(0), val.at("i")->as<uint32_t>());
+        Assert::AreEqual(uint16_t(0), val.at("i")->as<uint16_t>());
+        Assert::AreEqual(uint8_t(0), val.at("i")->as<uint8_t>());
+        Assert::AreEqual(0.0, val.at("f")->as<double>());
+        Assert::AreEqual(0.0f, val.at("f")->as<float>());
+        Assert::AreEqual(true, val.at("b")->as<bool>());
     }
 
     TEST_METHOD(Custom) {

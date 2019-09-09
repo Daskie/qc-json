@@ -37,6 +37,11 @@ namespace qjson {
 
 namespace qjson {
 
+    using std::string;
+    using std::string_view;
+    using namespace std::string_literals;
+    using namespace std::string_view_literals;
+
     // This will be thrown if anything goes wrong during the encoding process
     struct JsonWriteError : public JsonError {
         JsonWriteError(const char * msg) : JsonError(msg) {}
@@ -57,10 +62,10 @@ namespace qjson {
 
         Writer & array(bool compact = false);
 
-        Writer & key(std::string_view k);
+        Writer & key(string_view k);
 
-        Writer & val(std::string_view v);
-        Writer & val(const std::string & v);
+        Writer & val(string_view v);
+        Writer & val(const string & v);
         Writer & val(const char * v);
         Writer & val(char v);
         Writer & val(int64_t v);
@@ -79,7 +84,7 @@ namespace qjson {
 
         Writer & end();
 
-        std::string finish();
+        string finish();
 
         private:
 
@@ -88,7 +93,7 @@ namespace qjson {
         std::ostringstream m_ss;
         std::vector<State> m_state;
         int m_indentation;
-        std::string_view m_indent;
+        string_view m_indent;
         bool m_isKey;
 
         void m_start(bool compact, char bracket);
@@ -101,7 +106,7 @@ namespace qjson {
 
         void m_checkKey() const;
 
-        void m_encode(std::string_view val);
+        void m_encode(string_view val);
         void m_encode(int64_t val);
         void m_encode(uint64_t val);
         void m_encode(double val);
@@ -122,8 +127,6 @@ namespace qjson {
 // IMPLEMENTATION //////////////////////////////////////////////////////////////////////////////////////////////////////
 
 namespace qjson {
-
-    using namespace std::string_view_literals;
 
     namespace detail {
 
@@ -176,7 +179,7 @@ namespace qjson {
         return *this;
     }
 
-    inline Writer & Writer::key(std::string_view key) {
+    inline Writer & Writer::key(string_view key) {
         if (m_isKey) {
             throw JsonWriteError("Expected value to follow key");
         }
@@ -195,7 +198,7 @@ namespace qjson {
         return *this;
     }
 
-    inline Writer & Writer::val(std::string_view v) {
+    inline Writer & Writer::val(string_view v) {
         m_checkKey();
         if (!m_isKey) m_putPrefix();
         m_encode(v);
@@ -205,16 +208,16 @@ namespace qjson {
         return *this;
     }
 
-    inline Writer & Writer::val(const std::string & v) {
-        return val(std::string_view(v));
+    inline Writer & Writer::val(const string & v) {
+        return val(string_view(v));
     }
 
     inline Writer & Writer::val(const char * v) {
-        return val(std::string_view(v));
+        return val(string_view(v));
     }
 
     inline Writer & Writer::val(char v) {
-        return val(std::string_view(&v, 1));
+        return val(string_view(&v, 1));
     }
 
     inline Writer & Writer::val(int64_t v) {
@@ -314,7 +317,7 @@ namespace qjson {
         return *this;
     }
 
-    inline std::string Writer::finish() {
+    inline string Writer::finish() {
         if (m_isKey) {
             throw JsonWriteError("Expected value");
         }
@@ -324,7 +327,7 @@ namespace qjson {
         while (!m_state.empty()) {
             m_end();
         }
-        std::string str(m_ss.str());
+        string str(m_ss.str());
 
         // Reset state
         m_ss.str("");
@@ -384,7 +387,7 @@ namespace qjson {
         }
     }
 
-    inline void Writer::m_encode(std::string_view v) {
+    inline void Writer::m_encode(string_view v) {
         m_ss << '"';
 
         for (char c : v) {
@@ -433,7 +436,7 @@ namespace qjson {
             uv = quotent;
         } while (uv);
 
-        m_ss << std::string_view(pos, end - pos);
+        m_ss << string_view(pos, end - pos);
     }
 
     inline void Writer::m_encode(uint64_t v) {
@@ -448,7 +451,7 @@ namespace qjson {
             v >>= 4;
         } while (v);
 
-        m_ss << std::string_view(pos, end - pos);
+        m_ss << string_view(pos, end - pos);
     }
 
     inline void Writer::m_encode(double v) {
@@ -465,7 +468,7 @@ namespace qjson {
             throw JsonWriteError("Error encoding float");
         }
 
-        m_ss << std::string_view(buffer, len);
+        m_ss << string_view(buffer, len);
     }
 
     inline void Writer::m_encode(bool v) {
