@@ -114,12 +114,12 @@ TEST_CLASS(Write) {
         }
         { // Max
             Writer writer(true);
-            writer.key("v").val(9223372036854775807ll);
+            writer.key("v").val(9223372036854775807LL);
             Assert::AreEqual(R"({ "v": 9223372036854775807 })"s, writer.finish());
         }
         { // Min
             Writer writer(true);
-            writer.key("v").val(-9223372036854775808ll);
+            writer.key("v").val(-9223372036854775808LL);
             Assert::AreEqual(R"({ "v": -9223372036854775808 })"s, writer.finish());
         }
         { // Fewer digits
@@ -137,7 +137,7 @@ TEST_CLASS(Write) {
         }
         { // Max
             Writer writer(true);
-            writer.key("v").val(0xFFFFFFFFFFFFFFFFull);
+            writer.key("v").val(0xFFFFFFFFFFFFFFFFULL);
             Assert::AreEqual(R"({ "v": 0xFFFFFFFFFFFFFFFF })"s, writer.finish());
         }
         { // Something else
@@ -155,13 +155,13 @@ TEST_CLASS(Write) {
         }
         { // Max
             Writer writer(true);
-            uint64_t val(0b0111111111101111111111111111111111111111111111111111111111111111ull);
+            uint64_t val(0b0111111111101111111111111111111111111111111111111111111111111111ULL);
             writer.key("v").val(reinterpret_cast<double &>(val));
             Assert::AreEqual(R"({ "v": 1.7976931348623157e+308 })"s, writer.finish());
         }
         { // Negative min
             Writer writer(true);
-            uint64_t val(0b1000000000010000000000000000000000000000000000000000000000000000ull);
+            uint64_t val(0b1000000000010000000000000000000000000000000000000000000000000000ULL);
             writer.key("v").val(reinterpret_cast<double &>(val));
             Assert::AreEqual(R"({ "v": -2.2250738585072014e-308 })"s, writer.finish());
         }

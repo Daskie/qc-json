@@ -53,11 +53,11 @@ TEST_CLASS(Read) {
     TEST_METHOD(Integer) {
         { // Zero
             Object val(qjson::read(R"({ "v": 0 })"sv));
-            Assert::AreEqual(0ll, val.at("v")->asInteger());
+            Assert::AreEqual(0LL, val.at("v")->asInteger());
         }
         { // Normal
             Object val(qjson::read(R"({ "v": 123 })"sv));
-            Assert::AreEqual(123ll, val.at("v")->asInteger());
+            Assert::AreEqual(123LL, val.at("v")->asInteger());
         }
         { // Min
             Object val(qjson::read(R"({ "v": -9223372036854775808 })"sv));
@@ -67,24 +67,28 @@ TEST_CLASS(Read) {
             Object val(qjson::read(R"({ "v": 9223372036854775807 })"sv));
             Assert::AreEqual(std::numeric_limits<int64_t>::max(), val.at("v")->asInteger());
         }
+        { // Overflow
+            Object val(qjson::read(R"({ "v": 18446744073709551615 })"sv));
+            Assert::AreEqual(-1LL, val.at("v")->asInteger());
+        }
     }
 
     TEST_METHOD(Hex) {
         { // Zero
             Object val(qjson::read(R"({ "v": 0x0 })"sv));
-            Assert::AreEqual(0x0ull, val.at("v")->asHex());
+            Assert::AreEqual(0x0ULL, uint64_t(val.at("v")->asInteger()));
         }
         { // Uppercase
             Object val(qjson::read(R"({ "v": 0x0123456789ABCDEF })"sv));
-            Assert::AreEqual(0x0123456789ABCDEFull, val.at("v")->asHex());
+            Assert::AreEqual(0x0123456789ABCDEFULL, uint64_t(val.at("v")->asInteger()));
         }
         { // Lowercase
             Object val(qjson::read(R"({ "v": 0x0123456789abcdef })"sv));
-            Assert::AreEqual(0x0123456789ABCDEFull, val.at("v")->asHex());
+            Assert::AreEqual(0x0123456789ABCDEFULL, uint64_t(val.at("v")->asInteger()));
         }
         { // Max
             Object val(qjson::read(R"({ "v": 0xFFFFFFFFFFFFFFFF })"sv));
-            Assert::AreEqual(0xFFFFFFFFFFFFFFFFull, val.at("v")->asHex());
+            Assert::AreEqual(0xFFFFFFFFFFFFFFFFULL, uint64_t(val.at("v")->asInteger()));
         }
     }
 
@@ -166,7 +170,7 @@ R"({
 
         Assert::AreEqual(size_t(4), val.size());
         Assert::AreEqual("Salt's Crust"s, val.at("Name")->asString());
-        Assert::AreEqual(1964ll, val.at("Founded")->asInteger());
+        Assert::AreEqual(1964LL, val.at("Founded")->asInteger());
         
         const Array & employees(val.at("Employees")->asArray());
         Assert::AreEqual(size_t(3), employees.size());
@@ -175,21 +179,21 @@ R"({
             Assert::AreEqual(size_t(3), employee.size());
             Assert::AreEqual("Ol' Joe Fisher"s, employee.at("Name")->asString());
             Assert::AreEqual("Fisherman"s, employee.at("Title")->asString());
-            Assert::AreEqual(69ll, employee.at("Age")->asInteger());
+            Assert::AreEqual(69LL, employee.at("Age")->asInteger());
         }
         {
             const Object & employee(employees.at(1)->asObject());
             Assert::AreEqual(size_t(3), employee.size());
             Assert::AreEqual("Mark Rower"s, employee.at("Name")->asString());
             Assert::AreEqual("Cook"s, employee.at("Title")->asString());
-            Assert::AreEqual(41ll, employee.at("Age")->asInteger());
+            Assert::AreEqual(41LL, employee.at("Age")->asInteger());
         }
         {
             const Object & employee(employees.at(2)->asObject());
             Assert::AreEqual(size_t(3), employee.size());
             Assert::AreEqual("Phineas"s, employee.at("Name")->asString());
             Assert::AreEqual("Server Boy"s, employee.at("Title")->asString());
-            Assert::AreEqual(19ll, employee.at("Age")->asInteger());
+            Assert::AreEqual(19LL, employee.at("Age")->asInteger());
         }
 
         const Array & dishes(val.at("Dishes")->asArray());
@@ -232,7 +236,7 @@ R"({
         const Array & arr(val.at("a")->asArray());
         Assert::AreEqual(size_t(5), arr.size());
         Assert::AreEqual("abc"s, arr.at(0)->asString());
-        Assert::AreEqual(-123ll, arr.at(1)->asInteger());
+        Assert::AreEqual(-123LL, arr.at(1)->asInteger());
         Assert::AreEqual(-123.456e-78, arr.at(2)->asFloating(), 1.0e-82);
         Assert::IsTrue(arr.at(3)->asBoolean());
         Assert::AreEqual(Type::null, arr.at(4)->type());
@@ -248,22 +252,58 @@ R"({
         const auto & fval(val.at("f"));
         const auto & bval(val.at("b"));
         const auto & nval(val.at("n"));
+
         Assert::AreEqual(Type::  object, oval->type());
         Assert::AreEqual(Type::   array, aval->type());
         Assert::AreEqual(Type::  string, sval->type());
         Assert::AreEqual(Type:: integer, ival->type());
-        Assert::AreEqual(Type::     hex, hval->type());
+        Assert::AreEqual(Type:: integer, hval->type());
         Assert::AreEqual(Type::floating, fval->type());
         Assert::AreEqual(Type:: boolean, bval->type());
         Assert::AreEqual(Type::    null, nval->type());
-        Assert::ExpectException<JsonTypeError>([&]() { oval->   asArray(); });
-        Assert::ExpectException<JsonTypeError>([&]() { aval->  asString(); });
-        Assert::ExpectException<JsonTypeError>([&]() { sval-> asInteger(); });
-        Assert::ExpectException<JsonTypeError>([&]() { ival->     asHex(); });
-        Assert::ExpectException<JsonTypeError>([&]() { hval->asFloating(); });
-        Assert::ExpectException<JsonTypeError>([&]() { fval-> asBoolean(); });
-        Assert::ExpectException<JsonTypeError>([&]() { bval->  asObject(); });
-        Assert::ExpectException<JsonTypeError>([&]() { nval->  asObject(); });
+
+        Assert::ExpectException<JsonTypeError>([&]() { oval->asArray();    });
+        Assert::ExpectException<JsonTypeError>([&]() { oval->asString();   });
+        Assert::ExpectException<JsonTypeError>([&]() { oval->asInteger();  });
+        Assert::ExpectException<JsonTypeError>([&]() { oval->asFloating(); });
+        Assert::ExpectException<JsonTypeError>([&]() { oval->asBoolean();  });
+
+        Assert::ExpectException<JsonTypeError>([&]() { aval->asObject();   });
+        Assert::ExpectException<JsonTypeError>([&]() { aval->asString();   });
+        Assert::ExpectException<JsonTypeError>([&]() { aval->asInteger();  });
+        Assert::ExpectException<JsonTypeError>([&]() { aval->asFloating(); });
+        Assert::ExpectException<JsonTypeError>([&]() { aval->asBoolean();  });
+
+        Assert::ExpectException<JsonTypeError>([&]() { sval->asObject();   });
+        Assert::ExpectException<JsonTypeError>([&]() { sval->asArray();    });
+        Assert::ExpectException<JsonTypeError>([&]() { sval->asInteger();  });
+        Assert::ExpectException<JsonTypeError>([&]() { sval->asFloating(); });
+        Assert::ExpectException<JsonTypeError>([&]() { sval->asBoolean();  });
+
+        Assert::ExpectException<JsonTypeError>([&]() { ival->asObject();   });
+        Assert::ExpectException<JsonTypeError>([&]() { ival->asArray();    });
+        Assert::ExpectException<JsonTypeError>([&]() { ival->asString();   });
+        Assert::ExpectException<JsonTypeError>([&]() { ival->asFloating(); });
+        Assert::ExpectException<JsonTypeError>([&]() { ival->asBoolean();  });
+
+        Assert::ExpectException<JsonTypeError>([&]() { fval->asObject();  });
+        Assert::ExpectException<JsonTypeError>([&]() { fval->asArray();   });
+        Assert::ExpectException<JsonTypeError>([&]() { fval->asString();  });
+        Assert::ExpectException<JsonTypeError>([&]() { fval->asInteger(); });
+        Assert::ExpectException<JsonTypeError>([&]() { fval->asBoolean(); });
+
+        Assert::ExpectException<JsonTypeError>([&]() { bval->asObject();   });
+        Assert::ExpectException<JsonTypeError>([&]() { bval->asArray();    });
+        Assert::ExpectException<JsonTypeError>([&]() { bval->asString();   });
+        Assert::ExpectException<JsonTypeError>([&]() { bval->asInteger();  });
+        Assert::ExpectException<JsonTypeError>([&]() { bval->asFloating(); });
+
+        Assert::ExpectException<JsonTypeError>([&]() { nval->asObject();   });
+        Assert::ExpectException<JsonTypeError>([&]() { nval->asArray();    });
+        Assert::ExpectException<JsonTypeError>([&]() { nval->asString();   });
+        Assert::ExpectException<JsonTypeError>([&]() { nval->asInteger();  });
+        Assert::ExpectException<JsonTypeError>([&]() { nval->asFloating(); });
+        Assert::ExpectException<JsonTypeError>([&]() { nval->asBoolean();  });
     }
 
     TEST_METHOD(Exceptions) {
@@ -333,18 +373,24 @@ R"({
             Assert::ExpectException<JsonReadError>([]() { qjson::read(R"({ "a": -A })"); });
         }
         { // Integer value too large
-            Assert::ExpectException<JsonReadError>([]() { qjson::read(R"({ "a": 9999999999999999999 })"); });
+            Assert::ExpectException<JsonReadError>([]() { qjson::read(R"({ "a": 18446744073709551616 })"); });
         }
         { // Too many integer digits
-            Assert::ExpectException<JsonReadError>([]() { qjson::read(R"({ "a": 00000000000000000000 })"); });
+            Assert::ExpectException<JsonReadError>([]() { qjson::read(R"({ "a": 000000000000000000000 })"); });
         }
         { // Missing fractional component
             Assert::ExpectException<JsonReadError>([]() { qjson::read(R"({ "a": 0. })"); });
+        }
+        { // Fractional component too large
+            Assert::ExpectException<JsonReadError>([]() { qjson::read(R"({ "a": 0.18446744073709551616 })"); });
         }
         { // Missing exponent
             Assert::ExpectException<JsonReadError>([]() { qjson::read(R"({ "a": 0e })"); });
             Assert::ExpectException<JsonReadError>([]() { qjson::read(R"({ "a": 0e+ })"); });
             Assert::ExpectException<JsonReadError>([]() { qjson::read(R"({ "a": 0e- })"); });
+        }
+        { // Exponent too large
+            Assert::ExpectException<JsonReadError>([]() { qjson::read(R"({ "a": 0e1001 })"); });
         }
     }
 

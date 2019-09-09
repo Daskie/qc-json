@@ -47,7 +47,7 @@ namespace qjson {
     // This will be thrown when attempting to access as value as the wrong type
     struct JsonTypeError : public JsonError {};
 
-    enum class Type { object, array, string, integer, hex, floating, boolean, null };
+    enum class Type { object, array, string, integer, floating, boolean, null };
 
     struct Value;
 
@@ -62,9 +62,11 @@ namespace qjson {
         virtual const       Array &    asArray() const { throw JsonTypeError(); }
         virtual const std::string &   asString() const { throw JsonTypeError(); }
         virtual           int64_t    asInteger() const { throw JsonTypeError(); }
-        virtual          uint64_t        asHex() const { throw JsonTypeError(); }
         virtual            double   asFloating() const { throw JsonTypeError(); }
         virtual              bool    asBoolean() const { throw JsonTypeError(); }
+        template <typename T> T as() const {
+            return qjson_decode<T>(*this);
+        }
 
     };
 
@@ -112,7 +114,7 @@ namespace qjson {
 
         uint64_t m_readHex();
 
-        int64_t m_readInteger(bool negative);
+        uint64_t m_readUnsignedInteger();
 
         std::unique_ptr<Value> m_readNumber();
 
@@ -155,13 +157,6 @@ namespace qjson {
             virtual int64_t asInteger() const override { return val; }
         };
 
-        struct HexWrapper : public Value {
-            uint64_t val;
-            HexWrapper(uint64_t val) : val(val) {}
-            virtual Type type() const override { return Type::hex; }
-            virtual uint64_t asHex() const override { return val; }
-        };
-
         struct FloatingWrapper : public Value {
             double val;
             FloatingWrapper(double val) : val(val) {}
@@ -199,7 +194,7 @@ namespace qjson {
             -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1
         };
 
-        inline double fastPow(double v, uint64_t e) {
+        inline double fastPow(double v, unsigned int e) {
             double r(1.0);
 
             do {
@@ -211,12 +206,12 @@ namespace qjson {
             return r;
         }
 
-        inline double fastPow(double v, int64_t e) {
+        inline double fastPow(double v, int e) {
             if (e >= 0) {
-                return pow(v, uint64_t(e));
+                return pow(v, unsigned int(e));
             }
             else {
-                return pow(1.0 / v, uint64_t(-e));
+                return pow(1.0 / v, unsigned int(-e));
             }
         }
 
@@ -492,7 +487,7 @@ namespace qjson {
         return val;
     }
 
-    inline int64_t Reader::m_readInteger(bool negative) {
+    inline uint64_t Reader::m_readUnsignedInteger() {
         if (!m_isMore()) {
             throw JsonReadError("Expected integer sequence", m_position());
         }
@@ -501,20 +496,27 @@ namespace qjson {
             throw JsonReadError("Invalid digit", m_position());
         }
 
-        uint64_t uval(*m_pos - '0');
+        uint64_t val(*m_pos - '0');
         ++m_pos;
 
         for (int digits(1); digits < 19 && m_isMore() && std::isdigit(*m_pos); ++digits, ++m_pos) {
-            uval = uval * 10 + (*m_pos - '0');
+            val = val * 10 + (*m_pos - '0');
         }
 
-        bool inRange(uval < 0x8000000000000000ull || negative && uval == 0x8000000000000000ull);
-        if (!inRange || m_isMore() && std::isdigit(*m_pos)) {
-            throw JsonReadError("Integer value is too large", m_position());
+        if (m_isMore() && std::isdigit(*m_pos)) {
+            uint64_t potentialVal(val * 10 + (*m_pos - '0'));
+            if (potentialVal < val) {
+                throw JsonReadError("Integer too large", m_position());
+            }
+            val = potentialVal;
+            ++m_pos;
+
+            if (m_isMore() && std::isdigit(*m_pos)) {
+                throw JsonReadError("Too many digits", m_position());
+            }
         }
 
-        int64_t sval{int64_t(uval)};
-        return negative ? -sval : sval;
+        return val;
     }
 
     inline std::unique_ptr<Value> Reader::m_readNumber() {
@@ -525,7 +527,7 @@ namespace qjson {
         // Hexadecimal
         if (m_remaining() >= 3 && m_pos[0] == '0' && m_pos[1] == 'x') {
             m_pos += 2;
-            return std::make_unique<HexWrapper>(m_readHex());
+            return std::make_unique<IntegerWrapper>(int64_t(m_readHex()));
         }
 
         // Parse sign
@@ -539,11 +541,11 @@ namespace qjson {
         }
 
         // Parse whole part
-        int64_t integer(m_readInteger(negative));
+        uint64_t integer(m_readUnsignedInteger());
 
         // Parse fractional part
-        int64_t fraction(0);
-        int64_t fractionDigits(0);
+        uint64_t fraction(0);
+        int fractionDigits(0);
         if (m_isMore() && *m_pos == '.') {
             ++m_pos;
             if (!m_isMore()) {
@@ -551,13 +553,13 @@ namespace qjson {
             }
 
             const char * start(m_pos);
-            fraction = m_readInteger(negative);
-            fractionDigits = int64_t(m_pos - start);
+            fraction = m_readUnsignedInteger();
+            fractionDigits = int(m_pos - start);
         }
 
         // Parse exponent part
         bool hasExponent(false);
-        int64_t exponent(0);
+        int exponent(0);
         if (m_isMore() && (*m_pos == 'e' || *m_pos == 'E')) {
             hasExponent = true;
 
@@ -581,18 +583,23 @@ namespace qjson {
                 }
             }
 
-            exponent = m_readInteger(exponentNegative);
+            uint64_t tempExponent(m_readUnsignedInteger());
+            if (tempExponent > 1000) {
+                throw JsonReadError("Exponent is too large", m_position());
+            }
+            exponent = exponentNegative ? -int(tempExponent) : int(tempExponent);
         }
 
         // Assemble floating
         if (fractionDigits || hasExponent) {
             double val(double(integer) + double(fraction) * fastPow(10.0, -fractionDigits));
+            if (negative) val = -val;
             if (hasExponent) val *= fastPow(10.0, exponent);
             return std::make_unique<FloatingWrapper>(val);
         }
         // Assemble integral
         else {
-            return std::make_unique<IntegerWrapper>(integer);
+            return std::make_unique<IntegerWrapper>(negative ? -int64_t(integer) : int64_t(integer));
         }
 
     }
