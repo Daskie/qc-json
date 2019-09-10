@@ -16,7 +16,7 @@
 //------------------------------------------------------------------------------
 
 #include <string>
-#include <unordered_map>
+#include <map>
 #include <vector>
 #include <memory>
 #include <stdexcept>
@@ -53,7 +53,7 @@ namespace qjson {
     // This will be thrown when attempting to access as value as the wrong type
     struct JsonTypeError : public JsonError {};
 
-    enum class Type {
+    enum class Type : uint32_t {
             null = 0,
           object = 0b0000001,
            array = 0b0000010,
@@ -67,73 +67,89 @@ namespace qjson {
 
         public:
 
-        using Object = std::unordered_map<string, Value>;
-        using Array = std::vector<Value>;
-
-        Value(Object && val) : m_type(Type::  object),   m_object(new Object(std::move(val))) {}
-        Value( Array && val) : m_type(Type::   array),    m_array(new  Array(std::move(val))) {}
-        Value(string && val) : m_type(Type::  string),   m_string(new string(std::move(val))) {}
-        Value(  int64_t val) : m_type(Type:: integer),  m_integer(val) {}
-        Value(   double val) : m_type(Type::floating), m_floating(val) {}
-        Value(     bool val) : m_type(Type:: boolean),  m_boolean(val) {}
-        Value(nullptr_t    ) : m_type(Type::    null), m_data(0) {}
+        Value(uint32_t size, std::pair<string, Value> * objData) : m_type(Type::object), m_size(size), m_objData(objData) {}
+        Value(uint32_t size, Value * arrData) : m_type(Type::array), m_size(size), m_arrData(arrData) {}
+        Value(uint32_t size, char * strData) : m_type(Type::string), m_size(size), m_strData(strData) {}
+        Value(  int64_t val) : m_type(Type:: integer), m_size(0), m_integer(val) {}
+        Value(   double val) : m_type(Type::floating), m_size(0), m_floating(val) {}
+        Value(     bool val) : m_type(Type:: boolean), m_size(0), m_boolean(val) {}
+        Value(nullptr_t    ) : m_type(Type::    null), m_size(0), m_data(0) {}
 
         Value(const Value &) = delete;
-        Value(Value && other) : m_type(other.m_type), m_data(other.m_data) { other.m_type = Type::null; other.m_data = 0; }
+        Value(Value && other) : m_type(other.m_type), m_size(other.m_size), m_data(other.m_data) { other.m_type = Type::null; other.m_size = 0; other.m_data = 0; }
 
         Value & operator=(const Value &) = delete;
         Value & operator=(Value &&) = delete;
 
         ~Value() {
             switch (m_type) {
-                case Type::object: delete m_object; break;
-                case Type:: array: delete  m_array; break;
-                case Type::string: delete m_string; break;
+                case Type::object: for (uint32_t i(0); i < m_size; ++i) m_objData[i].~pair(); ::operator delete(m_objData); break;
+                case Type:: array: for (uint32_t i(0); i < m_size; ++i) m_arrData[i].~Value(); ::operator delete(m_arrData); break;
+                case Type::string: ::operator delete(m_strData); break;
             }
         }
 
         Type type() const { return m_type; }
 
-        const  Object &   asObject() const { if (m_type != Type::  object) throw JsonTypeError(); return  *m_object; }
-        const   Array &    asArray() const { if (m_type != Type::   array) throw JsonTypeError(); return   *m_array; }
-        const  string &   asString() const { if (m_type != Type::  string) throw JsonTypeError(); return  *m_string; }
-              int64_t    asInteger() const { if (m_type != Type:: integer) throw JsonTypeError(); return  m_integer; }
-               double   asFloating() const { if (m_type != Type::floating) throw JsonTypeError(); return m_floating; }
-                 bool    asBoolean() const { if (m_type != Type:: boolean) throw JsonTypeError(); return  m_boolean; }
+        uint32_t size() const { return m_size; }
+
+        const Value & operator[](string_view key) const {
+            if (m_type != Type::object) throw JsonTypeError();
+            if (m_size == 0) throw JsonTypeError(); // TODO: different exception
+            const std::pair<string, Value> * low(m_objData), * high(low + m_size - 1);
+            while (low < high) {
+                const auto * mid(((high - low) >> 1) + low);
+                if (key <= mid->first) {
+                    high = mid;
+                }
+                else {
+                    low = mid + 1;
+                }
+            }
+            if (low->first == key) {
+                return low->second;
+            }
+            else {
+                throw JsonTypeError(); // TODO: different exception
+            }
+        }
+
+        const Value & operator[](uint32_t i) const {
+            if (m_type != Type::array) throw JsonTypeError();
+            return m_arrData[i];
+        }
 
         template <typename T> T as() const { return qjson_decode<T>()(*this); }
 
-        template <> string_view as<string_view>() const { return asString(); }
-        template <>        char as<       char>() const { const string & s(asString()); if (s.length() > 1) throw JsonTypeError(); return s.front(); };
-        template <>     int64_t as<    int64_t>() const { return          asInteger() ; }
-        template <>     int32_t as<    int32_t>() const { return  int32_t(asInteger()); }
-        template <>     int16_t as<    int16_t>() const { return  int16_t(asInteger()); }
-        template <>      int8_t as<     int8_t>() const { return   int8_t(asInteger()); }
-        template <>    uint64_t as<   uint64_t>() const { return uint64_t(asInteger()); }
-        template <>    uint32_t as<   uint32_t>() const { return uint32_t(asInteger()); }
-        template <>    uint16_t as<   uint16_t>() const { return uint16_t(asInteger()); }
-        template <>     uint8_t as<    uint8_t>() const { return  uint8_t(asInteger()); }
-        template <>      double as<     double>() const { return       asFloating() ; }
-        template <>       float as<      float>() const { return float(asFloating()); }
-        template <>        bool as<       bool>() const { return asBoolean(); }
+        template <> string_view as<string_view>() const { if (m_type != Type::string) throw JsonTypeError(); return {m_strData, m_size}; }
+        template <>        char as<       char>() const { if (m_type != Type::string || m_size > 1) throw JsonTypeError(); return *m_strData; };
+        template <>     int64_t as<    int64_t>() const { if (m_type != Type:: integer) throw JsonTypeError(); return m_integer; }
+        template <>     int32_t as<    int32_t>() const { return  int32_t(as<int64_t>()); }
+        template <>     int16_t as<    int16_t>() const { return  int16_t(as<int64_t>()); }
+        template <>      int8_t as<     int8_t>() const { return   int8_t(as<int64_t>()); }
+        template <>    uint64_t as<   uint64_t>() const { return uint64_t(as<int64_t>()); }
+        template <>    uint32_t as<   uint32_t>() const { return uint32_t(as<int64_t>()); }
+        template <>    uint16_t as<   uint16_t>() const { return uint16_t(as<int64_t>()); }
+        template <>     uint8_t as<    uint8_t>() const { return  uint8_t(as<int64_t>()); }
+        template <>      double as<     double>() const { if (m_type != Type::floating) throw JsonTypeError(); return m_floating; }
+        template <>       float as<      float>() const { return float(as<double>()); }
+        template <>        bool as<       bool>() const { if (m_type != Type::boolean) throw JsonTypeError(); return m_boolean; }
 
         private:
 
         Type m_type;
+        uint32_t m_size;
         union {
             uint64_t m_data;
-            Object * m_object;
-            Array * m_array;
-            string * m_string;
+            std::pair<string, Value> * m_objData;
+            Value * m_arrData;
+            char * m_strData;
             int64_t m_integer;
             double m_floating;
             bool m_boolean;
         };
 
     };
-
-    using Object = Value::Object;
-    using Array = Value::Array;
 
     Value read(string_view str);
 
@@ -279,7 +295,12 @@ namespace qjson {
                 char c(*m_pos);
                 if (c == '"') {
                     ++m_pos;
-                    return m_readString();
+                    // TODO: optimize
+                    string str(m_readString());
+                    if (str.length() > std::numeric_limits<int32_t>::max()) throw JsonTypeError();
+                    char * chars(static_cast<char *>(::operator new(str.length())));
+                    std::memcpy(chars, str.c_str(), str.length());
+                    return Value(uint32_t(str.length()), chars);
                 }
                 else if (std::isdigit(c) || c == '-') {
                     return m_readNumber();
@@ -306,12 +327,12 @@ namespace qjson {
                 }
             }
 
-            Object m_readObject() {
-                Object obj;
+            Value m_readObject() {
+                std::map<string, Value> obj;
 
                 m_skipWhitespace();
                 if (m_checkChar('}')) {
-                    return obj;
+                    return Value(0, static_cast<std::pair<string, Value> *>(nullptr));
                 }
 
                 m_readChar('"');
@@ -334,15 +355,23 @@ namespace qjson {
                     m_skipWhitespace();
                 }
 
-                return obj;
+                // TODO: optimize
+                if (obj.size() > std::numeric_limits<int32_t>::max()) throw JsonTypeError();
+                std::pair<string, Value> * elements(static_cast<std::pair<string, Value> *>(::operator new(obj.size() * sizeof(std::pair<string, Value>))));
+                uint32_t i(0);
+                for (auto & element : obj) {
+                    new (elements + i) std::pair<string, Value>(std::move(element));
+                    ++i;
+                }
+                return Value(uint32_t(obj.size()), elements);
             }
 
-            Array m_readArray() {
-                Array arr;
+            Value m_readArray() {
+                std::vector<Value> arr;
 
                 m_skipWhitespace();
                 if (m_checkChar(']')) {
-                    return arr;
+                    return Value(0, static_cast<Value *>(nullptr));
                 }
 
                 m_skipWhitespace();
@@ -356,7 +385,11 @@ namespace qjson {
                     m_skipWhitespace();
                 }
 
-                return arr;
+                // TODO: optimize
+                if (arr.size() > std::numeric_limits<int32_t>::max()) throw JsonTypeError();
+                Value * elements(static_cast<Value *>(::operator new(arr.size() * sizeof(Value))));
+                for (uint32_t i(0); i < arr.size(); ++i) new (elements + i) Value(std::move(arr.at(i)));
+                return Value(uint32_t(arr.size()), elements);
             }
 
             void m_readEscaped(string & str) {
