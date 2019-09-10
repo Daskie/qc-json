@@ -53,23 +53,53 @@ namespace qjson {
     // This will be thrown when attempting to access as value as the wrong type
     struct JsonTypeError : public JsonError {};
 
-    enum class Type { object, array, string, integer, floating, boolean, null };
+    enum class Type {
+            null = 0,
+          object = 0b0000001,
+           array = 0b0000010,
+          string = 0b0000100,
+         integer = 0b0001000,
+        floating = 0b0010000, 
+         boolean = 0b0100000
+    };
 
-    struct Value;
+    class Value {
 
-    using Object = std::unordered_map<string, unique_ptr<Value>>;
-    using Array = std::vector<unique_ptr<Value>>;
+        public:
 
-    struct Value {
+        using Object = std::unordered_map<string, Value>;
+        using Array = std::vector<Value>;
 
-        virtual Type type() const = 0;
+        Value(Object && val) : m_type(Type::  object),   m_object(new Object(std::move(val))) {}
+        Value( Array && val) : m_type(Type::   array),    m_array(new  Array(std::move(val))) {}
+        Value(string && val) : m_type(Type::  string),   m_string(new string(std::move(val))) {}
+        Value(  int64_t val) : m_type(Type:: integer),  m_integer(val) {}
+        Value(   double val) : m_type(Type::floating), m_floating(val) {}
+        Value(     bool val) : m_type(Type:: boolean),  m_boolean(val) {}
+        Value(nullptr_t    ) : m_type(Type::    null), m_data(0) {}
 
-        virtual const  Object &   asObject() const { throw JsonTypeError(); }
-        virtual const   Array &    asArray() const { throw JsonTypeError(); }
-        virtual const  string &   asString() const { throw JsonTypeError(); }
-        virtual       int64_t    asInteger() const { throw JsonTypeError(); }
-        virtual        double   asFloating() const { throw JsonTypeError(); }
-        virtual          bool    asBoolean() const { throw JsonTypeError(); }
+        Value(const Value &) = delete;
+        Value(Value && other) : m_type(other.m_type), m_data(other.m_data) { other.m_type = Type::null; other.m_data = 0; }
+
+        Value & operator=(const Value &) = delete;
+        Value & operator=(Value &&) = delete;
+
+        ~Value() {
+            switch (m_type) {
+                case Type::object: delete m_object; break;
+                case Type:: array: delete  m_array; break;
+                case Type::string: delete m_string; break;
+            }
+        }
+
+        Type type() const { return m_type; }
+
+        const  Object &   asObject() const { if (m_type != Type::  object) throw JsonTypeError(); return  *m_object; }
+        const   Array &    asArray() const { if (m_type != Type::   array) throw JsonTypeError(); return   *m_array; }
+        const  string &   asString() const { if (m_type != Type::  string) throw JsonTypeError(); return  *m_string; }
+              int64_t    asInteger() const { if (m_type != Type:: integer) throw JsonTypeError(); return  m_integer; }
+               double   asFloating() const { if (m_type != Type::floating) throw JsonTypeError(); return m_floating; }
+                 bool    asBoolean() const { if (m_type != Type:: boolean) throw JsonTypeError(); return  m_boolean; }
 
         template <typename T> T as() const { return qjson_decode<T>()(*this); }
 
@@ -87,9 +117,25 @@ namespace qjson {
         template <>       float as<      float>() const { return float(asFloating()); }
         template <>        bool as<       bool>() const { return asBoolean(); }
 
+        private:
+
+        Type m_type;
+        union {
+            uint64_t m_data;
+            Object * m_object;
+            Array * m_array;
+            string * m_string;
+            int64_t m_integer;
+            double m_floating;
+            bool m_boolean;
+        };
+
     };
 
-    Object read(string_view str);
+    using Object = Value::Object;
+    using Array = Value::Array;
+
+    Value read(string_view str);
 
 }
 
@@ -110,50 +156,6 @@ template <typename T> struct qjson_decode;
 namespace qjson {
 
     namespace detail {
-
-        struct ObjectWrapper : public Value {
-            Object val;
-            virtual Type type() const override { return Type::object; }
-            virtual const Object & asObject() const override { return val; }
-        };
-
-        struct ArrayWrapper : public Value {
-            Array val;
-            virtual Type type() const override { return Type::array; }
-            virtual const Array & asArray() const override { return val; }
-        };
-
-        struct StringWrapper : public Value {
-            string val;
-            StringWrapper(string && str) : val(move(str)) {}
-            virtual Type type() const override { return Type::string; }
-            virtual const string & asString() const override { return val; }
-        };
-
-        struct IntegerWrapper : public Value {
-            int64_t val;
-            virtual Type type() const override { return Type::integer; }
-            IntegerWrapper(int64_t val) : val(val) {}
-            virtual int64_t asInteger() const override { return val; }
-        };
-
-        struct FloatingWrapper : public Value {
-            double val;
-            FloatingWrapper(double val) : val(val) {}
-            virtual Type type() const override { return Type::floating; }
-            virtual double asFloating() const override { return val; }
-        };
-
-        struct BooleanWrapper : public Value {
-            bool val;
-            BooleanWrapper(bool val) : val(val) {}
-            virtual Type type() const override { return Type::boolean; }
-            virtual bool asBoolean() const override { return val; }
-        };
-
-        struct NullWrapper : public Value {
-            virtual Type type() const override { return Type::null; }
-        };
 
         constexpr unsigned char k_hexTable[256]{
             -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
@@ -208,18 +210,18 @@ namespace qjson {
                 m_pos(m_start)
             {}
 
-            Object operator()() {
+            Value operator()() {
                 m_skipWhitespace();
                 m_readChar('{');
 
-                unique_ptr<Value> val(m_readObject());
+                Value val(m_readObject());
 
                 m_skipWhitespace();
                 if (m_pos != m_end) {
                     throw JsonReadError("Content in string after root object", m_position());
                 }
 
-                return std::move(static_cast<ObjectWrapper *>(val.get())->val);
+                return val;
             }
 
             bool m_isMore() const {
@@ -269,7 +271,7 @@ namespace qjson {
                 }
             }
 
-            unique_ptr<Value> m_readValue() {
+            Value m_readValue() {
                 if (!m_isMore()) {
                     throw JsonReadError("Expected value", m_position());
                 }
@@ -277,7 +279,7 @@ namespace qjson {
                 char c(*m_pos);
                 if (c == '"') {
                     ++m_pos;
-                    return std::make_unique<StringWrapper>(m_readString());
+                    return m_readString();
                 }
                 else if (std::isdigit(c) || c == '-') {
                     return m_readNumber();
@@ -291,25 +293,25 @@ namespace qjson {
                     return m_readArray();
                 }
                 else if (m_checkString("true"sv)) {
-                    return std::make_unique<BooleanWrapper>(true);
+                    return true;
                 }
                 else if (m_checkString("false"sv)) {
-                    return std::make_unique<BooleanWrapper>(false);
+                    return false;
                 }
                 else if (m_checkString("null"sv)) {
-                    return std::make_unique<NullWrapper>();
+                    return nullptr;
                 }
                 else {
                     throw JsonReadError("Unknown value", m_position());
                 }
             }
 
-            unique_ptr<Value> m_readObject() {
-                unique_ptr<ObjectWrapper> obj(std::make_unique<ObjectWrapper>());
+            Object m_readObject() {
+                Object obj;
 
                 m_skipWhitespace();
                 if (m_checkChar('}')) {
-                    return std::move(obj);
+                    return obj;
                 }
 
                 m_readChar('"');
@@ -317,7 +319,7 @@ namespace qjson {
                 m_skipWhitespace();
                 m_readChar(':');
                 m_skipWhitespace();
-                obj->val[std::move(key)] = m_readValue();
+                obj.emplace(std::move(key), m_readValue());
                 m_skipWhitespace();
 
                 while (!m_checkChar('}')) {
@@ -328,33 +330,33 @@ namespace qjson {
                     m_skipWhitespace();
                     m_readChar(':');
                     m_skipWhitespace();
-                    obj->val[std::move(key)] = m_readValue();
+                    obj.emplace(std::move(key), m_readValue());
                     m_skipWhitespace();
                 }
 
-                return std::move(obj);
+                return obj;
             }
 
-            unique_ptr<Value> m_readArray() {
-                unique_ptr<ArrayWrapper> arr(std::make_unique<ArrayWrapper>());
+            Array m_readArray() {
+                Array arr;
 
                 m_skipWhitespace();
                 if (m_checkChar(']')) {
-                    return std::move(arr);
+                    return arr;
                 }
 
                 m_skipWhitespace();
-                arr->val.push_back(m_readValue());
+                arr.emplace_back(m_readValue());
                 m_skipWhitespace();
 
                 while (!m_checkChar(']')) {
                     m_readChar(',');
                     m_skipWhitespace();
-                    arr->val.push_back(m_readValue());
+                    arr.emplace_back(m_readValue());
                     m_skipWhitespace();
                 }
 
-                return std::move(arr);
+                return arr;
             }
 
             void m_readEscaped(string & str) {
@@ -426,7 +428,7 @@ namespace qjson {
                     char c(*m_pos);
                     if (c == '"') {
                         ++m_pos;
-                        return std::move(str);
+                        return str;
                     }
                     else if (c == '\\') {
                         ++m_pos;
@@ -498,7 +500,7 @@ namespace qjson {
                 return val;
             }
 
-            unique_ptr<Value> m_readNumber() {
+            Value m_readNumber() {
                 if (!m_isMore()) {
                     throw JsonReadError("Expected number", m_position());
                 }
@@ -506,7 +508,7 @@ namespace qjson {
                 // Hexadecimal
                 if (m_remaining() >= 3 && m_pos[0] == '0' && m_pos[1] == 'x') {
                     m_pos += 2;
-                    return std::make_unique<IntegerWrapper>(int64_t(m_readHex()));
+                    return int64_t(m_readHex());
                 }
 
                 // Parse sign
@@ -574,11 +576,11 @@ namespace qjson {
                     double val(double(integer) + double(fraction) * fastPow(10.0, -fractionDigits));
                     if (negative) val = -val;
                     if (hasExponent) val *= fastPow(10.0, exponent);
-                    return std::make_unique<FloatingWrapper>(val);
+                    return val;
                 }
                 // Assemble integral
                 else {
-                    return std::make_unique<IntegerWrapper>(negative ? -int64_t(integer) : int64_t(integer));
+                    return negative ? -int64_t(integer) : int64_t(integer);
                 }
             }
 
@@ -588,7 +590,7 @@ namespace qjson {
 
     using namespace detail;
 
-    inline Object read(string_view str) {
+    inline Value read(string_view str) {
         return Reader(str)();
     }
 
