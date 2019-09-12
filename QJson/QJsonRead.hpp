@@ -53,97 +53,190 @@ namespace qjson {
     // This will be thrown when attempting to access as value as the wrong type
     struct JsonTypeError : public JsonError {};
 
-    enum class Type : uint32_t {
-            null = 0,
-          object = 0b0000001,
-           array = 0b0000010,
-          string = 0b0000100,
-         integer = 0b0001000,
-        floating = 0b0010000, 
-         boolean = 0b0100000
-    };
+    enum class Type : uint32_t { none, object, array, string, integer, floating, boolean, null }; // CAN ONLY HAVE 8 VALUES
 
     class Value {
 
+        using Pair = std::pair<string, Value>;
+
         public:
 
-        Value(uint32_t size, std::pair<string, Value> * objData) : m_type(Type::object), m_size(size), m_objData(objData) {}
-        Value(uint32_t size, Value * arrData) : m_type(Type::array), m_size(size), m_arrData(arrData) {}
-        Value(uint32_t size, char * strData) : m_type(Type::string), m_size(size), m_strData(strData) {}
-        Value(  int64_t val) : m_type(Type:: integer), m_size(0), m_integer(val) {}
-        Value(   double val) : m_type(Type::floating), m_size(0), m_floating(val) {}
-        Value(     bool val) : m_type(Type:: boolean), m_size(0), m_boolean(val) {}
-        Value(nullptr_t    ) : m_type(Type::    null), m_size(0), m_data(0) {}
+        Value(Type type) : m_typeCapacity(uint32_t(type)), m_size(0), m_data(0) {}
+        Value(const string & str) : m_typeCapacity(uint32_t(Type::string)), m_size(uint32_t(str.length())) { // TODO: find a way to avoid this copy
+            if (m_size <= 8) {
+                std::copy_n(str.c_str(), m_size, m_strData);
+            }
+            else {
+                m_strPtr = static_cast<char *>(::operator new(m_size));
+                std::copy_n(str.c_str(), m_size, m_strPtr);
+            }
+        }
+        Value(int64_t val) : m_typeCapacity(uint32_t(Type::integer)), m_size(0), m_integer(val) {}
+        Value(double val) : m_typeCapacity(uint32_t(Type::floating)), m_size(0), m_floating(val) {}
+        Value(bool val) : m_typeCapacity(uint32_t(Type::boolean)), m_size(0), m_boolean(val) {}
+        Value(nullptr_t) : m_typeCapacity(uint32_t(Type::null)), m_size(0), m_data(0) {}
 
         Value(const Value &) = delete;
-        Value(Value && other) : m_type(other.m_type), m_size(other.m_size), m_data(other.m_data) { other.m_type = Type::null; other.m_size = 0; other.m_data = 0; }
+        Value(Value && other) : m_typeCapacity(other.m_typeCapacity), m_size(other.m_size), m_data(other.m_data) { other.m_typeCapacity = 0; other.m_size = 0; other.m_data = 0; }
 
         Value & operator=(const Value &) = delete;
         Value & operator=(Value &&) = delete;
 
         ~Value() {
-            switch (m_type) {
-                case Type::object: for (uint32_t i(0); i < m_size; ++i) m_objData[i].~pair(); ::operator delete(m_objData); break;
-                case Type:: array: for (uint32_t i(0); i < m_size; ++i) m_arrData[i].~Value(); ::operator delete(m_arrData); break;
-                case Type::string: ::operator delete(m_strData); break;
+            switch (type()) {
+                case Type::object: for (uint32_t i(0); i < m_size; ++i) m_objPtr[i].~pair(); ::operator delete(m_objPtr); break;
+                case Type::array: for (uint32_t i(0); i < m_size; ++i) m_arrPtr[i].~Value(); ::operator delete(m_arrPtr); break;
+                case Type::string: if (m_size > 8) ::operator delete(m_strPtr); break;
             }
         }
 
-        Type type() const { return m_type; }
+        Type type() const { return Type(m_typeCapacity & 7u); }
 
         uint32_t size() const { return m_size; }
 
-        const Value & operator[](string_view key) const {
-            if (m_type != Type::object) throw JsonTypeError();
-            if (m_size == 0) throw JsonTypeError(); // TODO: different exception
-            const std::pair<string, Value> * low(m_objData), * high(low + m_size - 1);
+        uint32_t capacity() const { return m_typeCapacity & 0xFFFFFFF8u; }
+
+        void reallocateArray() {
+            uint32_t currCapacity(capacity());
+            uint32_t newCapacity(currCapacity << 1);
+            Value * newArrData(static_cast<Value *>(::operator new(newCapacity * sizeof(Value))));
+            std::memcpy(newArrData, m_arrPtr, currCapacity * sizeof(Value));
+            ::operator delete(m_arrPtr);
+            m_typeCapacity = newCapacity | (m_typeCapacity & 7u);
+            m_arrPtr = newArrData;
+        }
+
+        void reallocateObject() {
+            uint32_t currCapacity(capacity());
+            uint32_t newCapacity(currCapacity << 1);
+            Pair * newObjData(static_cast<Pair *>(::operator new(newCapacity * sizeof(Pair))));
+            std::memcpy(newObjData, m_objPtr, currCapacity * sizeof(Pair));
+            ::operator delete(m_objPtr);
+            m_typeCapacity = newCapacity | (m_typeCapacity & 7u);
+            m_objPtr = newObjData;
+        }
+
+        Pair * find(string_view key) const {
+            // TODO: this needs to return one past end in case of key being largest
+            Pair * low(m_objPtr), * high(low + m_size);
             while (low < high) {
-                const auto * mid(((high - low) >> 1) + low);
-                if (key <= mid->first) {
+                Pair * mid(((high - low) >> 1) + low);
+                int c(std::strcmp(key.data(), mid->first.c_str()));
+                if (c < 0) {
                     high = mid;
                 }
-                else {
+                else if (c > 0) {
                     low = mid + 1;
                 }
+                else {
+                    return mid;
+                }
             }
-            if (low->first == key) {
-                return low->second;
+            return low;
+        }
+
+        const Value & operator[](string_view key) const {
+            if (type() != Type::object) {
+                throw JsonTypeError();
+            }
+            if (m_size == 0) {
+                throw std::out_of_range("Key not found");
+            }
+
+            const Pair * pos(find(key));
+            if (pos->first == key) {
+                return pos->second;
             }
             else {
-                throw JsonTypeError(); // TODO: different exception
+                throw std::out_of_range("Key not found");
             }
         }
 
         const Value & operator[](uint32_t i) const {
-            if (m_type != Type::array) throw JsonTypeError();
-            return m_arrData[i];
+            if (type() != Type::array) {
+                throw JsonTypeError();
+            }
+            if (i >= m_size) {
+                throw std::out_of_range("Index is out of bounds");
+            }
+
+            return m_arrPtr[i];
+        }
+
+        void add(Value && val) {
+            if (type() != Type::array) throw JsonTypeError();
+
+            if (capacity() == 0) {
+                m_arrPtr = static_cast<Value *>(::operator new(8 * sizeof(Value)));
+                m_typeCapacity |= 8;
+            }
+            else if (m_size == capacity()) {
+                reallocateArray();
+            }
+
+            new (m_arrPtr + m_size) Value(std::move(val));
+            ++m_size;
+        }
+
+        void add(string && key, Value && val) {
+            if (type() != Type::object) throw JsonTypeError();
+
+            if (capacity() == 0) {
+                m_objPtr = static_cast<Pair *>(::operator new(8 * sizeof(Pair)));
+                m_typeCapacity |= 8;
+            }
+
+            if (m_size == 0) {
+                new (&m_objPtr->first) string(std::move(key));
+                new (&m_objPtr->second) Value(std::move(val));
+                m_size = 1;
+                return;
+            }
+
+            Pair * pos(find(key));
+
+            if (pos > m_objPtr && (pos - 1)->first == key) {
+                pos->second.~Value();
+                new (&pos->second) Value(std::move(val));
+                ++m_size;
+                return;
+            }
+
+            if (m_size == capacity()) reallocateObject();
+
+            std::memmove(pos + 1, pos, (m_size - (pos - m_objPtr)) * sizeof(Pair)); // TODO: possibly optimize by doing a backwards copy using 32 or 64 bit data chunks
+
+            new (&pos->first) string(std::move(key));
+            new (&pos->second) Value(std::move(val));
+            ++m_size;
         }
 
         template <typename T> T as() const { return qjson_decode<T>()(*this); }
 
-        template <> string_view as<string_view>() const { if (m_type != Type::string) throw JsonTypeError(); return {m_strData, m_size}; }
-        template <>        char as<       char>() const { if (m_type != Type::string || m_size > 1) throw JsonTypeError(); return *m_strData; };
-        template <>     int64_t as<    int64_t>() const { if (m_type != Type:: integer) throw JsonTypeError(); return m_integer; }
-        template <>     int32_t as<    int32_t>() const { return  int32_t(as<int64_t>()); }
-        template <>     int16_t as<    int16_t>() const { return  int16_t(as<int64_t>()); }
-        template <>      int8_t as<     int8_t>() const { return   int8_t(as<int64_t>()); }
-        template <>    uint64_t as<   uint64_t>() const { return uint64_t(as<int64_t>()); }
-        template <>    uint32_t as<   uint32_t>() const { return uint32_t(as<int64_t>()); }
-        template <>    uint16_t as<   uint16_t>() const { return uint16_t(as<int64_t>()); }
-        template <>     uint8_t as<    uint8_t>() const { return  uint8_t(as<int64_t>()); }
-        template <>      double as<     double>() const { if (m_type != Type::floating) throw JsonTypeError(); return m_floating; }
+        template <> string_view as<string_view>() const { if (type() != Type::string) throw JsonTypeError(); return {m_size <= 8 ? m_strData : m_strPtr, m_size}; }
+        template <>        char as<       char>() const { if (type() != Type::string || m_size > 1) throw JsonTypeError(); return *m_strData; };
+        template <>     int64_t as<    int64_t>() const { if (type() != Type::integer) throw JsonTypeError(); return  int64_t(m_integer); }
+        template <>     int32_t as<    int32_t>() const { if (type() != Type::integer) throw JsonTypeError(); return  int32_t(m_integer); }
+        template <>     int16_t as<    int16_t>() const { if (type() != Type::integer) throw JsonTypeError(); return  int16_t(m_integer); }
+        template <>      int8_t as<     int8_t>() const { if (type() != Type::integer) throw JsonTypeError(); return   int8_t(m_integer); }
+        template <>    uint64_t as<   uint64_t>() const { if (type() != Type::integer) throw JsonTypeError(); return uint64_t(m_integer); }
+        template <>    uint32_t as<   uint32_t>() const { if (type() != Type::integer) throw JsonTypeError(); return uint32_t(m_integer); }
+        template <>    uint16_t as<   uint16_t>() const { if (type() != Type::integer) throw JsonTypeError(); return uint16_t(m_integer); }
+        template <>     uint8_t as<    uint8_t>() const { if (type() != Type::integer) throw JsonTypeError(); return  uint8_t(m_integer); }
+        template <>      double as<     double>() const { if (type() != Type::floating) throw JsonTypeError(); return m_floating; }
         template <>       float as<      float>() const { return float(as<double>()); }
-        template <>        bool as<       bool>() const { if (m_type != Type::boolean) throw JsonTypeError(); return m_boolean; }
+        template <>        bool as<       bool>() const { if (type() != Type::boolean) throw JsonTypeError(); return m_boolean; }
 
         private:
 
-        Type m_type;
+        uint32_t m_typeCapacity;
         uint32_t m_size;
         union {
             uint64_t m_data;
-            std::pair<string, Value> * m_objData;
-            Value * m_arrData;
-            char * m_strData;
+            Pair * m_objPtr;
+            Value * m_arrPtr;
+            char * m_strPtr;
+            char m_strData[8];
             int64_t m_integer;
             double m_floating;
             bool m_boolean;
@@ -295,12 +388,7 @@ namespace qjson {
                 char c(*m_pos);
                 if (c == '"') {
                     ++m_pos;
-                    // TODO: optimize
-                    string str(m_readString());
-                    if (str.length() > std::numeric_limits<int32_t>::max()) throw JsonTypeError();
-                    char * chars(static_cast<char *>(::operator new(str.length())));
-                    std::memcpy(chars, str.c_str(), str.length());
-                    return Value(uint32_t(str.length()), chars);
+                    return Value(m_readString());
                 }
                 else if (std::isdigit(c) || c == '-') {
                     return m_readNumber();
@@ -328,11 +416,11 @@ namespace qjson {
             }
 
             Value m_readObject() {
-                std::map<string, Value> obj;
+                Value obj(Type::object);
 
                 m_skipWhitespace();
                 if (m_checkChar('}')) {
-                    return Value(0, static_cast<std::pair<string, Value> *>(nullptr));
+                    return obj;
                 }
 
                 m_readChar('"');
@@ -340,7 +428,7 @@ namespace qjson {
                 m_skipWhitespace();
                 m_readChar(':');
                 m_skipWhitespace();
-                obj.emplace(std::move(key), m_readValue());
+                obj.add(std::move(key), m_readValue());
                 m_skipWhitespace();
 
                 while (!m_checkChar('}')) {
@@ -351,45 +439,33 @@ namespace qjson {
                     m_skipWhitespace();
                     m_readChar(':');
                     m_skipWhitespace();
-                    obj.emplace(std::move(key), m_readValue());
+                    obj.add(std::move(key), m_readValue());
                     m_skipWhitespace();
                 }
 
-                // TODO: optimize
-                if (obj.size() > std::numeric_limits<int32_t>::max()) throw JsonTypeError();
-                std::pair<string, Value> * elements(static_cast<std::pair<string, Value> *>(::operator new(obj.size() * sizeof(std::pair<string, Value>))));
-                uint32_t i(0);
-                for (auto & element : obj) {
-                    new (elements + i) std::pair<string, Value>(std::move(element));
-                    ++i;
-                }
-                return Value(uint32_t(obj.size()), elements);
+                return obj;
             }
 
             Value m_readArray() {
-                std::vector<Value> arr;
+                Value arr(Type::array);
 
                 m_skipWhitespace();
                 if (m_checkChar(']')) {
-                    return Value(0, static_cast<Value *>(nullptr));
+                    return arr;
                 }
 
                 m_skipWhitespace();
-                arr.emplace_back(m_readValue());
+                arr.add(m_readValue());
                 m_skipWhitespace();
 
                 while (!m_checkChar(']')) {
                     m_readChar(',');
                     m_skipWhitespace();
-                    arr.emplace_back(m_readValue());
+                    arr.add(m_readValue());
                     m_skipWhitespace();
                 }
 
-                // TODO: optimize
-                if (arr.size() > std::numeric_limits<int32_t>::max()) throw JsonTypeError();
-                Value * elements(static_cast<Value *>(::operator new(arr.size() * sizeof(Value))));
-                for (uint32_t i(0); i < arr.size(); ++i) new (elements + i) Value(std::move(arr.at(i)));
-                return Value(uint32_t(arr.size()), elements);
+                return arr;
             }
 
             void m_readEscaped(string & str) {
@@ -450,7 +526,6 @@ namespace qjson {
             }
 
             string m_readString() {
-                const char * start(m_pos);
                 string str;
 
                 while (true) {

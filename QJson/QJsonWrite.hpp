@@ -335,7 +335,7 @@ namespace qjson {
         m_ss << '{';
         m_state.push_back(State{false, compact, false});
 
-        return std::move(str);
+        return str;
     }
 
     inline void Writer::m_start(bool compact, char bracket) {
