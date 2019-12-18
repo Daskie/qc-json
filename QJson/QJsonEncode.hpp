@@ -8,81 +8,81 @@
 // Basic, lightweight JSON encoder.
 //
 // Example:
-//      qjson::Writer writer();
-//      writer.key("Name").val("Roslin");
-//      writer.key("Favorite Books").array();
-//      writer.val("Dark Day");
+//      qjson::Encoder encoder();
+//      encoder.key("Name").val("Roslin");
+//      encoder.key("Favorite Books").array();
+//      encoder.val("Dark Day");
 //      ...
-//      writer.end();
-//      std::string jsonString(writer.finish());
+//      encoder.end();
+//      std::string jsonString(encoder.finish());
 //------------------------------------------------------------------------------
 
 #include <string>
 #include <vector>
 #include <sstream>
 
+namespace qjson {
+
 #ifndef QJSON_COMMON
 #define QJSON_COMMON
-namespace qjson {
 
     // If anything goes wrong, this exception will be thrown
-    struct JsonError : public std::exception {
-        JsonError() = default;
-        JsonError(const char * msg) : std::exception(msg) {}
-        virtual ~JsonError() = default;
+    struct Error : public std::exception {
+        Error() = default;
+        Error(const char * msg) : std::exception(msg) {}
+        virtual ~Error() = default;
     };
 
-}
 #endif
-
-namespace qjson {
 
     using std::string;
     using std::string_view;
     using namespace std::string_literals;
     using namespace std::string_view_literals;
 
+    constexpr bool k_defaultCompact{false};
+    constexpr int k_defaultIndentSize{4};
+
     // This will be thrown if anything goes wrong during the encoding process
-    struct JsonWriteError : public JsonError {
-        JsonWriteError(const char * msg) : JsonError(msg) {}
+    struct EncodeError : public Error {
+        EncodeError(const char * msg) : Error(msg) {}
     };
 
-    class Writer {
+    class Encoder {
 
         public:
 
-        Writer(bool compact = false, int indentSize = 4);
-        Writer(const Writer & other) = delete;
-        Writer(Writer && other);
+        Encoder(bool compact = false, int indentSize = k_defaultIndentSize);
+        Encoder(const Encoder & other) = delete;
+        Encoder(Encoder && other);
 
-        Writer & operator=(const Writer & other) = delete;
-        Writer & operator=(Writer && other) = delete;
+        Encoder & operator=(const Encoder & other) = delete;
+        Encoder & operator=(Encoder && other) = delete;
 
-        Writer & object(bool compact = false);
+        Encoder & object(bool compact = false);
 
-        Writer & array(bool compact = false);
+        Encoder & array(bool compact = false);
 
-        Writer & key(string_view k);
+        Encoder & key(string_view k);
 
-        Writer & val(string_view v);
-        Writer & val(const string & v);
-        Writer & val(const char * v);
-        Writer & val(char v);
-        Writer & val(int64_t v);
-        Writer & val(int32_t v);
-        Writer & val(int16_t v);
-        Writer & val(int8_t v);
-        Writer & val(uint64_t v);
-        Writer & val(uint32_t v);
-        Writer & val(uint16_t v);
-        Writer & val(uint8_t v);
-        Writer & val(double v);
-        Writer & val(float v);
-        Writer & val(bool v);
-        Writer & val(nullptr_t);
-        template <typename T> Writer & val(const T & v);
+        Encoder & val(string_view v);
+        Encoder & val(const string & v);
+        Encoder & val(const char * v);
+        Encoder & val(int64_t v);
+        Encoder & val(int32_t v);
+        Encoder & val(int16_t v);
+        Encoder & val(int8_t v);
+        Encoder & val(uint64_t v);
+        Encoder & val(uint32_t v);
+        Encoder & val(uint16_t v);
+        Encoder & val(uint8_t v);
+        Encoder & val(double v);
+        Encoder & val(float v);
+        Encoder & val(bool v);
+        Encoder & val(nullptr_t);
+        template <typename T> Encoder & val(const T & v);
 
-        Writer & end();
+        Encoder & end();
 
         string finish();
 
@@ -117,10 +117,10 @@ namespace qjson {
 
 }
 
-// Implement `qjson_encode` to enable Writer::val for custom types
+// Implement `qjson_encode` to enable Encoder::val for custom types
 // Example:
-//      void qjson_encode(qjson::Writer & writer, const std::pair<int, int> & v) {
-//          writer.val(v.first).val(v.second);
+//      void qjson_encode(qjson::Encoder & encoder, const std::pair<int, int> & v) {
+//          encoder.val(v.first).val(v.second);
 //      }
 //
 
@@ -136,7 +136,7 @@ namespace qjson {
 
     using namespace detail;
 
-    inline Writer::Writer(bool compact, int indentSize) :
+    inline Encoder::Encoder(bool compact, int indentSize) :
         m_ss(),
         m_state(),
         m_indentation(),
@@ -144,14 +144,14 @@ namespace qjson {
         m_isKey()
     {
         if (indentSize < 0 || indentSize > 8) {
-            throw JsonWriteError("Invalid indent size - must be in range [0, 8]");
+            throw EncodeError("Invalid indent size - must be in range [0, 8]");
         }
 
         m_ss << '{';
         m_state.push_back(State{false, compact, false});
     }
 
-    inline Writer::Writer(Writer && other) :
+    inline Encoder::Encoder(Encoder && other) :
         m_ss(std::move(other.m_ss)),
         m_state(std::move(other.m_state)),
         m_indentation(other.m_indentation),
@@ -161,7 +161,7 @@ namespace qjson {
         other.m_indent = {};
     }
 
-    inline Writer & Writer::object(bool compact) {
+    inline Encoder & Encoder::object(bool compact) {
         m_checkKey();
         if (!m_isKey) m_putPrefix();
         m_start(compact, '{');
@@ -170,7 +170,7 @@ namespace qjson {
         return *this;
     }
 
-    inline Writer & Writer::array(bool compact) {
+    inline Encoder & Encoder::array(bool compact) {
         m_checkKey();
         if (!m_isKey) m_putPrefix();
         m_start(compact, '[');
@@ -179,15 +179,15 @@ namespace qjson {
         return *this;
     }
 
-    inline Writer & Writer::key(string_view key) {
+    inline Encoder & Encoder::key(string_view key) {
         if (m_isKey) {
-            throw JsonWriteError("Expected value to follow key");
+            throw EncodeError("Expected value to follow key");
         }
         if (m_state.back().array) {
-            throw JsonWriteError("Array elements must not have keys");
+            throw EncodeError("Array elements must not have keys");
         }
         if (key.empty()) {
-            throw JsonWriteError("Key must not be empty");
+            throw EncodeError("Key must not be empty");
         }
 
         m_putPrefix();
@@ -198,7 +198,7 @@ namespace qjson {
         return *this;
     }
 
-    inline Writer & Writer::val(string_view v) {
+    inline Encoder & Encoder::val(string_view v) {
         m_checkKey();
         if (!m_isKey) m_putPrefix();
         m_encode(v);
@@ -208,19 +208,15 @@ namespace qjson {
         return *this;
     }
 
-    inline Writer & Writer::val(const string & v) {
+    inline Encoder & Encoder::val(const string & v) {
         return val(string_view(v));
     }
 
-    inline Writer & Writer::val(const char * v) {
+    inline Encoder & Encoder::val(const char * v) {
         return val(string_view(v));
     }
 
-    inline Writer & Writer::val(char v) {
-        return val(string_view(&v, 1));
-    }
-
-    inline Writer & Writer::val(int64_t v) {
+    inline Encoder & Encoder::val(int64_t v) {
         m_checkKey();
         if (!m_isKey) m_putPrefix();
         m_encode(v);
@@ -230,19 +226,19 @@ namespace qjson {
         return *this;
     }
 
-    inline Writer & Writer::val(int32_t v) {
+    inline Encoder & Encoder::val(int32_t v) {
         return val(int64_t(v));
     }
 
-    inline Writer & Writer::val(int16_t v) {
+    inline Encoder & Encoder::val(int16_t v) {
         return val(int64_t(v));
     }
 
-    inline Writer & Writer::val(int8_t v) {
+    inline Encoder & Encoder::val(int8_t v) {
         return val(uint64_t(v));
     }
 
-    inline Writer & Writer::val(uint64_t v) {
+    inline Encoder & Encoder::val(uint64_t v) {
         m_checkKey();
         if (!m_isKey) m_putPrefix();
         m_encode(v);
@@ -252,19 +248,19 @@ namespace qjson {
         return *this;
     }
 
-    inline Writer & Writer::val(uint32_t v) {
+    inline Encoder & Encoder::val(uint32_t v) {
         return val(uint64_t(v));
     }
 
-    inline Writer & Writer::val(uint16_t v) {
+    inline Encoder & Encoder::val(uint16_t v) {
         return val(uint64_t(v));
     }
 
-    inline Writer & Writer::val(uint8_t v) {
+    inline Encoder & Encoder::val(uint8_t v) {
         return val(uint64_t(v));
     }
 
-    inline Writer & Writer::val(double v) {
+    inline Encoder & Encoder::val(double v) {
         m_checkKey();
         if (!m_isKey) m_putPrefix();
         m_encode(v);
@@ -274,11 +270,11 @@ namespace qjson {
         return *this;
     }
 
-    inline Writer & Writer::val(float v) {
+    inline Encoder & Encoder::val(float v) {
         return val(double(v));
     }
 
-    inline Writer & Writer::val(bool v) {
+    inline Encoder & Encoder::val(bool v) {
         m_checkKey();
         if (!m_isKey) m_putPrefix();
         m_encode(v);
@@ -288,7 +284,7 @@ namespace qjson {
         return *this;
     }
 
-    inline Writer & Writer::val(nullptr_t) {
+    inline Encoder & Encoder::val(nullptr_t) {
         m_checkKey();
         if (!m_isKey) m_putPrefix();
         m_encode(nullptr);
@@ -299,17 +295,17 @@ namespace qjson {
     }
 
     template <typename T>
-    inline Writer & Writer::val(const T & v) {
+    inline Encoder & Encoder::val(const T & v) {
         ::qjson_encode(*this, v);
         return *this;
     }
 
-    inline Writer & Writer::end() {
+    inline Encoder & Encoder::end() {
         if (m_state.size() <= 1) {
-            throw JsonWriteError("No object or array to end");
+            throw EncodeError("No object or array to end");
         }
         if (m_isKey) {
-            throw JsonWriteError("Expected value to follow key");
+            throw EncodeError("Expected value to follow key");
         }
 
         m_end();
@@ -317,16 +313,13 @@ namespace qjson {
         return *this;
     }
 
-    inline string Writer::finish() {
-        if (m_isKey) {
-            throw JsonWriteError("Expected value");
+    inline string Encoder::finish() {
+        if (!m_state.empty()) {
+            throw EncodeError("Premature finish");
         }
 
         bool compact(m_state.front().compact);
 
-        while (!m_state.empty()) {
-            m_end();
-        }
         string str(m_ss.str());
 
         // Reset state
@@ -338,13 +331,13 @@ namespace qjson {
         return str;
     }
 
-    inline void Writer::m_start(bool compact, char bracket) {
+    inline void Encoder::m_start(bool compact, char bracket) {
         m_ss << bracket;
         m_state.back().content = true;
         m_state.push_back(State{bracket == '[', m_state.back().compact || compact, false});
     }
 
-    inline void Writer::m_end() {
+    inline void Encoder::m_end() {
         const State & state(m_state.back());
         if (state.content) {
             if (state.compact) {
@@ -360,7 +353,7 @@ namespace qjson {
         m_state.pop_back();
     }
 
-    inline void Writer::m_putPrefix() {
+    inline void Encoder::m_putPrefix() {
         const State & state(m_state.back());
         if (state.content) {
             m_ss << ',';
@@ -375,19 +368,19 @@ namespace qjson {
         }
     }
 
-    inline void Writer::m_putIndentation() {
+    inline void Encoder::m_putIndentation() {
         for (int i(0); i < m_indentation; ++i) {
             m_ss << m_indent;
         }
     }
 
-    inline void Writer::m_checkKey() const {
+    inline void Encoder::m_checkKey() const {
         if (!m_isKey && !m_state.back().array) {
-            throw JsonWriteError("Object elements must have keys");
+            throw EncodeError("Object elements must have keys");
         }
     }
 
-    inline void Writer::m_encode(string_view v) {
+    inline void Encoder::m_encode(string_view v) {
         m_ss << '"';
 
         for (char c : v) {
@@ -409,7 +402,7 @@ namespace qjson {
                             m_ss << '\\' << 'u' << '0' << '0' << k_hexChars[(c >> 4) & 0xF] << k_hexChars[c & 0xF];
                         }
                         else {
-                            throw JsonWriteError("Non-ASCII unicode is unsupported");
+                            throw EncodeError("Non-ASCII unicode is unsupported");
                         }
                 }
             }
@@ -418,7 +411,7 @@ namespace qjson {
         m_ss << '"';
     }
 
-    inline void Writer::m_encode(int64_t v) {
+    inline void Encoder::m_encode(int64_t v) {
         if (v < 0) {
             m_ss << '-';
             v = -v;
@@ -439,7 +432,7 @@ namespace qjson {
         m_ss << string_view(pos, end - pos);
     }
 
-    inline void Writer::m_encode(uint64_t v) {
+    inline void Encoder::m_encode(uint64_t v) {
         m_ss << "0x"sv;
 
         char buffer[16];
@@ -454,28 +447,28 @@ namespace qjson {
         m_ss << string_view(pos, end - pos);
     }
 
-    inline void Writer::m_encode(double v) {
+    inline void Encoder::m_encode(double v) {
         if (std::isinf(v)) {
-            throw JsonWriteError("The JSON standard does not support infinity");
+            throw EncodeError("The JSON standard does not support infinity");
         }
         if (std::isnan(v)) {
-            throw JsonWriteError("The JSON standard does not support NaN");
+            throw EncodeError("The JSON standard does not support NaN");
         }
 
         char buffer[32];
         int len(std::snprintf(buffer, sizeof(buffer), "%#.17g", v));
         if (len < 0 || len >= sizeof(buffer)) {
-            throw JsonWriteError("Error encoding float");
+            throw EncodeError("Error encoding float");
         }
 
         m_ss << string_view(buffer, len);
     }
 
-    inline void Writer::m_encode(bool v) {
+    inline void Encoder::m_encode(bool v) {
         m_ss << (v ? "true"sv : "false"sv);
     }
 
-    inline void Writer::m_encode(nullptr_t) {
+    inline void Encoder::m_encode(nullptr_t) {
         m_ss << "null"sv;
     }
 
