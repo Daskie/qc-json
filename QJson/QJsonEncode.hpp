@@ -4,7 +4,7 @@
 // QJson 1.1.0
 // Austin Quick
 // July 2019
-//
+//------------------------------------------------------------------------------
 // Basic, lightweight JSON encoder.
 //
 // Example:
@@ -26,11 +26,10 @@ namespace qjson {
 #ifndef QJSON_COMMON
 #define QJSON_COMMON
 
-    // If anything goes wrong, this exception will be thrown
     struct Error : public std::exception {
         Error() = default;
         Error(const char * msg) : std::exception(msg) {}
-        virtual ~Error() = default;
+        ~Error() override = default;
     };
 
 #endif
@@ -68,6 +67,7 @@ namespace qjson {
         Encoder & val(string_view v);
         Encoder & val(const string & v);
         Encoder & val(const char * v);
+        Encoder & val(char v);
         Encoder & val(int64_t v);
         Encoder & val(int32_t v);
         Encoder & val(int16_t v);
@@ -214,6 +214,10 @@ namespace qjson {
 
     inline Encoder & Encoder::val(const char * v) {
         return val(string_view(v));
+    }
+
+    inline Encoder & Encoder::val(char v) {
+        return val(string_view(&v, 1));
     }
 
     inline Encoder & Encoder::val(int64_t v) {

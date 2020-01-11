@@ -40,7 +40,7 @@ struct qjson_valueFrom<CustomVal> {
     }
 };
 
-TEST_CLASS(Read) {
+TEST_CLASS(Json) {
 
     public:
 

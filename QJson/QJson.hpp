@@ -4,7 +4,7 @@
 // QJson 1.1.0
 // Austin Quick
 // July 2019
-//
+//------------------------------------------------------------------------------
 // Basic, lightweight JSON decoder.
 //
 // Example:
@@ -687,16 +687,44 @@ namespace qjson {
         m_integer(val)
     {}
 
+    inline Value::Value(int32_t val) :
+        Value(int64_t(val))
+    {}
+
+    inline Value::Value(int16_t val) :
+        Value(int64_t(val))
+    {}
+
+    inline Value::Value(int8_t val) :
+        Value(int64_t(val))
+    {}
+
     inline Value::Value(uint64_t val) :
         m_type_data0(uint32_t(Type::hex)),
         m_data1(),
         m_hex(val)
     {}
 
+    inline Value::Value(uint32_t val) :
+        Value(uint64_t(val))
+    {}
+
+    inline Value::Value(uint16_t val) :
+        Value(uint64_t(val))
+    {}
+
+    inline Value::Value(uint8_t val) :
+        Value(uint64_t(val))
+    {}
+
     inline Value::Value(double val) :
         m_type_data0(uint32_t(Type::floater)),
         m_data1(),
         m_floater(val)
+    {}
+
+    inline Value::Value(float val) :
+        Value(double(val))
     {}
 
     inline Value::Value(bool val) :
