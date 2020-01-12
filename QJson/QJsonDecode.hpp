@@ -33,52 +33,73 @@ class MyDecoder {
     };
 
     // Called when a json object is encountered.
+    //
     // `outerState` is the state at the level containing the object
     // returns the new state to use for within the object
+    //
     MyState object(MyState & outerState);
 
     // Called when an array is encountered.
+    //
     // `outerState` is the state at the level containing the array
     // returns the new state to use for within the array
+    //
     MyState array(MyState & outerState);
 
     // Called at then end of an object or array.
+    //
     // `innerState` is the state that existed within the object or array
     // `outerState` is the state at the level containing the object or array
+    //
     void end(MyState && innerState, MyState & outerState);
 
     // Called when an object key is parsed.
+    //
     // `key` is the key string
     // `state` is the state of the current object
+    //
     void key(std::string && key, MyState & state);
 
     // Called when a string is parsed.
+    //
     // `val` is the string
     // `state` is the state of the current object or array
+    //
     void val(string_view val, MyState & state);
 
     // Called when an integer is parsed.
+    //
     // `val` is the integer
     // `state` is the state of the current object or array
+    //
     void val(int64_t val, MyState & state);
 
     // Called when a hex value is parsed.
+    //
     // `val` is the hex value
     // `state` is the state of the current object or array
+    //
     void val(uint64_t val, MyState & state);
 
     // Called when a floating point number is parsed.
+    //
     // `val` is the floating point number
     // `state` is the state of the current object or array
+    //
     void val(double val, MyState & state);
 
+    //
     // Called when a boolean is parsed.
+    //
     // `val` is the boolean
     // `state` is the state of the current object or array
+    //
     void val(bool val, MyState & state);
 
     // Called when a `null` is parsed.
+    //
     // `state` is the state of the current object or array
+    //
     void val(nullptr_t, MyState & state);
 
 };
