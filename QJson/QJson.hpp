@@ -15,12 +15,11 @@
 //      ...
 //------------------------------------------------------------------------------
 
-#include <string>
-#include <map>
-#include <vector>
-#include <memory>
+// TODO: optimize
 #include <stdexcept>
-#include <deque>
+#include <string>
+#include <string_view>
+#include <utility>
 
 #include "QJsonDecode.hpp"
 #include "QJsonEncode.hpp"
@@ -39,7 +38,6 @@ namespace qjson {
 
     using std::string;
     using std::string_view;
-    using std::unique_ptr;
     using namespace std::string_literals;
     using namespace std::string_view_literals;
 
@@ -511,7 +509,7 @@ namespace qjson {
 
     Value decode(string_view json);
 
-    string encode(const Value & val, bool compact = k_defaultCompact, int indentSize = k_defaultIndentSize);
+    string encode(const Value & val, bool compact = defaultCompact);
 
 }
 
@@ -544,7 +542,7 @@ namespace qjson {
 
     namespace detail {
 
-        class Decoder {
+        class Composer {
 
             public:
 
@@ -589,25 +587,25 @@ namespace qjson {
 
         };
 
-        inline void encodeRecursive(Encoder & encoder, const Value & val) {
+        inline void encodeRecursive(Encoder & encoder, const Value & val, bool compact) {
             switch (val.type()) {
                 case Type::null: {
                     encoder.val(nullptr);
                     break;
                 }
                 case Type::object: {
-                    encoder.object();
+                    encoder.object(compact);
                     for (const auto & [key, v] : val.asObject()) {
                         encoder.key(key);
-                        encodeRecursive(encoder, v);
+                        encodeRecursive(encoder, v, compact);
                     }
                     encoder.end();
                     break;
                 }
                 case Type::array: {
-                    encoder.array();
+                    encoder.array(compact);
                     for (const auto & v : val.asArray()) {
-                        encodeRecursive(encoder, v);
+                        encodeRecursive(encoder, v, compact);
                     }
                     encoder.end();
                     break;
@@ -985,14 +983,14 @@ namespace qjson {
 
     inline Value decode(string_view json) {
         Value root;
-        Decoder decoder;
-        decode(json, decoder, Decoder::State{&root, false, false});
+        Composer composer;
+        decode(json, composer, Composer::State{&root, false, false});
         return root;
     }
 
-    inline string encode(const Value & val, bool compact, int indentSize) {
-        Encoder encoder(compact, indentSize);
-        encodeRecursive(encoder, val);
+    inline string encode(const Value & val, bool compact) {
+        Encoder encoder;
+        encodeRecursive(encoder, val, compact);
         return encoder.finish();
     }
 

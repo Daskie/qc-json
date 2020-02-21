@@ -3,17 +3,17 @@
 //==============================================================================
 // QJson 1.1.0
 // Austin Quick
-// July 2019
+// July 2019 - February 2020
 //------------------------------------------------------------------------------
 // Basic, lightweight JSON decoder.
 //
-// Parses a json string and sends its json constituents to the Decoder provided
-// in SAX form.
+// Decodes a json string and sends its json constituents to the Composer
+// provided in a SAX fashion.
 //
 // Basic usage:
 //
 //      try {
-//          qjson::decode(myJsonString, myDecoder, myState);
+//          qjson::decode(myJsonString, myComposer, myState);
 //      }
 //      catch (const qjson::DecoderError & e) {
 //          std::cerr << "Error decoding json" << std::endl;
@@ -21,12 +21,12 @@
 //          std::cerr << "Where: " << e.position << std::endl;
 //      }
 //
-// A decoder must provide a set of methods that will be called from the `decode`
-// function. An example prototype class for a decoder is provided below:
+// A composer class must provide a set of methods that will be called from the
+// `decode` function. An example prototype class is provided below:
 //
 #if 0
 
-class MyDecoder {
+class MyComposer {
 
     struct MyState {
         // Some useful data
@@ -88,7 +88,6 @@ class MyDecoder {
     //
     void val(double val, MyState & state);
 
-    //
     // Called when a boolean is parsed.
     //
     // `val` is the boolean
@@ -111,36 +110,42 @@ class MyDecoder {
 // just pass nullptr.
 //------------------------------------------------------------------------------
 
+#include <cctype>
 #include <charconv>
+#include <limits>
+#include <stdexcept>
 #include <string>
-
+#include <string_view>
+#include <system_error>
+#include <utility>
 
 namespace qjson {
 
 #ifndef QJSON_COMMON
 #define QJSON_COMMON
 
-    struct Error : public std::exception {
-        Error() = default;
-        Error(const char * msg) : std::exception(msg) {}
+    struct Error : public std::runtime_error {
+
+        Error() : std::runtime_error(nullptr) {}
+        Error(const std::string & msg) : std::runtime_error(msg) {}
+
         ~Error() override = default;
+
     };
 
 #endif
 
-    using std::string;
-    using std::string_view;
-    using namespace std::string_literals;
-    using namespace std::string_view_literals;
-
-    // This will be thrown if anything goes wrong during the decoding process
-    // `position` is the index into the string where the error occured (roughly)
+    // This will be thrown if anything goes wrong during the decoding process.
+    // `position` is the index into the string where the error occured.
     struct DecodeError : public Error {
+
         size_t position;
-        DecodeError(const char * msg, size_t position) : Error(msg), position(position) {}
+
+        DecodeError(const std::string & msg, size_t position) : Error(msg), position(position) {}
+
     };
 
-    template <typename Decoder, typename State> void decode(string_view json, Decoder & decoder, State initialState);
+    template <typename Composer, typename State> void decode(std::string_view json, Composer & decoder, State initialState);
 
 }
 
@@ -148,19 +153,25 @@ namespace qjson {
 
 namespace qjson {
 
+    using std::string;
+    using std::string_view;
+    using namespace std::string_literals;
+    using namespace std::string_view_literals;
+
     namespace detail {
 
         // A helper class to keep track of state
-        template <typename Decoder, typename State>
+        template <typename Composer, typename State>
         class DecodeHelper {
 
-            public:
+          public:
 
-            DecodeHelper(string_view str, Decoder & decoder) :
+            DecodeHelper(string_view str, Composer & decoder) :
                 m_start(str.data()),
                 m_end(m_start + str.length()),
                 m_pos(m_start),
-                m_decoder(decoder)
+                m_composer(decoder),
+                m_stringBuffer()
             {}
 
             void operator()(State & initialState) {
@@ -169,34 +180,26 @@ namespace qjson {
                 m_skipWhitespace();
 
                 if (m_pos != m_end) {
-                    throw DecodeError("Extraneous content", m_position());
+                    throw DecodeError("Extraneous content", m_pos - m_start);
                 }
             }
 
-            private:
+          private:
 
-            const char * const m_start, * const m_end, * m_pos;
-            Decoder & m_decoder;
+            const char * const m_start;
+            const char * const m_end;
+            const char * m_pos;
+            size_t m_line;
+            size_t m_column;
+            Composer & m_composer;
             string m_stringBuffer;
 
-            bool m_isMore() const {
-                return m_pos < m_end;
-            }
-
-            size_t m_remaining() const {
-                return m_end - m_pos;
-            }
-
-            size_t m_position() const {
-                return m_pos - m_start;
-            }
-
             void m_skipWhitespace() {
-                while (m_isMore() && std::isspace(*m_pos)) ++m_pos;
+                while (m_pos < m_end && std::isspace(*m_pos)) ++m_pos;
             }
 
             bool m_tryConsumeChar(char c) {
-                if (m_isMore() && *m_pos == c) {
+                if (m_pos < m_end && *m_pos == c) {
                     ++m_pos;
                     return true;
                 }
@@ -207,12 +210,12 @@ namespace qjson {
 
             void m_consumeChar(char c) {
                 if (!m_tryConsumeChar(c)) {
-                    throw DecodeError(("Expected `"s + c + "`"s).c_str(), m_position());
+                    throw DecodeError(("Expected `"s + c + "`"s).c_str(), m_pos - m_start);
                 }
             }
 
             bool m_tryConsumeChars(string_view str) {
-                if (m_remaining() >= str.length()) {
+                if (size_t(m_end - m_pos) >= str.length()) {
                     for (size_t i(0); i < str.length(); ++i) {
                         if (m_pos[i] != str[i]) {
                             return false;
@@ -227,133 +230,166 @@ namespace qjson {
             }
 
             void m_ingestValue(State & state) {
-                if (!m_isMore()) {
-                    throw DecodeError("Expected value", m_position());
+                if (m_pos >= m_end) {
+                    throw DecodeError("Expected value", m_pos - m_start);
                 }
 
-                if (!(
-                    m_tryIngestObject(state) ||
-                    m_tryIngestArray(state) ||
-                    m_tryIngestString(state) ||
-                    m_tryIngestHex(state) ||
-                    m_tryIngestIntegerOrFloater(state) ||
-                    m_tryIngestBool(state) ||
-                    m_tryIngestNull(state) ||
-                    m_tryIngestSpecialFloater(state)
-                )) {
-                    throw DecodeError("Unknown value", m_position());
-                }
-            }
-
-            bool m_tryIngestObject(State & outerState) {
-                if (!m_tryConsumeChar('{')) {
-                    return false;
-                }
-
-                State innerState(m_decoder.object(outerState));
-
-                m_skipWhitespace();
-                if (m_tryConsumeChar('}')) {
-                    m_decoder.end(std::move(innerState), outerState);
-                    return true;
-                }
-
-                while (true) {
-                    auto [wasStr, key](m_tryConsumeString());
-                    if (!wasStr) {
-                        throw DecodeError("Expected key string", m_position());
-                    }
-                    if (key.empty()) {
-                        throw DecodeError("Key is empty", m_position());
-                    }
-                    m_decoder.key(string(key), innerState);
-                    m_skipWhitespace();
-                    m_consumeChar(':');
-                    m_skipWhitespace();
-                    m_ingestValue(innerState);
-                    m_skipWhitespace();
-                    if (m_tryConsumeChar('}')) {
+                switch (*m_pos) {
+                    case '{': {
+                        m_ingestObject(state);
                         break;
                     }
-                    m_consumeChar(',');
-                    m_skipWhitespace();
-                }
-
-                m_decoder.end(std::move(innerState), outerState);
-                return true;
-            }
-
-            bool m_tryIngestArray(State & outerState) {
-                if (!m_tryConsumeChar('[')) {
-                    return false;
-                }
-
-                State innerState(m_decoder.array(outerState));
-
-                m_skipWhitespace();
-                if (m_tryConsumeChar(']')) {
-                    m_decoder.end(std::move(innerState), outerState);
-                    return true;
-                }
-
-                while (true) {
-                    m_ingestValue(innerState);
-                    m_skipWhitespace();
-                    if (m_tryConsumeChar(']')) {
+                    case '[': {
+                        m_ingestArray(state);
                         break;
                     }
-                    m_consumeChar(',');
-                    m_skipWhitespace();
+                    case '"': {
+                        m_ingestString(state);
+                        break;
+                    }
+                    case '0': {
+                        if (m_end - m_pos > 1 && m_pos[1] == 'x') {
+                            m_ingestHex(state);
+                        }
+                        else {
+                            m_ingestDecimal(state);
+                        }
+                        break;
+                    }
+                    case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': case '9': {
+                        m_ingestDecimal(state);
+                        break;
+                    }
+                    case '-': {
+                        if (m_end - m_pos > 1 && std::isdigit(m_pos[1])) {
+                            m_ingestDecimal(state);
+                            break;
+                        }
+                        else if (m_tryConsumeChars("-inf"sv)) {
+                            m_composer.val(-std::numeric_limits<double>::infinity(), state);
+                            break;
+                        }
+                        // Intentional fallthrough
+                    }
+                    default:
+                        if (m_tryConsumeChars("true"sv)) {
+                            m_composer.val(true, state);
+                        }
+                        else if (m_tryConsumeChars("false"sv)) {
+                            m_composer.val(false, state);
+                        }
+                        else if (m_tryConsumeChars("null"sv)) {
+                            m_composer.val(nullptr, state);
+                        }
+                        else if (m_tryConsumeChars("inf"sv)) {
+                            m_composer.val(std::numeric_limits<double>::infinity(), state);
+                        }
+                        else if (m_tryConsumeChars("nan"sv)) {
+                            m_composer.val(std::numeric_limits<double>::quiet_NaN(), state);
+                        }
+                        else {
+                            throw DecodeError("Unknown value", m_pos - m_start);
+                        }
                 }
-
-                m_decoder.end(std::move(innerState), outerState);
-                return true;
             }
 
-            bool m_tryIngestString(State & state) {
-                if (auto [wasStr, str](m_tryConsumeString()); wasStr) {
-                    m_decoder.val(str, state);
-                    return true;
+            void m_ingestObject(State & outerState) {
+                State innerState(m_composer.object(outerState));
+
+                ++m_pos; // We already know we have `{`
+                m_skipWhitespace();
+
+                if (!m_tryConsumeChar('}')) {
+                    while (true) {
+                        if (*m_pos != '"') {
+                            throw DecodeError("Expected key", m_pos - m_start);
+                        }
+                        string_view key(m_consumeString());
+                        if (key.empty()) {
+                            throw DecodeError("Key is empty", m_pos - m_start);
+                        }
+                        m_composer.key(string(key), innerState);
+                        m_skipWhitespace();
+
+                        m_consumeChar(':');
+                        m_skipWhitespace();
+
+                        m_ingestValue(innerState);
+                        m_skipWhitespace();
+
+                        if (m_tryConsumeChar('}')) {
+                            break;
+                        }
+                        else {
+                            m_consumeChar(',');
+                            m_skipWhitespace();
+                        }
+                    }
                 }
-                else {
-                    return false;
-                }
+
+                m_composer.end(std::move(innerState), outerState);
             }
 
-            std::pair<bool, string_view> m_tryConsumeString() {
-                if (!m_tryConsumeChar('"')) {
-                    return {};
+            void m_ingestArray(State & outerState) {
+                State innerState(m_composer.array(outerState));
+
+                ++m_pos; // We already know we have `[`
+                m_skipWhitespace();
+
+                if (!m_tryConsumeChar(']')) {
+                    while (true) {
+                        m_ingestValue(innerState);
+                        m_skipWhitespace();
+
+                        if (m_tryConsumeChar(']')) {
+                            break;
+                        }
+                        else {
+                            m_consumeChar(',');
+                            m_skipWhitespace();
+                        }
+                    }
                 }
 
+                m_composer.end(std::move(innerState), outerState);
+            }
+
+            void m_ingestString(State & state) {
+                m_composer.val(m_consumeString(), state);
+            }
+
+            string_view m_consumeString() {
                 m_stringBuffer.clear();
 
+                ++m_pos; // We already know we have `"`
+
                 while (true) {
-                    if (!m_isMore()) {
-                        throw DecodeError("Expected end quote", m_position());
+                    if (m_pos >= m_end) {
+                        throw DecodeError("Expected end quote", m_pos - m_start);
                     }
 
                     char c(*m_pos);
                     if (c == '"') {
                         ++m_pos;
-                        return {true, m_stringBuffer};
+                        return m_stringBuffer;
                     }
                     else if (c == '\\') {
                         ++m_pos;
-                        m_stringBuffer.push_back(m_ingestEscaped());
+                        m_stringBuffer.push_back(m_consumeEscaped());
                     }
                     else if (std::isprint(c)) {
                         m_stringBuffer.push_back(c);
                         ++m_pos;
                     }
                     else {
-                        throw DecodeError("Unknown string content", m_position());
+                        throw DecodeError("Unknown string content", m_pos - m_start);
                     }
                 }
             }
 
-            char m_ingestEscaped() {
-                if (!m_isMore()) {
-                    throw DecodeError("Expected escape sequence", m_position());
+            char m_consumeEscaped() {
+                if (m_pos >= m_end) {
+                    throw DecodeError("Expected escape sequence", m_pos - m_start);
                 }
 
                 switch (*m_pos++) {
@@ -365,25 +401,25 @@ namespace qjson {
                     case  'n': return '\n';
                     case  'r': return '\r';
                     case  't': return '\t';
-                    case  'u': return m_ingestUnicode();
+                    case  'u': return m_consumeUnicode();
                     default:
-                        throw DecodeError("Unknown escape sequence", m_position() - 1);
+                        throw DecodeError("Unknown escape sequence", m_pos - m_start - 1);
                 }
             }
 
-            char m_ingestUnicode() {
-                if (m_remaining() < 4) {
-                    throw DecodeError("Expected four digits of unicode", m_position());
+            char m_consumeUnicode() {
+                if (m_end - m_pos < 4) {
+                    throw DecodeError("Expected four digits of unicode", m_pos - m_start);
                 }
 
                 uint32_t val;
                 std::from_chars_result res(std::from_chars(m_pos, m_pos + 4, val, 16));
                 if (res.ec != std::errc()) {
-                    throw DecodeError("Invalid unicode", m_position());
+                    throw DecodeError("Invalid unicode", m_pos - m_start);
                 }
 
                 if (val & 0xFFFFFF80) {
-                    throw DecodeError("Non-ASCII unicode is unsupported", m_position());
+                    throw DecodeError("Non-ASCII unicode is unsupported", m_pos - m_start);
                 }
 
                 m_pos += 4;
@@ -391,28 +427,21 @@ namespace qjson {
                 return val;
             }
 
-            bool m_tryIngestHex(State & state) {
-                if (!m_tryConsumeChars("0x"sv)) {
-                    return false;
-                }
+            void m_ingestHex(State & state) {
+                m_pos += 2; // We already know we have `0x`
 
                 uint64_t val;
                 std::from_chars_result res(std::from_chars(m_pos, m_end, val, 16));
 
                 if (res.ec != std::errc()) {
-                    throw DecodeError("Invalid hex", m_position());
+                    throw DecodeError("Invalid hex", m_pos - m_start);
                 }
 
                 m_pos = res.ptr;
-                m_decoder.val(val, state);
-                return true;
+                m_composer.val(val, state);
             }
 
-            bool m_tryIngestIntegerOrFloater(State & state) {
-                if (!(std::isdigit(*m_pos) || (*m_pos == '-' && m_remaining() >= 2 && std::isdigit(m_pos[1])))) {
-                    return false;
-                }
-
+            void m_ingestDecimal(State & state) {
                 // Determine if integral or floating point
                 const char * pos(m_pos + 1);
                 while (pos < m_end && std::isdigit(*pos)) ++pos;
@@ -422,7 +451,6 @@ namespace qjson {
                 else {
                     m_ingestFloater(state);
                 }
-                return true;
             }
 
             void m_ingestInteger(State & state) {
@@ -430,11 +458,11 @@ namespace qjson {
                 std::from_chars_result res(std::from_chars(m_pos, m_end, val));
 
                 if (res.ec != std::errc()) {
-                    throw DecodeError("Invalid integer", m_position());
+                    throw DecodeError("Invalid integer", m_pos - m_start);
                 }
 
                 m_pos = res.ptr;
-                m_decoder.val(val, state);
+                m_composer.val(val, state);
             }
 
             void m_ingestFloater(State & state) {
@@ -442,62 +470,20 @@ namespace qjson {
                 std::from_chars_result res(std::from_chars(m_pos, m_end, val));
 
                 if (res.ec != std::errc() || res.ptr[-1] == '.') {
-                    throw DecodeError("Invalid floater", m_position());
+                    throw DecodeError("Invalid floater", m_pos - m_start);
                 }
 
                 m_pos = res.ptr;
-                m_decoder.val(val, state);
-            }
-
-            bool m_tryIngestBool(State & state) {
-                if (m_tryConsumeChars("true"sv)) {
-                    m_decoder.val(true, state);
-                    return true;
-                }
-                else if (m_tryConsumeChars("false"sv)) {
-                    m_decoder.val(false, state);
-                    return true;
-                }
-                else {
-                    return false;
-                }
-            }
-
-            bool m_tryIngestNull(State & state) {
-                if (m_tryConsumeChars("null"sv)) {
-                    m_decoder.val(nullptr, state);
-                    return true;
-                }
-                else {
-                    return false;
-                }
-            }
-
-            bool m_tryIngestSpecialFloater(State & state) {
-                if (m_tryConsumeChars("inf"sv)) {
-                    m_decoder.val(std::numeric_limits<double>::infinity(), state);
-                    return true;
-                }
-                else if (m_tryConsumeChars("-inf"sv)) {
-                    m_decoder.val(-std::numeric_limits<double>::infinity(), state);
-                    return true;
-                }
-                else if (m_tryConsumeChars("nan"sv)) {
-                    m_decoder.val(std::numeric_limits<double>::quiet_NaN(), state);
-                    return true;
-                }
-                else {
-                    return false;
-                }
+                m_composer.val(val, state);
             }
 
         };
 
     }
 
-    template <typename Decoder, typename State>
-    inline void decode(string_view json, Decoder & decoder, State initialState) {
-        return detail::DecodeHelper<Decoder, State>(json, decoder)(initialState);
+    template <typename Composer, typename State>
+    inline void decode(string_view json, Composer & decoder, State initialState) {
+        return detail::DecodeHelper<Composer, State>(json, decoder)(initialState);
     }
 
 }

@@ -133,6 +133,18 @@ TEST_CLASS(Decode) {
             qjson::decode(R"({ "a": null, "b": null, "c": null })"sv, decoder, nullptr);
             Assert::IsTrue(decoder.isDone());
         }
+        { // No space
+            ExpectantDecoder decoder;
+            decoder.expectObject().expectKey("a"sv).expectNull().expectKey("b"sv).expectNull().expectEnd();
+            qjson::decode(R"({"a":null,"b":null})"sv, decoder, nullptr);
+            Assert::IsTrue(decoder.isDone());
+        }
+        { // Weird spacing
+            ExpectantDecoder decoder;
+            decoder.expectObject().expectKey("a"sv).expectNull().expectKey("b"sv).expectNull().expectEnd();
+            qjson::decode(R"({"a" :null ,"b" :null})"sv, decoder, nullptr);
+            Assert::IsTrue(decoder.isDone());
+        }
         { // Key not within quotes
             Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"({ a: 0 })", DummyDecoder(), nullptr); });
         }
@@ -174,6 +186,18 @@ TEST_CLASS(Decode) {
             ExpectantDecoder decoder;
             decoder.expectArray().expectNull().expectNull().expectNull().expectEnd();
             qjson::decode(R"([ null, null, null ])"sv, decoder, nullptr);
+            Assert::IsTrue(decoder.isDone());
+        }
+        { // No space
+            ExpectantDecoder decoder;
+            decoder.expectArray().expectNull().expectNull().expectEnd();
+            qjson::decode(R"([null,null])"sv, decoder, nullptr);
+            Assert::IsTrue(decoder.isDone());
+        }
+        { // Weird spacing
+            ExpectantDecoder decoder;
+            decoder.expectArray().expectNull().expectNull().expectEnd();
+            qjson::decode(R"([null ,null])"sv, decoder, nullptr);
             Assert::IsTrue(decoder.isDone());
         }
         { // No comma between elements
@@ -268,14 +292,13 @@ TEST_CLASS(Decode) {
         { // Number too large
             Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"(9223372036854775808)"sv, DummyDecoder(), nullptr); });
         }
-        { // Plus sign
-            Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"(+0)", DummyDecoder(), nullptr); });
-        }
-        { // Missing number after minus
+        { // Invalid minus sign
             Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"(-)", DummyDecoder(), nullptr); });
-        }
-        { // Invalid digit
             Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"(-A)", DummyDecoder(), nullptr); });
+        }
+        { // Plus sign
+            Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"(+)", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"(+123)", DummyDecoder(), nullptr); });
         }
     }
 
@@ -288,19 +311,19 @@ TEST_CLASS(Decode) {
         }
         { // Uppercase
             ExpectantDecoder decoder;
-            decoder.expectHex(0x0123456789ABCDEFull);
+            decoder.expectHex(0x0123456789ABCDEFu);
             qjson::decode(R"(0x0123456789ABCDEF)"sv, decoder, nullptr);
             Assert::IsTrue(decoder.isDone());
         }
         { // Lowercase
             ExpectantDecoder decoder;
-            decoder.expectHex(0x0123456789ABCDEFull);
+            decoder.expectHex(0x0123456789ABCDEFu);
             qjson::decode(R"(0x0123456789abcdef)"sv, decoder, nullptr);
             Assert::IsTrue(decoder.isDone());
         }
         { // Max
             ExpectantDecoder decoder;
-            decoder.expectHex(0xFFFFFFFFFFFFFFFFull);
+            decoder.expectHex(0xFFFFFFFFFFFFFFFFu);
             qjson::decode(R"(0xFFFFFFFFFFFFFFFF)"sv, decoder, nullptr);
             Assert::IsTrue(decoder.isDone());
         }
@@ -312,7 +335,7 @@ TEST_CLASS(Decode) {
         }
     }
 
-    TEST_METHOD(Float) {
+    TEST_METHOD(Floater) {
         { // Zero
             ExpectantDecoder decoder;
             decoder.expectFloater(0.0);
@@ -361,7 +384,13 @@ TEST_CLASS(Decode) {
             qjson::decode(R"(123e34)", decoder, nullptr);
             Assert::IsTrue(decoder.isDone());
         }
-        { // +infinity
+        { // Max integer
+            ExpectantDecoder decoder;
+            decoder.expectFloater(9007199254740991.0);
+            qjson::decode(R"(9007199254740991.0)", decoder, nullptr);
+            Assert::IsTrue(decoder.isDone());
+        }
+        { // infinity
             ExpectantDecoder decoder;
             decoder.expectFloater(std::numeric_limits<double>::infinity());
             qjson::decode(R"(inf)", decoder, nullptr);
@@ -395,7 +424,7 @@ TEST_CLASS(Decode) {
         }
     }
 
-    TEST_METHOD(Bool) {
+    TEST_METHOD(Boolean) {
         { // True
             ExpectantDecoder decoder;
             decoder.expectBoolean(true);
@@ -445,18 +474,21 @@ TEST_CLASS(Decode) {
                     decoder.expectKey("Price"sv).expectFloater(5.45);
                     decoder.expectKey("Ingredients"sv).expectArray().expectString("Salt"sv).expectString("Barnacles"sv).expectEnd();
                     decoder.expectKey("Gluten-Free"sv).expectBoolean(false);
+                    decoder.expectKey("Code"sv).expectHex(0x8080u);
                 decoder.expectEnd();
                 decoder.expectObject();
                     decoder.expectKey("Name"sv).expectString("Two Tuna"sv);
                     decoder.expectKey("Price"sv).expectFloater(14.99);
                     decoder.expectKey("Ingredients"sv).expectArray().expectString("Tuna"sv).expectEnd();
                     decoder.expectKey("Gluten-Free"sv).expectBoolean(true);
+                    decoder.expectKey("Code"sv).expectHex(0xA034u);
                 decoder.expectEnd();
                 decoder.expectObject();
                     decoder.expectKey("Name"sv).expectString("18 Leg Bouquet"sv);
                     decoder.expectKey("Price"sv).expectFloater(18.00);
                     decoder.expectKey("Ingredients"sv).expectArray().expectString("Salt"sv).expectString("Octopus"sv).expectString("Crab"sv).expectEnd();
                     decoder.expectKey("Gluten-Free"sv).expectBoolean(false);
+                    decoder.expectKey("Code"sv).expectHex(0x17E4u);
                 decoder.expectEnd();
             decoder.expectEnd();
         decoder.expectEnd();
@@ -474,19 +506,22 @@ R"({
             "Name": "Basket o' Barnacles",
             "Price": 5.45,
             "Ingredients": [ "Salt", "Barnacles" ],
-            "Gluten-Free": false
+            "Gluten-Free": false,
+            "Code": 0x8080
         },
         {
             "Name": "Two Tuna",
             "Price": 14.99,
             "Ingredients": [ "Tuna" ],
-            "Gluten-Free": true
+            "Gluten-Free": true,
+            "Code": 0xA034
         },
         {
             "Name": "18 Leg Bouquet",
             "Price": 18.00,
             "Ingredients": [ "Salt", "Octopus", "Crab" ],
-            "Gluten-Free": false
+            "Gluten-Free": false,
+            "Code": 0x17E4
         }
     ]
 })"sv, decoder, nullptr);

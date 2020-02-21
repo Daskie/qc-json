@@ -81,7 +81,7 @@ TEST_CLASS(Json) {
     }
 
     TEST_METHOD(EncodeInteger) {
-        Assert::AreEqual(R"(123)"s, encode(123LL));
+        Assert::AreEqual(R"(123)"s, encode(123));
     }
 
     TEST_METHOD(DecodeHex) {
@@ -94,7 +94,7 @@ TEST_CLASS(Json) {
     }
 
     TEST_METHOD(EncodeHex) {
-        Assert::AreEqual(R"(0xABC)"s, encode(0xABCULL));
+        Assert::AreEqual(R"(0xABC)"s, encode(0xABCu));
     }
 
     TEST_METHOD(DecodeFloater) {
