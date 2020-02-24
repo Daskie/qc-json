@@ -75,11 +75,14 @@ namespace qjson {
       public:
 
         Encoder() = default;
+
         Encoder(const Encoder & other) = delete;
         Encoder(Encoder && other);
 
         Encoder & operator=(const Encoder & other) = delete;
         Encoder & operator=(Encoder && other) = delete;
+
+        ~Encoder() = default;
 
         Encoder & object(bool compact = defaultCompact);
 

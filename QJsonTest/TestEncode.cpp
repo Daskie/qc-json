@@ -17,7 +17,7 @@ void qjson_encode(qjson::Encoder & encoder, const CustomVal & v) {
 
 TEST_CLASS(Encode) {
 
-    public:
+  public:
 
     TEST_METHOD(Object) {
         { // Empty non-compact
@@ -282,7 +282,7 @@ TEST_CLASS(Encode) {
         }
         { // Max integer 32
             qjson::Encoder encoder;
-            uint32_t val(0b0'10010110'11111111111111111111111);
+            uint32_t val(0b0'10010110'11111111111111111111111u);
             encoder.val(reinterpret_cast<const float &>(val));
             Assert::AreEqual(R"(16777215.0)"s, encoder.finish());
         }
@@ -294,7 +294,7 @@ TEST_CLASS(Encode) {
         }
         { // Max 32
             qjson::Encoder encoder;
-            uint32_t val(0b0'11111110'11111111111111111111111);
+            uint32_t val(0b0'11111110'11111111111111111111111u);
             encoder.val(reinterpret_cast<const float &>(val));
             Assert::AreEqual(R"(3.4028234663852886e+38)"s, encoder.finish());
         }
@@ -306,7 +306,7 @@ TEST_CLASS(Encode) {
         }
         { // Min normal 32
             qjson::Encoder encoder;
-            uint32_t val(0b0'00000001'00000000000000000000000);
+            uint32_t val(0b0'00000001'00000000000000000000000u);
             encoder.val(reinterpret_cast<const float &>(val));
             Assert::AreEqual(R"(1.1754943508222875e-38)"s, encoder.finish());
         }
@@ -318,7 +318,7 @@ TEST_CLASS(Encode) {
         }
         { // Min subnormal 32
             qjson::Encoder encoder;
-            uint64_t val(0b0'00000000'00000000000000000000001);
+            uint64_t val(0b0'00000000'00000000000000000000001u);
             encoder.val(reinterpret_cast<const float &>(val));
             Assert::AreEqual(R"(1.401298464324817e-45)"s, encoder.finish());
         }
@@ -403,24 +403,25 @@ TEST_CLASS(Encode) {
                     encoder.key("Name"sv).val("Basket o' Barnacles"sv);
                     encoder.key("Price"sv).val(5.45);
                     encoder.key("Ingredients"sv).array(true).val("Salt"sv).val("Barnacles"sv).end();
-                    encoder.key("Gluten-Free"sv).val(false);
+                    encoder.key("Gluten Free"sv).val(false);
                     encoder.key("Code"sv).val(0x8080u);
                 encoder.end();
                 encoder.object();
                     encoder.key("Name"sv).val("Two Tuna"sv);
                     encoder.key("Price"sv).val(14.99);
                     encoder.key("Ingredients"sv).array(true).val("Tuna"sv).end();
-                    encoder.key("Gluten-Free"sv).val(true);
+                    encoder.key("Gluten Free"sv).val(true);
                     encoder.key("Code"sv).val(0xA034u);
                 encoder.end();
                 encoder.object();
                     encoder.key("Name"sv).val("18 Leg Bouquet"sv);
                     encoder.key("Price"sv).val(18.00);
                     encoder.key("Ingredients"sv).array(true).val("Salt"sv).val("Octopus"sv).val("Crab"sv).end();
-                    encoder.key("Gluten-Free"sv).val(false);
+                    encoder.key("Gluten Free"sv).val(false);
                     encoder.key("Code"sv).val(0x17E4u);
                 encoder.end();
             encoder.end();
+            encoder.key("Profit Margin"sv).val(nullptr);
         encoder.end();
 
         Assert::AreEqual(R"({
@@ -436,24 +437,25 @@ TEST_CLASS(Encode) {
             "Name": "Basket o' Barnacles",
             "Price": 5.45,
             "Ingredients": [ "Salt", "Barnacles" ],
-            "Gluten-Free": false,
+            "Gluten Free": false,
             "Code": 0x8080
         },
         {
             "Name": "Two Tuna",
             "Price": 14.99,
             "Ingredients": [ "Tuna" ],
-            "Gluten-Free": true,
+            "Gluten Free": true,
             "Code": 0xA034
         },
         {
             "Name": "18 Leg Bouquet",
             "Price": 18.0,
             "Ingredients": [ "Salt", "Octopus", "Crab" ],
-            "Gluten-Free": false,
+            "Gluten Free": false,
             "Code": 0x17E4
         }
-    ]
+    ],
+    "Profit Margin": null
 })"s, encoder.finish());
     }
 

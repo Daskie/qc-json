@@ -3,7 +3,7 @@
 //==============================================================================
 // QJson 1.1.0
 // Austin Quick
-// July 2019
+// July 2019 - February 2020
 //------------------------------------------------------------------------------
 // Basic, lightweight JSON decoder.
 //
@@ -26,53 +26,35 @@
 
 namespace qjson {
 
-    constexpr uint32_t ceil2(uint32_t v) {
-        --v;
-        v |= v >>  1;
-        v |= v >>  2;
-        v |= v >>  4;
-        v |= v >>  8;
-        v |= v >> 16;
-        return v + 1;
-    }
-
     using std::string;
     using std::string_view;
     using namespace std::string_literals;
     using namespace std::string_view_literals;
 
-    // This will be thrown when attempting to access as value as the wrong type
+    // This will be thrown when attempting to access a value as the wrong type
     struct TypeError : public Error {};
 
     enum class Type : uint32_t {
-           null = 0b00000000'00000000'00000000'00000000u,
-         object = 0b00100000'00000000'00000000'00000000u,
-          array = 0b01000000'00000000'00000000'00000000u,
-         string = 0b01100000'00000000'00000000'00000000u,
-        integer = 0b10000000'00000000'00000000'00000000u,
-        floater = 0b10100000'00000000'00000000'00000000u,
-        boolean = 0b11000000'00000000'00000000'00000000u,
-            hex = 0b11100000'00000000'00000000'00000000u
+           null = 0b000'00000'00000000'00000000'00000000u,
+         object = 0b001'00000'00000000'00000000'00000000u,
+          array = 0b010'00000'00000000'00000000'00000000u,
+         string = 0b011'00000'00000000'00000000'00000000u,
+        integer = 0b100'00000'00000000'00000000'00000000u,
+            hex = 0b101'00000'00000000'00000000'00000000u,
+        floater = 0b110'00000'00000000'00000000'00000000u,
+        boolean = 0b111'00000'00000000'00000000'00000000u
     };
-
-    constexpr bool isPow2(uint32_t v) {
-        return (v & (v - 1)) == 0;
-    }
 
     class Object;
     class Array;
-    class String;
 
     class Value {
 
-        public:
+      public:
 
         Value() = default;
-        Value(const Value &) = delete;
-        Value(Value && other);
         Value(Object && val);
         Value(Array && val);
-        Value(String && val);
         Value(string_view val);
         Value(const string & val);
         Value(const char * val);
@@ -92,6 +74,9 @@ namespace qjson {
         Value(nullptr_t);
         template <typename T> Value(const T & val);
 
+        Value(const Value &) = delete;
+        Value(Value && other);
+
         Value & operator=(const Value &) = delete;
         Value & operator=(Value && other);
 
@@ -107,8 +92,7 @@ namespace qjson {
         template <bool unsafe = false> const Array & asArray() const;
         template <bool unsafe = false>       Array & asArray();
 
-        template <bool unsafe = false> const String & asString() const;
-        template <bool unsafe = false>       String & asString();
+        template <bool unsafe = false> std::string_view asString() const;
 
         template <bool unsafe = false> const int64_t & asInteger() const;
         template <bool unsafe = false>       int64_t & asInteger();
@@ -122,388 +106,153 @@ namespace qjson {
         template <bool unsafe = false> const uint64_t & asHex() const;
         template <bool unsafe = false>       uint64_t & asHex();
 
+        template <bool unsafe = false> nullptr_t asNull() const;
+
         template <typename T, bool unsafe = false> T as() const;
 
-        private:
+      private:
 
         uint32_t m_type_data0{0};
         uint32_t m_data1{0};
         union {
             uint64_t m_data2{0};
             int64_t m_integer;
+            uint64_t m_hex;
             double m_floater;
             bool m_boolean;
-            uint64_t m_hex;
         };
 
     };
 
     class Object {
 
-        public:
+      public:
 
         using Pair = std::pair<string, Value>;
-
-        Object() = default;
-
-        Object(const Object &) = delete;
-
-        Object(Object && other) :
-            m_type_capacity(other.m_type_capacity),
-            m_size(other.m_size),
-            m_pairs(other.m_pairs)
-        {
-            other.m_type_capacity = uint32_t(Type::object);
-            other.m_size = 0;
-            other.m_pairs = nullptr;
-        }
-
-        template <typename... Ts>
-        Object(std::pair<std::string, Ts>... pairs) :
-            m_type_capacity(uint32_t(Type::object)), // For explicitly populated objects, capacity is 0 (avoiding unneccessary allocation)
-            m_size(sizeof...(pairs)),
-            m_pairs(::operator new(m_size * sizeof(Pair)))
-        {
-            // Populate `m_pairs` using fold expression
-            int index(0);
-            auto f([&index](std::string key, auto val) { new (m_pairs + index++) Pair(std::move(key), std::move(val)); });
-            (f(std::move(pairs.first), std::move(pairs.second)), ...);
-        }
-
-        Object & operator=(const Object &) = delete;
-
-        Object & operator=(Object && other) {
-            m_type_capacity = other.m_type_capacity;
-            m_size = other.m_size;
-            m_pairs = other.m_pairs;
-            other.m_type_capacity = uint32_t(Type::object);
-            other.m_size = 0;
-            other.m_pairs = nullptr;
-            return *this;
-        }
-
-        ~Object() {
-            if (m_size > 0) {
-                for (uint32_t i(0); i < m_size; ++i) m_pairs[i].~pair();
-                ::operator delete(m_pairs);
-            }
-        }
-
-        uint32_t size() const {
-            return m_size;
-        }
-
-        bool empty() const {
-            return m_size == 0;
-        }
-
-        const Value & operator[](string_view key) const {
-            auto [pos, found](m_find(key));
-            if (!found) {
-                throw std::out_of_range("Key not found");
-            }
-            return pos->second;
-        }
-
-        Value & operator[](string_view key) {
-            return const_cast<Value &>(const_cast<const Object &>(*this)[key]);
-        }
-
-        Pair & add(string && key, Value && val) {
-            if (m_size == 0) {
-                m_pairs = static_cast<Pair *>(::operator new(8 * sizeof(Pair)));
-                m_type_capacity = uint32_t(Type::object) | 1u;
-            }
-
-            auto [pos, found](m_find(key));
-
-            // If key already exists, replace its value
-            if (found) {
-                pos->second.~Value();
-                pos->first = std::move(key);
-                new (&pos->second) Value(std::move(val));
-                return *pos;
-            }
-
-            // If we're at capacity, expand
-            if (uint32_t capacity(m_type_capacity << 3); m_size >= capacity) {
-                uint32_t newCapacity(capacity == 0 ? (m_size <= 4 ? 8 : ceil2(m_size << 1)) : capacity << 1);
-                Pair * newPairs(static_cast<Pair *>(::operator new(newCapacity * sizeof(Pair))));
-                Pair * newPos(newPairs + (pos - m_pairs));
-                // Copy the pairs before the one we're inserting
-                std::copy(reinterpret_cast<const uint64_t *>(m_pairs), reinterpret_cast<const uint64_t *>(pos), reinterpret_cast<uint64_t *>(newPairs));
-                // Copy the pairs after the one we're inserting, leaving a gap
-                std::copy(reinterpret_cast<const uint64_t *>(pos), reinterpret_cast<const uint64_t *>(end()), reinterpret_cast<uint64_t *>(newPos + 1));
-                ::operator delete(m_pairs);
-                m_pairs = newPairs;
-                m_type_capacity = uint32_t(Type::object) | (newCapacity >> 3);
-                pos = newPos;
-            }
-            // We've still got space
-            else {
-                // Shift back the pairs after the one we're inserting, leaving a gap
-                Pair * endPos(end());
-                std::copy_backward(reinterpret_cast<uint64_t *>(pos), reinterpret_cast<uint64_t *>(endPos), reinterpret_cast<uint64_t *>(endPos + 1));
-            }
-
-            new (&pos->first) string(std::move(key));
-            new (&pos->second) Value(std::move(val));
-            ++m_size;
-            return *pos;
-        }
 
         using iterator = Pair *;
         using const_iterator = const Pair *;
 
-        iterator begin() {
-            return m_pairs;
-        }
+        Object() = default;
 
-        const_iterator begin() const {
-            return m_pairs;
-        }
+        Object(const Object &) = delete;
+        Object(Object && other);
 
-        const_iterator cbegin() const {
-            return m_pairs;
-        }
+        Object & operator=(const Object &) = delete;
+        Object & operator=(Object && other);
 
-        iterator end() {
-            return m_pairs + m_size;
-        }
+        ~Object();
 
-        const_iterator end() const {
-            return m_pairs + m_size;
-        }
+        uint32_t size() const;
 
-        const_iterator cend() const {
-            return m_pairs + m_size;
-        }
+        uint32_t capacity() const;
 
-        private:
+        bool empty() const;
+
+        Pair & add(string && key, Value && val);
+
+        bool contains(string_view key) const;
+
+        const Value & at(string_view key) const;
+        Value & at(string_view key);
+
+        const_iterator find(string_view key) const;
+        iterator find(string_view key);
+
+        const_iterator begin() const;
+        iterator begin();
+
+        const_iterator cbegin() const;
+
+        const_iterator end() const;
+        iterator end();
+
+        const_iterator cend() const;
+
+      private:
 
         uint32_t m_type_capacity{uint32_t(Type::object)};
         uint32_t m_size{0};
-        Pair * m_pairs{nullptr};
+        alignas(8) Pair * m_pairs{nullptr};
 
-        std::pair<const Pair *, bool> m_find(string_view key) const {
-            const Pair * endPos(end());
-            const Pair * low(m_pairs), * high(endPos);
-            while (low < high) {
-                const Pair * mid(low + ((high - low) >> 1));
-                int delta(std::strcmp(key.data(), mid->first.c_str())); // TODO: replace with spaceship operator
-                if (delta < 0) {
-                    high = mid;
-                }
-                else if (delta > 0) {
-                    low = mid + 1;
-                }
-                else {
-                    return {mid, true};
-                }
-            }
-            return {low, low != endPos && low->first == key};
-        }
-
-        std::pair<Pair *, bool> m_find(string_view key) {
-            auto [pos, found](const_cast<const Object *>(this)->m_find(key));
-            return {const_cast<Pair *>(pos), found};
-        }
+        std::pair<const Pair *, bool> m_search(string_view key) const;
+        std::pair<Pair *, bool> m_search(string_view key);
 
     };
 
     class Array {
 
-        public:
-
-        Array() = default;
-
-        Array(const Array & other) = delete;
-
-        Array(Array && other) :
-            m_type_capacity(other.m_type_capacity),
-            m_size(other.m_size),
-            m_values(other.m_values)
-        {
-            other.m_type_capacity = uint32_t(Type::array);
-            other.m_size = 0;
-            other.m_values = nullptr;
-        }
-
-        template <typename... Ts>
-        Array(Ts &&... vals) :
-            m_type_capacity(uint32_t(Type::array)), // For explicitly populated arrays, capacity is 0 (avoiding unneccessary allocation)
-            m_size(sizeof...(vals)),
-            m_values(static_cast<Value *>(::operator new(m_size * sizeof(Value))))
-        {
-            // Populate `m_values` using fold expression
-            int index(0);
-            auto f([this, &index](auto && val) { new (m_values + index++) Value(std::forward<decltype(val)>(val)); });
-            (f(std::forward<Ts>(vals)), ...);
-        }
-
-        Array & operator=(const Array &) = delete;
-
-        Array & operator=(Array && other) {
-            m_type_capacity = other.m_type_capacity;
-            m_size = other.m_size;
-            m_values = other.m_values;
-            other.m_type_capacity = uint32_t(Type::array);
-            other.m_size = 0;
-            other.m_values = nullptr;
-            return *this;
-        }
-
-        ~Array() {
-            if (m_size > 0) {
-                for (uint32_t i(0); i < m_size; ++i) m_values[i].~Value();
-                ::operator delete(m_values);
-            }
-        }
-
-        uint32_t size() const {
-            return m_size;
-        }
-
-        bool empty() const {
-            return m_size == 0;
-        }
-
-        const Value & operator[](uint32_t i) const {
-            return m_values[i];
-        }
-
-        Value & operator[](uint32_t i) {
-            return m_values[i];
-        }
-
-        Value & add(Value && val) {
-            // If this is the first value, allocate initial storage
-            if (m_size == 0) {
-                m_values = static_cast<Value *>(::operator new(8 * sizeof(Value)));
-                m_type_capacity = uint32_t(Type::array) | 1u;
-            }
-            // If we're at capacity, expand
-            else if (uint32_t capacity(m_type_capacity << 3); m_size >= capacity) {
-                uint32_t newCapacity(capacity == 0 ? (m_size <= 4 ? 8 : ceil2(m_size << 1)) : capacity << 1);
-                Value * newValues(static_cast<Value *>(::operator new(newCapacity * sizeof(Value))));
-                std::copy(reinterpret_cast<const uint64_t *>(m_values), reinterpret_cast<const uint64_t *>(end()), reinterpret_cast<uint64_t *>(newValues));
-                ::operator delete(m_values);
-                m_values = newValues;
-                m_type_capacity = uint32_t(Type::array) | (newCapacity >> 3);
-            }
-
-            return *(new (m_values + m_size++) Value(std::move(val)));
-        }
+      public:
 
         using iterator = Value *;
         using const_iterator = const Value *;
 
-        iterator begin() {
-            return m_values;
-        }
+        template <typename... Ts> Array(Ts &&... vals);
 
-        const_iterator begin() const {
-            return m_values;
-        }
+        Array(const Array & other) = delete;
+        Array(Array && other);
 
-        const_iterator cbegin() const {
-            return m_values;
-        }
+        Array & operator=(const Array &) = delete;
+        Array & operator=(Array && other);
 
-        iterator end() {
-            return m_values + m_size;
-        }
+        ~Array();
 
-        const_iterator end() const {
-            return m_values + m_size;
-        }
+        uint32_t size() const;
 
-        const_iterator cend() const {
-            return m_values + m_size;
-        }
+        uint32_t capacity() const;
 
-        private:
+        bool empty() const;
 
-        uint32_t m_type_capacity{uint32_t(Type::array)};
-        uint32_t m_size{0};
-        alignas(8) Value * m_values{nullptr};
+        Value & add(Value && val);
+
+        const Value & at(uint32_t i) const;
+
+        Value & at(uint32_t i);
+
+        const_iterator begin() const;
+        iterator begin();
+
+        const_iterator cbegin() const;
+
+        const_iterator end() const;
+        iterator end();
+
+        const_iterator cend() const;
+
+      private:
+
+        uint32_t m_type_capacity;
+        uint32_t m_size;
+        alignas(8) Value * m_values;
 
     };
 
     class String {
 
-        public:
+      public:
 
-        String() = default;
+        String(std::string_view str);
 
         String(const String &) = delete;
-
-        String(String && other) :
-            m_type_size(other.m_type_size),
-            m_inlineChars(other.m_inlineChars),
-            m_dynamicChars(other.m_dynamicChars)
-        {
-            other.m_type_size = uint32_t(Type::string);
-            other.m_inlineChars = 0;
-            other.m_dynamicChars = nullptr;
-        }
-
-        String(std::string_view str) :
-            m_type_size(uint32_t(Type::string) | uint32_t(str.size())),
-            m_inlineChars(),
-            m_dynamicChars()
-        {
-            if (str.size() <= 12) {
-                std::copy(str.cbegin(), str.cend(), &m_inlineChars);
-            }
-            else {
-                m_dynamicChars = static_cast<char *>(::operator new(str.size()));
-                std::copy(str.cbegin(), str.cend(), m_dynamicChars);
-            }
-        }
-
-        String(char c) :
-            m_type_size(uint32_t(Type::string) | 1u),
-            m_inlineChars(),
-            m_dynamicChars()
-        {
-            *reinterpret_cast<char *>(&m_inlineChars) = c;
-        }
+        String(String && other);
 
         String & operator=(const String &) = delete;
+        String & operator=(String && other);
 
-        String & operator=(String && other) {
-            m_type_size = other.m_type_size;
-            m_inlineChars = other.m_inlineChars;
-            m_dynamicChars = other.m_dynamicChars;
-            other.m_type_size = uint32_t(Type::string);
-            other.m_inlineChars = 0;
-            other.m_dynamicChars = nullptr;
-            return *this;
-        }
+        ~String();
 
-        ~String() {
-            if (size() > 12) ::operator delete(m_dynamicChars);
-        }
+        uint32_t size() const;
 
-        uint32_t size() const {
-            return m_type_size & 0b00011111'11111111'11111111'11111111u;
-        }
+        string_view view() const;
 
-        bool empty() const {
-            return size() == 0;
-        }
+      private:
 
-        string_view view() const {
-            uint32_t size(size());
-            return {size > 12 ? m_dynamicChars : reinterpret_cast<const char *>(&m_inlineChars), size};
-        }
-
-        private:
-
-        uint32_t m_type_size{uint32_t(Type::string)};
-        uint32_t m_inlineChars{};
-        alignas(8) char * m_dynamicChars{};
+        uint32_t m_type_size;
+        uint32_t m_inlineChars0;
+        union {
+            uint64_t m_inlineChars1;
+            char * m_dynamicChars;
+        };
 
     };
 
@@ -525,7 +274,7 @@ namespace qjson {
 //
 template <typename T, bool unsafe> struct qjson_valueTo;
 
-// Specialize `qjson_valueFrom` to enable value construction for custom types
+// Specialize `qjson_valueFrom` to enable Value construction from custom types
 // Example:
 //      template <>
 //      struct qjson_valueFrom<std::pair<int, int>> {
@@ -542,9 +291,19 @@ namespace qjson {
 
     namespace detail {
 
+        constexpr uint32_t ceil2(uint32_t v) {
+            --v;
+            v |= v >>  1;
+            v |= v >>  2;
+            v |= v >>  4;
+            v |= v >>  8;
+            v |= v >> 16;
+            return v + 1;
+        }
+
         class Composer {
 
-            public:
+          public:
 
             struct State {
                 Value * node;
@@ -554,17 +313,31 @@ namespace qjson {
 
             State object(State & outerState) {
                 Value * innerNode;
-                if (outerState.isObject) innerNode = &outerState.node->asObject().add(std::move(m_key), Object()).second;
-                else if (outerState.isArray) innerNode = &outerState.node->asArray().add(Object());
-                else innerNode = &(*outerState.node = Object());
+                if (outerState.isObject) {
+                    innerNode = &outerState.node->asObject<true>().add(std::move(m_key), Object()).second;
+                }
+                else if (outerState.isArray) {
+                    innerNode = &outerState.node->asArray<true>().add(Object());
+                }
+                else {
+                    *outerState.node = Object();
+                    innerNode = outerState.node;
+                }
                 return {innerNode, true, false};
             }
 
             State array(State & outerState) {
                 Value * innerNode;
-                if (outerState.isObject) innerNode = &outerState.node->asObject().add(std::move(m_key), Array()).second;
-                else if (outerState.isArray) innerNode = &outerState.node->asArray().add(Array());
-                else innerNode = &(*outerState.node = Array());
+                if (outerState.isObject) {
+                    innerNode = &outerState.node->asObject<true>().add(std::move(m_key), Array()).second;
+                }
+                else if (outerState.isArray) {
+                    innerNode = &outerState.node->asArray<true>().add(Array());
+                }
+                else {
+                    *outerState.node = Array();
+                    innerNode = outerState.node;
+                }
                 return {innerNode, false, true};
             }
 
@@ -576,12 +349,18 @@ namespace qjson {
 
             template <typename T>
             void val(T v, State & state) {
-                if (state.isObject) state.node->asObject().add(std::move(m_key), v);
-                else if (state.isArray) state.node->asArray().add(v);
-                else *state.node = v;
+                if (state.isObject) {
+                    state.node->asObject<true>().add(std::move(m_key), v);
+                }
+                else if (state.isArray) {
+                    state.node->asArray<true>().add(v);
+                }
+                else {
+                    *state.node = v;
+                }
             }
 
-            private:
+          private:
 
             std::string m_key;
 
@@ -595,7 +374,7 @@ namespace qjson {
                 }
                 case Type::object: {
                     encoder.object(compact);
-                    for (const auto & [key, v] : val.asObject()) {
+                    for (const auto & [key, v] : val.asObject<true>()) {
                         encoder.key(key);
                         encodeRecursive(encoder, v, compact);
                     }
@@ -604,47 +383,35 @@ namespace qjson {
                 }
                 case Type::array: {
                     encoder.array(compact);
-                    for (const auto & v : val.asArray()) {
+                    for (const auto & v : val.asArray<true>()) {
                         encodeRecursive(encoder, v, compact);
                     }
                     encoder.end();
                     break;
                 }
                 case Type::string: {
-                    encoder.val(val.asString().view());
+                    encoder.val(val.asString<true>());
                     break;
                 }
                 case Type::integer: {
-                    encoder.val(val.asInteger());
-                    break;
-                }
-                case Type::floater: {
-                    encoder.val(val.asFloater());
-                    break;
-                }
-                case Type::boolean: {
-                    encoder.val(val.asBoolean());
+                    encoder.val(val.asInteger<true>());
                     break;
                 }
                 case Type::hex: {
-                    encoder.val(val.asHex());
+                    encoder.val(val.asHex<true>());
+                    break;
+                }
+                case Type::floater: {
+                    encoder.val(val.asFloater<true>());
+                    break;
+                }
+                case Type::boolean: {
+                    encoder.val(val.asBoolean<true>());
                     break;
                 }
             }
         }
 
-    }
-
-    using namespace detail;
-
-    inline Value::Value(Value && other) :
-        m_type_data0(other.m_type_data0),
-        m_data1(other.m_data1),
-        m_data2(other.m_data2)
-    {
-        other.m_type_data0 = 0;
-        other.m_data1 = 0;
-        other.m_data2 = 0;
     }
 
     inline Value::Value(Object && val) :
@@ -655,28 +422,24 @@ namespace qjson {
         Value(reinterpret_cast<Value &&>(val))
     {}
 
-    inline Value::Value(String && val) :
-        Value(reinterpret_cast<Value &&>(val))
-    {}
-
     inline Value::Value(string_view val) :
-        Value(String(val))
+        Value(reinterpret_cast<Value &&>(String(val)))
     {}
 
     inline Value::Value(const string & val) :
-        Value(String(val))
+        Value(string_view(val))
     {}
 
     inline Value::Value(const char * val) :
-        Value(String(val))
+        Value(string_view(val))
     {}
 
     inline Value::Value(char * val) :
-        Value(String(val))
+        Value(string_view(val))
     {}
 
     inline Value::Value(char val) :
-        Value(String(val))
+        Value(string_view(&val, 1))
     {}
 
     inline Value::Value(int64_t val) :
@@ -740,6 +503,16 @@ namespace qjson {
         Value(qjson_valueFrom<T>()(val))
     {}
 
+    inline Value::Value(Value && other) :
+        m_type_data0(other.m_type_data0),
+        m_data1(other.m_data1),
+        m_data2(other.m_data2)
+    {
+        other.m_type_data0 = 0;
+        other.m_data1 = 0;
+        other.m_data2 = 0;
+    }
+
     inline Value & Value::operator=(Value && other) {
         m_type_data0 = other.m_type_data0;
         m_data1 = other.m_data1;
@@ -753,19 +526,19 @@ namespace qjson {
     inline Value::~Value() {
         switch (type()) {
             case Type::object:
-                reinterpret_cast<Object *>(this)->~Object();
+                reinterpret_cast<Object &>(*this).~Object();
                 break;
             case Type::array:
-                reinterpret_cast<Array *>(this)->~Array();
+                reinterpret_cast<Array &>(*this).~Array();
                 break;
             case Type::string:
-                reinterpret_cast<String *>(this)->~String();
+                reinterpret_cast<String &>(*this).~String();
                 break;
         }
     }
 
     inline Type Value::type() const {
-        return Type(m_type_data0 & 0b111'00000'00000000'00000000u);
+        return Type(m_type_data0 & 0b111'00000'00000000'00000000'00000000u);
     }
 
     inline bool Value::is(Type t) const {
@@ -775,37 +548,29 @@ namespace qjson {
     template <bool unsafe>
     inline const Object & Value::asObject() const {
         if constexpr (!unsafe) if (type() != Type::object) throw TypeError();
-        return *reinterpret_cast<const Object *>(this);
+        return reinterpret_cast<const Object &>(*this);
     }
 
     template <bool unsafe>
     inline Object & Value::asObject() {
-        if constexpr (!unsafe) if (type() != Type::object) throw TypeError();
-        return *reinterpret_cast<Object *>(this);
+        return const_cast<Object &>(const_cast<const Value &>(*this).asObject<unsafe>());
     }
 
     template <bool unsafe>
     inline const Array & Value::asArray() const {
         if constexpr (!unsafe) if (type() != Type::array) throw TypeError();
-        return *reinterpret_cast<const Array *>(this);
+        return reinterpret_cast<const Array &>(*this);
     }
 
     template <bool unsafe>
     inline Array & Value::asArray() {
-        if constexpr (!unsafe) if (type() != Type::array) throw TypeError();
-        return *reinterpret_cast<Array *>(this);
+        return const_cast<Array &>(const_cast<const Value &>(*this).asArray<unsafe>());
     }
 
     template <bool unsafe>
-    inline const String & Value::asString() const {
+    inline std::string_view Value::asString() const {
         if constexpr (!unsafe) if (type() != Type::string) throw TypeError();
-        return *reinterpret_cast<const String *>(this);
-    }
-
-    template <bool unsafe>
-    inline String & Value::asString() {
-        if constexpr (!unsafe) if (type() != Type::string) throw TypeError();
-        return *reinterpret_cast<String *>(this);
+        return reinterpret_cast<const String &>(*this).view();
     }
 
     template <bool unsafe>
@@ -816,32 +581,7 @@ namespace qjson {
 
     template <bool unsafe>
     inline int64_t & Value::asInteger() {
-        if constexpr (!unsafe) if (type() != Type::integer) throw TypeError();
-        return m_integer;
-    }
-
-    template <bool unsafe>
-    inline const double & Value::asFloater() const {
-        if constexpr (!unsafe) if (type() != Type::floater) throw TypeError();
-        return m_floater;
-    }
-
-    template <bool unsafe>
-    inline double & Value::asFloater() {
-        if constexpr (!unsafe) if (type() != Type::floater) throw TypeError();
-        return m_floater;
-    }
-
-    template <bool unsafe>
-    inline const bool & Value::asBoolean() const {
-        if constexpr (!unsafe) if (type() != Type::boolean) throw TypeError();
-        return m_boolean;
-    }
-
-    template <bool unsafe>
-    inline bool & Value::asBoolean() {
-        if constexpr (!unsafe) if (type() != Type::boolean) throw TypeError();
-        return m_boolean;
+        return const_cast<int64_t &>(const_cast<const Value &>(*this).asInteger<unsafe>());
     }
 
     template <bool unsafe>
@@ -852,145 +592,403 @@ namespace qjson {
 
     template <bool unsafe>
     inline uint64_t & Value::asHex() {
-        if constexpr (!unsafe) if (type() != Type::hex) throw TypeError();
-        return m_hex;
+        return const_cast<uint64_t &>(const_cast<const Value &>(*this).asHex<unsafe>());
+    }
+
+    template <bool unsafe>
+    inline nullptr_t Value::asNull() const {
+        if constexpr (!unsafe) if (type() != Type::null) throw TypeError();
+        return nullptr;
+    }
+
+    template <bool unsafe>
+    inline const double & Value::asFloater() const {
+        if constexpr (!unsafe) if (type() != Type::floater) throw TypeError();
+        return m_floater;
+    }
+
+    template <bool unsafe>
+    inline double & Value::asFloater() {
+        return const_cast<double &>(const_cast<const Value &>(*this).asFloater<unsafe>());
+    }
+
+    template <bool unsafe>
+    inline const bool & Value::asBoolean() const {
+        if constexpr (!unsafe) if (type() != Type::boolean) throw TypeError();
+        return m_boolean;
+    }
+
+    template <bool unsafe>
+    inline bool & Value::asBoolean() {
+        return const_cast<bool &>(const_cast<const Value &>(*this).asBoolean<unsafe>());
     }
 
     template <typename T, bool unsafe>
     inline T Value::as() const {
-        return qjson_valueTo<T, unsafe>()(*this);
+        // `T` should not be `qjson::Object`
+        static_assert(!std::is_same_v<T, Object>, "Use `qjson::Value::asObject` instead, as this function must return by value");
+        // `T` should not be `qjson::Array`
+        static_assert(!std::is_same_v<T, Object>, "Use `qjson::Value::asArray` instead, as this function must return by value");
+        // `T` should not be `std::string`, `const char *`, `char *`, `char`, or `qjson::String`
+        static_assert(
+            !(std::is_same_v<T, string> || std::is_same_v<T, const char *> || std::is_same_v<T, char *> || std::is_same_v<T, char> || std::is_same_v<T, String>),
+            "Use `qjson::Value::asString` or `qjson::Value::as<std::string_view>` instead"
+        );
+
+        // String
+        if constexpr (std::is_same_v<T, string_view>) {
+            return asString<unsafe>();
+        }
+        // Boolean
+        else if constexpr (std::is_same_v<T, bool>) {
+            return asBoolean<unsafe>();
+        }
+        // Integer
+        else if constexpr (std::is_integral_v<T> && std::is_signed_v<T>) {
+            return T(asInteger<unsafe>());
+        }
+        // Hex
+        else if constexpr (std::is_integral_v<T> && std::is_unsigned_v<T>) {
+            return T(asHex<unsafe>());
+        }
+        // Floater
+        else if constexpr (std::is_floating_point_v<T>) {
+            return T(asFloater<unsafe>());
+        }
+        // Null
+        else if constexpr (std::is_same_v<T, nullptr_t>) {
+            return asNull<unsafe>();
+        }
+        // Other
+        else {
+            return qjson_valueTo<T, unsafe>()(*this);
+        }
     }
 
-    template <>
-    inline string_view Value::as<string_view, false>() const {
-        return asString<false>().view();
+    inline Object::Object(Object && other) :
+        m_type_capacity(other.m_type_capacity),
+        m_size(other.m_size),
+        m_pairs(other.m_pairs)
+    {
+        other.m_type_capacity = uint32_t(Type::object);
+        other.m_size = 0;
+        other.m_pairs = nullptr;
     }
 
-    template <>
-    inline string_view Value::as<string_view, true>() const {
-        return asString<true>().view();
+    inline Object & Object::operator=(Object && other) {
+        m_type_capacity = other.m_type_capacity;
+        m_size = other.m_size;
+        m_pairs = other.m_pairs;
+        other.m_type_capacity = uint32_t(Type::object);
+        other.m_size = 0;
+        other.m_pairs = nullptr;
+        return *this;
     }
 
-    template <>
-    inline int64_t Value::as<int64_t, false>() const {
-        return asInteger<false>();
+    inline Object::~Object() {
+        if (m_size > 0) {
+            for (uint32_t i(0); i < m_size; ++i) m_pairs[i].~pair();
+            ::operator delete(m_pairs);
+        }
     }
 
-    template <>
-    inline int64_t Value::as<int64_t, true>() const {
-        return asInteger<true>();
+    inline uint32_t Object::size() const {
+        return m_size;
     }
 
-    template <>
-    inline int32_t Value::as<int32_t, false>() const {
-        return int32_t(asInteger<false>());
+    inline uint32_t Object::capacity() const {
+        return m_type_capacity << 3;
     }
 
-    template <>
-    inline int32_t Value::as<int32_t, true>() const {
-        return int32_t(asInteger<true>());
+    inline bool Object::empty() const {
+        return m_size == 0;
     }
 
-    template <>
-    inline int16_t Value::as<int16_t, false>() const {
-        return int16_t(asInteger<false>());
+    inline Object::Pair & Object::add(string && key, Value && val) {
+        if (m_size == 0) {
+            m_pairs = static_cast<Pair *>(::operator new(8 * sizeof(Pair)));
+            m_type_capacity = uint32_t(Type::object) | 1u;
+        }
+
+        auto [pos, found](m_search(key));
+
+        // If key already exists, replace it
+        if (found) {
+            pos->second.~Value();
+            pos->first = std::move(key);
+            new (&pos->second) Value(std::move(val));
+            return *pos;
+        }
+
+        // If we're at capacity, expand
+        if (uint32_t capacity(capacity()); m_size >= capacity) {
+            uint32_t newCapacity(capacity << 1);
+            Pair * newPairs(static_cast<Pair *>(::operator new(newCapacity * sizeof(Pair))));
+            Pair * newPos(newPairs + (pos - m_pairs));
+            // Copy the pairs before the one we're inserting
+            std::copy(reinterpret_cast<const uint64_t *>(m_pairs), reinterpret_cast<const uint64_t *>(pos), reinterpret_cast<uint64_t *>(newPairs));
+            // Copy the pairs after the one we're inserting, leaving a gap
+            std::copy(reinterpret_cast<const uint64_t *>(pos), reinterpret_cast<const uint64_t *>(m_pairs + m_size), reinterpret_cast<uint64_t *>(newPos + 1));
+            // Update our current state
+            ::operator delete(m_pairs);
+            m_pairs = newPairs;
+            m_type_capacity = uint32_t(Type::object) | (newCapacity >> 3);
+            pos = newPos;
+        }
+        // We've still got space
+        else {
+            // Shift back the pairs after the one we're inserting, leaving a gap
+            Pair * endPos(end());
+            std::copy_backward(reinterpret_cast<uint64_t *>(pos), reinterpret_cast<uint64_t *>(endPos), reinterpret_cast<uint64_t *>(endPos + 1));
+        }
+
+        new (&pos->first) string(std::move(key));
+        new (&pos->second) Value(std::move(val));
+        ++m_size;
+        return *pos;
     }
 
-    template <>
-    inline int16_t Value::as<int16_t, true>() const {
-        return int16_t(asInteger<true>());
+    inline bool Object::contains(string_view key) const {
+        return m_search(key).second;
     }
 
-    template <>
-    inline int8_t Value::as<int8_t, false>() const {
-        return int8_t(asInteger<false>());
+    inline const Value & Object::at(string_view key) const {
+        auto [pos, found](m_search(key));
+        if (!found) {
+            throw std::out_of_range("Key not found");
+        }
+        return pos->second;
     }
 
-    template <>
-    inline int8_t Value::as<int8_t, true>() const {
-        return int8_t(asInteger<true>());
+    inline Value & Object::at(string_view key) {
+        return const_cast<Value &>(const_cast<const Object &>(*this).at(key));
     }
 
-    template <>
-    inline uint64_t Value::as<uint64_t, false>() const {
-        return uint64_t(asInteger<false>());
+    inline Object::const_iterator Object::find(string_view key) const {
+        auto [pos, found](m_search(key));
+        return found ? pos : cend();
     }
 
-    template <>
-    inline uint64_t Value::as<uint64_t, true>() const {
-        return uint64_t(asInteger<true>());
+    inline Object::iterator Object::find(string_view key) {
+        return const_cast<iterator>(const_cast<const Object &>(*this).find(key));
     }
 
-    template <>
-    inline uint32_t Value::as<uint32_t, false>() const {
-        return uint32_t(asInteger<false>());
+    inline Object::iterator Object::begin() {
+        return m_pairs;
     }
 
-    template <>
-    inline uint32_t Value::as<uint32_t, true>() const {
-        return uint32_t(asInteger<true>());
+    inline Object::const_iterator Object::begin() const {
+        return m_pairs;
     }
 
-    template <>
-    inline uint16_t Value::as<uint16_t, false>() const {
-        return uint16_t(asInteger<false>());
+    inline Object::const_iterator Object::cbegin() const {
+        return m_pairs;
     }
 
-    template <>
-    inline uint16_t Value::as<uint16_t, true>() const {
-        return uint16_t(asInteger<true>());
+    inline Object::iterator Object::end() {
+        return m_pairs + m_size;
     }
 
-    template <>
-    inline uint8_t Value::as<uint8_t, false>() const {
-        return uint8_t(asInteger<false>());
+    inline Object::const_iterator Object::end() const {
+        return m_pairs + m_size;
     }
 
-    template <>
-    inline uint8_t Value::as<uint8_t, true>() const {
-        return uint8_t(asInteger<true>());
+    inline Object::const_iterator Object::cend() const {
+        return m_pairs + m_size;
     }
 
-    template <>
-    inline double Value::as<double, false>() const {
-        return asFloater<false>();
+    inline std::pair<const Object::Pair *, bool> Object::m_search(string_view key) const {
+        const Pair * endPos(end());
+        const Pair * low(m_pairs), * high(endPos);
+        while (low < high) {
+            const Pair * mid(low + ((high - low) >> 1));
+            int delta(std::strcmp(key.data(), mid->first.c_str()));
+            if (delta < 0) {
+                high = mid;
+            }
+            else if (delta > 0) {
+                low = mid + 1;
+            }
+            else {
+                return {mid, true};
+            }
+        }
+        return {low, low != endPos && low->first == key};
     }
 
-    template <>
-    inline double Value::as<double, true>() const {
-        return asFloater<true>();
+    inline std::pair<Object::Pair *, bool> Object::m_search(string_view key) {
+        auto [pos, found](const_cast<const Object *>(this)->m_search(key));
+        return {const_cast<Pair *>(pos), found};
     }
 
-    template <>
-    inline float Value::as<float, false>() const {
-        return float(asFloater<false>());
+    template <typename... Ts>
+    inline Array::Array(Ts &&... vals) :
+        m_type_capacity(uint32_t(Type::array)), // For explicitly populated arrays, capacity is 0 (avoiding unneccessary allocation)
+        m_size(sizeof...(vals)),
+        m_values(sizeof...(Ts) > 0 ? static_cast<Value *>(::operator new(m_size * sizeof(Value))) : nullptr)
+    {
+        if constexpr (sizeof...(Ts) > 0) {
+            // Populate `m_values` using fold expression
+            int index(0);
+            auto f([this, &index](auto && val) {
+                new (m_values + index) Value(std::forward<decltype(val)>(val));
+                ++index;
+            });
+            (f(std::forward<Ts>(vals)), ...);
+        }
     }
 
-    template <>
-    inline float Value::as<float, true>() const {
-        return float(asFloater<true>());
+    inline Array::Array(Array && other) :
+        m_type_capacity(other.m_type_capacity),
+        m_size(other.m_size),
+        m_values(other.m_values)
+    {
+        other.m_type_capacity = uint32_t(Type::array);
+        other.m_size = 0;
+        other.m_values = nullptr;
     }
 
-    template <>
-    inline bool Value::as<bool, false>() const {
-        return asBoolean<false>();
+    inline Array & Array::operator=(Array && other) {
+        m_type_capacity = other.m_type_capacity;
+        m_size = other.m_size;
+        m_values = other.m_values;
+        other.m_type_capacity = uint32_t(Type::array);
+        other.m_size = 0;
+        other.m_values = nullptr;
+        return *this;
     }
 
-    template <>
-    inline bool Value::as<bool, true>() const {
-        return asBoolean<true>();
+    inline Array::~Array() {
+        if (m_size > 0) {
+            for (uint32_t i(0); i < m_size; ++i) m_values[i].~Value();
+            ::operator delete(m_values);
+        }
+    }
+
+    inline uint32_t Array::size() const {
+        return m_size;
+    }
+
+    inline uint32_t Array::capacity() const {
+        return m_type_capacity << 3;
+    }
+
+    inline bool Array::empty() const {
+        return m_size == 0;
+    }
+
+    inline Value & Array::add(Value && val) {
+        // If this is the first value, allocate initial storage
+        if (m_size == 0) {
+            m_values = static_cast<Value *>(::operator new(8 * sizeof(Value)));
+            m_type_capacity = uint32_t(Type::array) | 1u;
+        }
+        // If we're at capacity, expand
+        else if (uint32_t capacity(capacity()); m_size >= capacity) {
+            uint32_t newCapacity(capacity == 0 ? (m_size <= 4 ? 8 : detail::ceil2(m_size << 1)) : capacity << 1);
+            Value * newValues(static_cast<Value *>(::operator new(newCapacity * sizeof(Value))));
+            std::copy(reinterpret_cast<const uint64_t *>(m_values), reinterpret_cast<const uint64_t *>(m_values + m_size), reinterpret_cast<uint64_t *>(newValues));
+            // Update our current state
+            ::operator delete(m_values);
+            m_values = newValues;
+            m_type_capacity = uint32_t(Type::array) | (newCapacity >> 3);
+        }
+
+        return *(new (m_values + m_size++) Value(std::move(val)));
+    }
+
+    inline const Value & Array::at(uint32_t i) const {
+        if (i >= m_size) {
+            throw std::out_of_range("Index out of bounds");
+        }
+        return m_values[i];
+    }
+
+    inline Value & Array::at(uint32_t i) {
+        return const_cast<Value &>(const_cast<const Array &>(*this).at(i));
+    }
+
+    inline Array::iterator Array::begin() {
+        return m_values;
+    }
+
+    inline Array::const_iterator Array::begin() const {
+        return m_values;
+    }
+
+    inline Array::const_iterator Array::cbegin() const {
+        return m_values;
+    }
+
+    inline Array::iterator Array::end() {
+        return m_values + m_size;
+    }
+
+    inline Array::const_iterator Array::end() const {
+        return m_values + m_size;
+    }
+
+    inline Array::const_iterator Array::cend() const {
+        return m_values + m_size;
+    }
+
+    inline String::String(std::string_view str) :
+        m_type_size(uint32_t(Type::string) | uint32_t(str.size())),
+        m_inlineChars0(),
+        m_inlineChars1()
+    {
+        if (str.size() <= 12) {
+            std::copy(str.cbegin(), str.cend(), reinterpret_cast<char *>(&m_inlineChars0));
+        }
+        else {
+            m_dynamicChars = static_cast<char *>(::operator new(str.size()));
+            std::copy(str.cbegin(), str.cend(), m_dynamicChars);
+        }
+    }
+
+    inline String::String(String && other) :
+        m_type_size(other.m_type_size),
+        m_inlineChars0(other.m_inlineChars0),
+        m_inlineChars1(other.m_inlineChars1)
+    {
+        other.m_type_size = uint32_t(Type::string);
+        other.m_inlineChars0 = 0;
+        other.m_inlineChars1 = 0;
+    }
+
+    inline String & String::operator=(String && other) {
+        m_type_size = other.m_type_size;
+        m_inlineChars0 = other.m_inlineChars0;
+        m_inlineChars1 = other.m_inlineChars1;
+        other.m_type_size = uint32_t(Type::string);
+        other.m_inlineChars0 = 0;
+        other.m_inlineChars1 = 0;
+        return *this;
+    }
+
+    inline String::~String() {
+        if (size() > 12) ::operator delete(m_dynamicChars);
+    }
+
+    inline uint32_t String::size() const {
+        return m_type_size & 0b000'11111'11111111'11111111'11111111u;
+    }
+
+    inline string_view String::view() const {
+        uint32_t size(size());
+        return {size > 12 ? m_dynamicChars : reinterpret_cast<const char *>(&m_inlineChars0), size};
     }
 
     inline Value decode(string_view json) {
         Value root;
-        Composer composer;
-        decode(json, composer, Composer::State{&root, false, false});
+        detail::Composer composer;
+        decode(json, composer, detail::Composer::State{&root, false, false});
         return root;
     }
 
     inline string encode(const Value & val, bool compact) {
         Encoder encoder;
-        encodeRecursive(encoder, val, compact);
+        detail::encodeRecursive(encoder, val, compact);
         return encoder.finish();
     }
 

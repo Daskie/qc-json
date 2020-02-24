@@ -15,7 +15,7 @@ using namespace std::string_view_literals;
 
 class DummyDecoder {
 
-    public:
+  public:
 
     nullptr_t object(nullptr_t) { return nullptr; }
     nullptr_t array(nullptr_t) { return nullptr; }
@@ -32,7 +32,7 @@ class DummyDecoder {
 
 class ExpectantDecoder {
 
-    public:
+  public:
 
     struct Object {};
     struct Array {};
@@ -82,7 +82,7 @@ class ExpectantDecoder {
 
     bool isDone() const { return m_sequence.empty(); }
 
-    private:
+  private:
 
     std::deque<Element> m_sequence;
 
@@ -112,7 +112,7 @@ namespace Microsoft { namespace VisualStudio { namespace CppUnitTestFramework {
 
 TEST_CLASS(Decode) {
 
-    public:
+  public:
 
     TEST_METHOD(Object) {
         { // Empty
@@ -473,24 +473,25 @@ TEST_CLASS(Decode) {
                     decoder.expectKey("Name"sv).expectString("Basket o' Barnacles"sv);
                     decoder.expectKey("Price"sv).expectFloater(5.45);
                     decoder.expectKey("Ingredients"sv).expectArray().expectString("Salt"sv).expectString("Barnacles"sv).expectEnd();
-                    decoder.expectKey("Gluten-Free"sv).expectBoolean(false);
+                    decoder.expectKey("Gluten Free"sv).expectBoolean(false);
                     decoder.expectKey("Code"sv).expectHex(0x8080u);
                 decoder.expectEnd();
                 decoder.expectObject();
                     decoder.expectKey("Name"sv).expectString("Two Tuna"sv);
                     decoder.expectKey("Price"sv).expectFloater(14.99);
                     decoder.expectKey("Ingredients"sv).expectArray().expectString("Tuna"sv).expectEnd();
-                    decoder.expectKey("Gluten-Free"sv).expectBoolean(true);
+                    decoder.expectKey("Gluten Free"sv).expectBoolean(true);
                     decoder.expectKey("Code"sv).expectHex(0xA034u);
                 decoder.expectEnd();
                 decoder.expectObject();
                     decoder.expectKey("Name"sv).expectString("18 Leg Bouquet"sv);
                     decoder.expectKey("Price"sv).expectFloater(18.00);
                     decoder.expectKey("Ingredients"sv).expectArray().expectString("Salt"sv).expectString("Octopus"sv).expectString("Crab"sv).expectEnd();
-                    decoder.expectKey("Gluten-Free"sv).expectBoolean(false);
+                    decoder.expectKey("Gluten Free"sv).expectBoolean(false);
                     decoder.expectKey("Code"sv).expectHex(0x17E4u);
                 decoder.expectEnd();
             decoder.expectEnd();
+            decoder.expectKey("Profit Margin").expectNull();
         decoder.expectEnd();
         qjson::decode(
 R"({
@@ -506,24 +507,25 @@ R"({
             "Name": "Basket o' Barnacles",
             "Price": 5.45,
             "Ingredients": [ "Salt", "Barnacles" ],
-            "Gluten-Free": false,
+            "Gluten Free": false,
             "Code": 0x8080
         },
         {
             "Name": "Two Tuna",
             "Price": 14.99,
             "Ingredients": [ "Tuna" ],
-            "Gluten-Free": true,
+            "Gluten Free": true,
             "Code": 0xA034
         },
         {
             "Name": "18 Leg Bouquet",
             "Price": 18.00,
             "Ingredients": [ "Salt", "Octopus", "Crab" ],
-            "Gluten-Free": false,
+            "Gluten Free": false,
             "Code": 0x17E4
         }
-    ]
+    ],
+    "Profit Margin": null
 })"sv, decoder, nullptr);
         Assert::IsTrue(decoder.isDone());
     }
