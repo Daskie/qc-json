@@ -74,13 +74,6 @@ class MyComposer {
     //
     void val(int64_t val, MyState & state);
 
-    // Called when a hex value is parsed.
-    //
-    // `val` is the hex value
-    // `state` is the state of the current object or array
-    //
-    void val(uint64_t val, MyState & state);
-
     // Called when a floating point number is parsed.
     //
     // `val` is the floating point number
@@ -247,16 +240,7 @@ namespace qjson {
                         m_ingestString(state);
                         break;
                     }
-                    case '0': {
-                        if (m_end - m_pos > 1 && m_pos[1] == 'x') {
-                            m_ingestHex(state);
-                        }
-                        else {
-                            m_ingestDecimal(state);
-                        }
-                        break;
-                    }
-                    case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': case '9': {
+                    case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': case '9': {
                         m_ingestDecimal(state);
                         break;
                     }
@@ -425,20 +409,6 @@ namespace qjson {
                 m_pos += 4;
 
                 return val;
-            }
-
-            void m_ingestHex(State & state) {
-                m_pos += 2; // We already know we have `0x`
-
-                uint64_t val;
-                std::from_chars_result res(std::from_chars(m_pos, m_end, val, 16));
-
-                if (res.ec != std::errc()) {
-                    throw DecodeError("Invalid hex", m_pos - m_start);
-                }
-
-                m_pos = res.ptr;
-                m_composer.val(val, state);
             }
 
             void m_ingestDecimal(State & state) {

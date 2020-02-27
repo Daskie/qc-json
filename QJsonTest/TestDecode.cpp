@@ -23,7 +23,6 @@ class DummyDecoder {
     void key(string && k, nullptr_t) {}
     void val(string_view v, nullptr_t) {}
     void val(int64_t v, nullptr_t) {}
-    void val(uint64_t v, nullptr_t) {}
     void val(double v, nullptr_t) {}
     void val(bool v, nullptr_t) {}
     void val(nullptr_t, nullptr_t) {}
@@ -40,7 +39,6 @@ class ExpectantDecoder {
     struct Key { string_view k; };
     struct String { string_view v; };
     struct Integer { int64_t v; };
-    struct Hex { uint64_t v; };
     struct Floater { double v; };
     struct Boolean { bool v; };
     struct Null {};
@@ -51,12 +49,11 @@ class ExpectantDecoder {
     friend bool operator==(const Key & a, const Key & b) { return a.k == b.k; }
     friend bool operator==(const String & a, const String & b) { return a.v == b.v; }
     friend bool operator==(const Integer & a, const Integer & b) { return a.v == b.v; }
-    friend bool operator==(const Hex & a, const Hex & b) { return a.v == b.v; }
     friend bool operator==(const Floater & a, const Floater & b) { return a.v == b.v || (std::isnan(a.v) && std::isnan(b.v)); }
     friend bool operator==(const Boolean & a, const Boolean & b) { return a.v == b.v; }
     friend bool operator==(const Null &, const Null &) { return true; }
 
-    using Element = std::variant<Object, Array, End, Key, String, Integer, Hex, Floater, Boolean, Null>;
+    using Element = std::variant<Object, Array, End, Key, String, Integer, Floater, Boolean, Null>;
 
     nullptr_t object(nullptr_t) { assertNextIs(Object{}); return nullptr; }
     nullptr_t array(nullptr_t) { assertNextIs(Array{}); return nullptr; }
@@ -64,7 +61,6 @@ class ExpectantDecoder {
     void key(string && k, nullptr_t) { assertNextIs(Key{k}); }
     void val(string_view v, nullptr_t) { assertNextIs(String{v}); }
     void val(int64_t v, nullptr_t) { assertNextIs(Integer{v}); }
-    void val(uint64_t v, nullptr_t) { assertNextIs(Hex{v}); }
     void val(double v, nullptr_t) { assertNextIs(Floater{v}); }
     void val(bool v, nullptr_t) { assertNextIs(Boolean{v}); }
     void val(nullptr_t, nullptr_t) { assertNextIs(Null{}); }
@@ -75,7 +71,6 @@ class ExpectantDecoder {
     ExpectantDecoder & expectKey(string_view k) { m_sequence.emplace_back(Key{k}); return *this; }
     ExpectantDecoder & expectString(string_view v) { m_sequence.emplace_back(String{v}); return *this; }
     ExpectantDecoder & expectInteger(int64_t v) { m_sequence.emplace_back(Integer{v}); return *this; }
-    ExpectantDecoder & expectHex(uint64_t v) { m_sequence.emplace_back(Hex{v}); return *this; }
     ExpectantDecoder & expectFloater(double v) { m_sequence.emplace_back(Floater{v}); return *this; }
     ExpectantDecoder & expectBoolean(bool v) { m_sequence.emplace_back(Boolean{v}); return *this; }
     ExpectantDecoder & expectNull() { m_sequence.emplace_back(Null{}); return *this; }
@@ -102,7 +97,6 @@ namespace Microsoft { namespace VisualStudio { namespace CppUnitTestFramework {
         else if (std::holds_alternative<ExpectantDecoder::Key>(v)) return L"Key `"s + std::wstring(std::get<ExpectantDecoder::Key>(v).k.cbegin(), std::get<ExpectantDecoder::Key>(v).k.cend()) + L"`"s;
         else if (std::holds_alternative<ExpectantDecoder::String>(v)) return L"String `"s + std::wstring(std::get<ExpectantDecoder::String>(v).v.cbegin(), std::get<ExpectantDecoder::String>(v).v.cend()) + L"`"s;
         else if (std::holds_alternative<ExpectantDecoder::Integer>(v)) return L"Integer `"s + std::to_wstring(std::get<ExpectantDecoder::Integer>(v).v) + L"`"s;
-        else if (std::holds_alternative<ExpectantDecoder::Hex>(v)) return L"Hex `"s + std::to_wstring(std::get<ExpectantDecoder::Hex>(v).v) + L"`"s;
         else if (std::holds_alternative<ExpectantDecoder::Floater>(v)) return L"Floater `"s + std::to_wstring(std::get<ExpectantDecoder::Floater>(v).v) + L"`"s;
         else if (std::holds_alternative<ExpectantDecoder::Boolean>(v)) return L"Boolean `"s + (std::get<ExpectantDecoder::Boolean>(v).v ? L"true"s : L"false"s) + L"`"s;
         else if (std::holds_alternative<ExpectantDecoder::Null>(v)) return L"Null"s;
@@ -289,6 +283,12 @@ TEST_CLASS(Decode) {
             qjson::decode(R"(9223372036854775807)"sv, decoder, nullptr);
             Assert::IsTrue(decoder.isDone());
         }
+        { // Max unsigned
+            ExpectantDecoder decoder;
+            decoder.expectInteger(0xFFFFFFFFFFFFFFFF);
+            qjson::decode(R"(-1)"sv, decoder, nullptr);
+            Assert::IsTrue(decoder.isDone());
+        }
         { // Number too large
             Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"(9223372036854775808)"sv, DummyDecoder(), nullptr); });
         }
@@ -299,39 +299,6 @@ TEST_CLASS(Decode) {
         { // Plus sign
             Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"(+)", DummyDecoder(), nullptr); });
             Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"(+123)", DummyDecoder(), nullptr); });
-        }
-    }
-
-    TEST_METHOD(Hex) {
-        { // Zero
-            ExpectantDecoder decoder;
-            decoder.expectHex(0x0u);
-            qjson::decode(R"(0x0)"sv, decoder, nullptr);
-            Assert::IsTrue(decoder.isDone());
-        }
-        { // Uppercase
-            ExpectantDecoder decoder;
-            decoder.expectHex(0x0123456789ABCDEFu);
-            qjson::decode(R"(0x0123456789ABCDEF)"sv, decoder, nullptr);
-            Assert::IsTrue(decoder.isDone());
-        }
-        { // Lowercase
-            ExpectantDecoder decoder;
-            decoder.expectHex(0x0123456789ABCDEFu);
-            qjson::decode(R"(0x0123456789abcdef)"sv, decoder, nullptr);
-            Assert::IsTrue(decoder.isDone());
-        }
-        { // Max
-            ExpectantDecoder decoder;
-            decoder.expectHex(0xFFFFFFFFFFFFFFFFu);
-            qjson::decode(R"(0xFFFFFFFFFFFFFFFF)"sv, decoder, nullptr);
-            Assert::IsTrue(decoder.isDone());
-        }
-        { // Missing value
-            Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"(0x)", DummyDecoder(), nullptr); });
-        }
-        { // Invalid digit
-            Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"(0xG)", DummyDecoder(), nullptr); });
         }
     }
 
@@ -474,21 +441,18 @@ TEST_CLASS(Decode) {
                     decoder.expectKey("Price"sv).expectFloater(5.45);
                     decoder.expectKey("Ingredients"sv).expectArray().expectString("Salt"sv).expectString("Barnacles"sv).expectEnd();
                     decoder.expectKey("Gluten Free"sv).expectBoolean(false);
-                    decoder.expectKey("Code"sv).expectHex(0x8080u);
                 decoder.expectEnd();
                 decoder.expectObject();
                     decoder.expectKey("Name"sv).expectString("Two Tuna"sv);
                     decoder.expectKey("Price"sv).expectFloater(14.99);
                     decoder.expectKey("Ingredients"sv).expectArray().expectString("Tuna"sv).expectEnd();
                     decoder.expectKey("Gluten Free"sv).expectBoolean(true);
-                    decoder.expectKey("Code"sv).expectHex(0xA034u);
                 decoder.expectEnd();
                 decoder.expectObject();
                     decoder.expectKey("Name"sv).expectString("18 Leg Bouquet"sv);
                     decoder.expectKey("Price"sv).expectFloater(18.00);
                     decoder.expectKey("Ingredients"sv).expectArray().expectString("Salt"sv).expectString("Octopus"sv).expectString("Crab"sv).expectEnd();
                     decoder.expectKey("Gluten Free"sv).expectBoolean(false);
-                    decoder.expectKey("Code"sv).expectHex(0x17E4u);
                 decoder.expectEnd();
             decoder.expectEnd();
             decoder.expectKey("Profit Margin").expectNull();
@@ -507,22 +471,19 @@ R"({
             "Name": "Basket o' Barnacles",
             "Price": 5.45,
             "Ingredients": [ "Salt", "Barnacles" ],
-            "Gluten Free": false,
-            "Code": 0x8080
+            "Gluten Free": false
         },
         {
             "Name": "Two Tuna",
             "Price": 14.99,
             "Ingredients": [ "Tuna" ],
-            "Gluten Free": true,
-            "Code": 0xA034
+            "Gluten Free": true
         },
         {
             "Name": "18 Leg Bouquet",
             "Price": 18.00,
             "Ingredients": [ "Salt", "Octopus", "Crab" ],
-            "Gluten Free": false,
-            "Code": 0x17E4
+            "Gluten Free": false
         }
     ],
     "Profit Margin": null

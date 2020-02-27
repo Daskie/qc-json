@@ -198,6 +198,11 @@ TEST_CLASS(Encode) {
             encoder.val(std::numeric_limits<int64_t>::min());
             Assert::AreEqual(R"(-9223372036854775808)"s, encoder.finish());
         }
+        { // Max 64 unsigned
+            qjson::Encoder encoder;
+            encoder.val(uint64_t(0xFFFFFFFFFFFFFFFFu));
+            Assert::AreEqual(R"(-1)"s, encoder.finish());
+        }
         { // Max 32
             qjson::Encoder encoder;
             encoder.val(std::numeric_limits<int32_t>::max());
@@ -207,6 +212,11 @@ TEST_CLASS(Encode) {
             qjson::Encoder encoder;
             encoder.val(std::numeric_limits<int32_t>::min());
             Assert::AreEqual(R"(-2147483648)"s, encoder.finish());
+        }
+        { // Max 32 unsigned
+            qjson::Encoder encoder;
+            encoder.val(uint32_t(0xFFFFFFFFu));
+            Assert::AreEqual(R"(4294967295)"s, encoder.finish());
         }
         { // Max 16
             qjson::Encoder encoder;
@@ -218,6 +228,11 @@ TEST_CLASS(Encode) {
             encoder.val(std::numeric_limits<int16_t>::min());
             Assert::AreEqual(R"(-32768)"s, encoder.finish());
         }
+        { // Max 16 unsigned
+            qjson::Encoder encoder;
+            encoder.val(uint16_t(0xFFFFu));
+            Assert::AreEqual(R"(65535)"s, encoder.finish());
+        }
         { // Max 8
             qjson::Encoder encoder;
             encoder.val(std::numeric_limits<int8_t>::max());
@@ -228,38 +243,10 @@ TEST_CLASS(Encode) {
             encoder.val(std::numeric_limits<int8_t>::min());
             Assert::AreEqual(R"(-128)"s, encoder.finish());
         }
-    }
-
-    TEST_METHOD(Hex) {
-        { // Zero
-            qjson::Encoder encoder;
-            encoder.val(0u);
-            Assert::AreEqual(R"(0x0)"s, encoder.finish());
-        }
-        { // Typical
-            qjson::Encoder encoder;
-            encoder.val(0x123ABCu);
-            Assert::AreEqual(R"(0x123ABC)"s, encoder.finish());
-        }
-        { // Max 64
-            qjson::Encoder encoder;
-            encoder.val(uint64_t(0xFFFFFFFFFFFFFFFFu));
-            Assert::AreEqual(R"(0xFFFFFFFFFFFFFFFF)"s, encoder.finish());
-        }
-        { // Max 32
-            qjson::Encoder encoder;
-            encoder.val(uint32_t(0xFFFFFFFFu));
-            Assert::AreEqual(R"(0xFFFFFFFF)"s, encoder.finish());
-        }
-        { // Max 16
-            qjson::Encoder encoder;
-            encoder.val(uint16_t(0xFFFFu));
-            Assert::AreEqual(R"(0xFFFF)"s, encoder.finish());
-        }
-        { // Max 8
+        { // Max 8 unsigned
             qjson::Encoder encoder;
             encoder.val(uint8_t(0xFFu));
-            Assert::AreEqual(R"(0xFF)"s, encoder.finish());
+            Assert::AreEqual(R"(255)"s, encoder.finish());
         }
     }
 
@@ -404,21 +391,18 @@ TEST_CLASS(Encode) {
                     encoder.key("Price"sv).val(5.45);
                     encoder.key("Ingredients"sv).array(true).val("Salt"sv).val("Barnacles"sv).end();
                     encoder.key("Gluten Free"sv).val(false);
-                    encoder.key("Code"sv).val(0x8080u);
                 encoder.end();
                 encoder.object();
                     encoder.key("Name"sv).val("Two Tuna"sv);
                     encoder.key("Price"sv).val(14.99);
                     encoder.key("Ingredients"sv).array(true).val("Tuna"sv).end();
                     encoder.key("Gluten Free"sv).val(true);
-                    encoder.key("Code"sv).val(0xA034u);
                 encoder.end();
                 encoder.object();
                     encoder.key("Name"sv).val("18 Leg Bouquet"sv);
                     encoder.key("Price"sv).val(18.00);
                     encoder.key("Ingredients"sv).array(true).val("Salt"sv).val("Octopus"sv).val("Crab"sv).end();
                     encoder.key("Gluten Free"sv).val(false);
-                    encoder.key("Code"sv).val(0x17E4u);
                 encoder.end();
             encoder.end();
             encoder.key("Profit Margin"sv).val(nullptr);
@@ -437,22 +421,19 @@ TEST_CLASS(Encode) {
             "Name": "Basket o' Barnacles",
             "Price": 5.45,
             "Ingredients": [ "Salt", "Barnacles" ],
-            "Gluten Free": false,
-            "Code": 0x8080
+            "Gluten Free": false
         },
         {
             "Name": "Two Tuna",
             "Price": 14.99,
             "Ingredients": [ "Tuna" ],
-            "Gluten Free": true,
-            "Code": 0xA034
+            "Gluten Free": true
         },
         {
             "Name": "18 Leg Bouquet",
             "Price": 18.0,
             "Ingredients": [ "Salt", "Octopus", "Crab" ],
-            "Gluten Free": false,
-            "Code": 0x17E4
+            "Gluten Free": false
         }
     ],
     "Profit Margin": null

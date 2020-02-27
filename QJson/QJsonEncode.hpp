@@ -96,12 +96,12 @@ namespace qjson {
         Encoder & val(char * v);
         Encoder & val(char v);
         Encoder & val(int64_t v);
-        Encoder & val(int32_t v);
-        Encoder & val(int16_t v);
-        Encoder & val(int8_t v);
         Encoder & val(uint64_t v);
+        Encoder & val(int32_t v);
         Encoder & val(uint32_t v);
+        Encoder & val(int16_t v);
         Encoder & val(uint16_t v);
+        Encoder & val(int8_t v);
         Encoder & val(uint8_t v);
         Encoder & val(double v);
         Encoder & val(float v);
@@ -133,7 +133,6 @@ namespace qjson {
 
         void m_encode(std::string_view val);
         void m_encode(int64_t val);
-        void m_encode(uint64_t val);
         void m_encode(double val);
         void m_encode(bool val);
         void m_encode(nullptr_t);
@@ -150,12 +149,6 @@ namespace qjson {
     using std::string_view;
     using namespace std::string_literals;
     using namespace std::string_view_literals;
-
-    namespace detail {
-
-        constexpr char hexChars[16]{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
-
-    }
 
     inline Encoder::Encoder(Encoder && other) :
         m_oss(std::move(other.m_oss)),
@@ -244,7 +237,15 @@ namespace qjson {
         return *this;
     }
 
+    inline Encoder & Encoder::val(uint64_t v) {
+        return val(int64_t(v));
+    }
+
     inline Encoder & Encoder::val(int32_t v) {
+        return val(int64_t(v));
+    }
+
+    inline Encoder & Encoder::val(uint32_t v) {
         return val(int64_t(v));
     }
 
@@ -252,26 +253,16 @@ namespace qjson {
         return val(int64_t(v));
     }
 
+    inline Encoder & Encoder::val(uint16_t v) {
+        return val(int64_t(v));
+    }
+
     inline Encoder & Encoder::val(int8_t v) {
         return val(int64_t(v));
     }
 
-    inline Encoder & Encoder::val(uint64_t v) {
-        m_val(v);
-
-        return *this;
-    }
-
-    inline Encoder & Encoder::val(uint32_t v) {
-        return val(uint64_t(v));
-    }
-
-    inline Encoder & Encoder::val(uint16_t v) {
-        return val(uint64_t(v));
-    }
-
     inline Encoder & Encoder::val(uint8_t v) {
-        return val(uint64_t(v));
+        return val(int64_t(v));
     }
 
     inline Encoder & Encoder::val(double v) {
@@ -393,6 +384,8 @@ namespace qjson {
     }
 
     inline void Encoder::m_encode(string_view v) {
+        static constexpr char s_hexChars[16]{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
+
         m_oss << '"';
 
         for (unsigned char c : v) {
@@ -409,7 +402,7 @@ namespace qjson {
                     case '\t': m_oss << R"(\t)"; break;
                     default:
                         if (c < 128) {
-                            m_oss << R"(\u00)" << detail::hexChars[(c >> 4) & 0xF] << detail::hexChars[c & 0xF];
+                            m_oss << R"(\u00)" << s_hexChars[(c >> 4) & 0xF] << s_hexChars[c & 0xF];
                         }
                         else {
                             throw EncodeError("Non-ASCII unicode is not supported");
@@ -427,23 +420,6 @@ namespace qjson {
         std::to_chars_result res(std::to_chars(buffer, buffer + sizeof(buffer), v));
 
         m_oss << string_view(buffer, res.ptr - buffer);
-    }
-
-    inline void Encoder::m_encode(uint64_t v) {
-        // std::to_chars produces lowercase hex, so we're doing it manually
-
-        m_oss << "0x"sv;
-
-        char buffer[16];
-        char * end(buffer + 16);
-        char * pos(end);
-
-        do {
-            *--pos = detail::hexChars[v & 0xF];
-            v >>= 4;
-        } while (v);
-
-        m_oss << string_view(pos, end - pos);
     }
 
     inline void Encoder::m_encode(double v) {

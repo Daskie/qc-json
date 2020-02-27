@@ -15,10 +15,12 @@
 //      ...
 //------------------------------------------------------------------------------
 
-// TODO: optimize
+#include <algorithm>
+#include <cstring>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <utility>
 
 #include "QJsonDecode.hpp"
@@ -40,9 +42,8 @@ namespace qjson {
           array = 0b010'00000'00000000'00000000'00000000u,
          string = 0b011'00000'00000000'00000000'00000000u,
         integer = 0b100'00000'00000000'00000000'00000000u,
-            hex = 0b101'00000'00000000'00000000'00000000u,
-        floater = 0b110'00000'00000000'00000000'00000000u,
-        boolean = 0b111'00000'00000000'00000000'00000000u
+        floater = 0b101'00000'00000000'00000000'00000000u,
+        boolean = 0b110'00000'00000000'00000000'00000000u
     };
 
     class Object;
@@ -60,13 +61,13 @@ namespace qjson {
         Value(const char * val);
         Value(char * val);
         Value(char val);
-        Value(int64_t val);
-        Value(int32_t val);
-        Value(int16_t val);
-        Value(int8_t val);
+        Value( int64_t val);
         Value(uint64_t val);
+        Value( int32_t val);
         Value(uint32_t val);
+        Value( int16_t val);
         Value(uint16_t val);
+        Value( int8_t val);
         Value(uint8_t val);
         Value(double val);
         Value(float val);
@@ -103,9 +104,6 @@ namespace qjson {
         template <bool unsafe = false> const bool & asBoolean() const;
         template <bool unsafe = false>       bool & asBoolean();
 
-        template <bool unsafe = false> const uint64_t & asHex() const;
-        template <bool unsafe = false>       uint64_t & asHex();
-
         template <bool unsafe = false> nullptr_t asNull() const;
 
         template <typename T, bool unsafe = false> T as() const;
@@ -117,7 +115,6 @@ namespace qjson {
         union {
             uint64_t m_data2{0};
             int64_t m_integer;
-            uint64_t m_hex;
             double m_floater;
             bool m_boolean;
         };
@@ -397,10 +394,6 @@ namespace qjson {
                     encoder.val(val.asInteger<true>());
                     break;
                 }
-                case Type::hex: {
-                    encoder.val(val.asHex<true>());
-                    break;
-                }
                 case Type::floater: {
                     encoder.val(val.asFloater<true>());
                     break;
@@ -448,7 +441,15 @@ namespace qjson {
         m_integer(val)
     {}
 
+    inline Value::Value(uint64_t val) :
+        Value(int64_t(val))
+    {}
+
     inline Value::Value(int32_t val) :
+        Value(int64_t(val))
+    {}
+
+    inline Value::Value(uint32_t val) :
         Value(int64_t(val))
     {}
 
@@ -456,26 +457,16 @@ namespace qjson {
         Value(int64_t(val))
     {}
 
+    inline Value::Value(uint16_t val) :
+        Value(int64_t(val))
+    {}
+
     inline Value::Value(int8_t val) :
         Value(int64_t(val))
     {}
 
-    inline Value::Value(uint64_t val) :
-        m_type_data0(uint32_t(Type::hex)),
-        m_data1(),
-        m_hex(val)
-    {}
-
-    inline Value::Value(uint32_t val) :
-        Value(uint64_t(val))
-    {}
-
-    inline Value::Value(uint16_t val) :
-        Value(uint64_t(val))
-    {}
-
     inline Value::Value(uint8_t val) :
-        Value(uint64_t(val))
+        Value(int64_t(val))
     {}
 
     inline Value::Value(double val) :
@@ -585,17 +576,6 @@ namespace qjson {
     }
 
     template <bool unsafe>
-    inline const uint64_t & Value::asHex() const {
-        if constexpr (!unsafe) if (type() != Type::hex) throw TypeError();
-        return m_hex;
-    }
-
-    template <bool unsafe>
-    inline uint64_t & Value::asHex() {
-        return const_cast<uint64_t &>(const_cast<const Value &>(*this).asHex<unsafe>());
-    }
-
-    template <bool unsafe>
     inline nullptr_t Value::asNull() const {
         if constexpr (!unsafe) if (type() != Type::null) throw TypeError();
         return nullptr;
@@ -644,12 +624,8 @@ namespace qjson {
             return asBoolean<unsafe>();
         }
         // Integer
-        else if constexpr (std::is_integral_v<T> && std::is_signed_v<T>) {
+        else if constexpr (std::is_integral_v<T>) {
             return T(asInteger<unsafe>());
-        }
-        // Hex
-        else if constexpr (std::is_integral_v<T> && std::is_unsigned_v<T>) {
-            return T(asHex<unsafe>());
         }
         // Floater
         else if constexpr (std::is_floating_point_v<T>) {

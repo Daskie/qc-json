@@ -70,32 +70,25 @@ TEST_CLASS(Json) {
         thereAndBackAgain(int64_t(9223372036854775807));
         // Min 64
         thereAndBackAgain(int64_t(9223372036854775808));
+        // Max 64 unsigned
+        thereAndBackAgain(uint64_t(0xFFFFFFFFFFFFFFFFu));
         // Max 32
         thereAndBackAgain(int32_t(2147483647));
         // Min 32
         thereAndBackAgain(int32_t(2147483648));
+        // Max 32 unsigned
+        thereAndBackAgain(uint32_t(0xFFFFFFFFu));
         // Max 16
         thereAndBackAgain(int16_t(32767));
         // Min 16
         thereAndBackAgain(int16_t(-32768));
+        // Max 16 unsigned
+        thereAndBackAgain(uint16_t(0xFFFFu));
         // Max 8
         thereAndBackAgain(int8_t(127));
         // Min 8
         thereAndBackAgain(int8_t(128));
-    }
-
-    TEST_METHOD(EncodeDecodeHex) {
-        // Zero
-        thereAndBackAgain(0x0u);
-        // Typical
-        thereAndBackAgain(0x123ABCu);
-        // Max 64
-        thereAndBackAgain(uint64_t(0xFFFFFFFFFFFFFFFFu));
-        // Max 32
-        thereAndBackAgain(uint32_t(0xFFFFFFFFu));
-        // Max 16
-        thereAndBackAgain(uint16_t(0xFFFFu));
-        // Max 8
+        // Max 8 unsigned
         thereAndBackAgain(uint8_t(0xFFu));
     }
 
@@ -160,14 +153,13 @@ TEST_CLASS(Json) {
         Assert::AreEqual(qjson::Type::string, qjson::Value('a').type());
         // Integer
         Assert::AreEqual(qjson::Type::integer, qjson::Value(int64_t(0)).type());
+        Assert::AreEqual(qjson::Type::integer, qjson::Value(uint64_t(0)).type());
         Assert::AreEqual(qjson::Type::integer, qjson::Value(int32_t(0)).type());
+        Assert::AreEqual(qjson::Type::integer, qjson::Value(uint32_t(0)).type());
         Assert::AreEqual(qjson::Type::integer, qjson::Value(int16_t(0)).type());
+        Assert::AreEqual(qjson::Type::integer, qjson::Value(uint16_t(0)).type());
         Assert::AreEqual(qjson::Type::integer, qjson::Value(int8_t(0)).type());
-        // Hex
-        Assert::AreEqual(qjson::Type::hex, qjson::Value(uint64_t(0x0u)).type());
-        Assert::AreEqual(qjson::Type::hex, qjson::Value(uint32_t(0x0u)).type());
-        Assert::AreEqual(qjson::Type::hex, qjson::Value(uint16_t(0x0u)).type());
-        Assert::AreEqual(qjson::Type::hex, qjson::Value(uint8_t(0x0u)).type());
+        Assert::AreEqual(qjson::Type::integer, qjson::Value(uint8_t(0)).type());
         // Floater
         Assert::AreEqual(qjson::Type::floater, qjson::Value(0.0).type());
         Assert::AreEqual(qjson::Type::floater, qjson::Value(0.0f).type());
@@ -225,25 +217,18 @@ TEST_CLASS(Json) {
             v.asInteger<true>();
             v.as<int64_t, false>();
             v.as<int64_t, true>();
-            v.as<int32_t, false>();
-            v.as<int32_t, true>();
-            v.as<int16_t, false>();
-            v.as<int16_t, true>();
-            v.as<int8_t, false>();
-            v.as<int8_t, true>();
-        }
-        { // Hex
-            qjson::Value v(0x0u);
-            Assert::AreEqual(qjson::Type::hex, v.type());
-            Assert::IsTrue(v.is(qjson::Type::hex));
-            v.asHex<false>();
-            v.asHex<true>();
             v.as<uint64_t, false>();
             v.as<uint64_t, true>();
+            v.as<int32_t, false>();
+            v.as<int32_t, true>();
             v.as<uint32_t, false>();
             v.as<uint32_t, true>();
+            v.as<int16_t, false>();
+            v.as<int16_t, true>();
             v.as<uint16_t, false>();
             v.as<uint16_t, true>();
+            v.as<int8_t, false>();
+            v.as<int8_t, true>();
             v.as<uint8_t, false>();
             v.as<uint8_t, true>();
         }
@@ -284,13 +269,12 @@ TEST_CLASS(Json) {
         Assert::ExpectException<qjson::TypeError>([]() { qjson::Value().as<std::string_view, false>(); });
         Assert::ExpectException<qjson::TypeError>([]() { qjson::Value().asInteger<false>(); });
         Assert::ExpectException<qjson::TypeError>([]() { qjson::Value().as<int64_t, false>(); });
-        Assert::ExpectException<qjson::TypeError>([]() { qjson::Value().as<int32_t, false>(); });
-        Assert::ExpectException<qjson::TypeError>([]() { qjson::Value().as<int16_t, false>(); });
-        Assert::ExpectException<qjson::TypeError>([]() { qjson::Value().as<int8_t, false>(); });
-        Assert::ExpectException<qjson::TypeError>([]() { qjson::Value().asHex<false>(); });
         Assert::ExpectException<qjson::TypeError>([]() { qjson::Value().as<uint64_t, false>(); });
+        Assert::ExpectException<qjson::TypeError>([]() { qjson::Value().as<int32_t, false>(); });
         Assert::ExpectException<qjson::TypeError>([]() { qjson::Value().as<uint32_t, false>(); });
+        Assert::ExpectException<qjson::TypeError>([]() { qjson::Value().as<int16_t, false>(); });
         Assert::ExpectException<qjson::TypeError>([]() { qjson::Value().as<uint16_t, false>(); });
+        Assert::ExpectException<qjson::TypeError>([]() { qjson::Value().as<int8_t, false>(); });
         Assert::ExpectException<qjson::TypeError>([]() { qjson::Value().as<uint8_t, false>(); });
         Assert::ExpectException<qjson::TypeError>([]() { qjson::Value().asFloater<false>(); });
         Assert::ExpectException<qjson::TypeError>([]() { qjson::Value().as<double, false>(); });
@@ -307,13 +291,12 @@ TEST_CLASS(Json) {
         qjson::Value().as<std::string_view, true>();
         qjson::Value().asInteger<true>();
         qjson::Value().as<int64_t, true>();
-        qjson::Value().as<int32_t, true>();
-        qjson::Value().as<int16_t, true>();
-        qjson::Value().as<int8_t, true>();
-        qjson::Value().asHex<true>();
         qjson::Value().as<uint64_t, true>();
+        qjson::Value().as<int32_t, true>();
         qjson::Value().as<uint32_t, true>();
+        qjson::Value().as<int16_t, true>();
         qjson::Value().as<uint16_t, true>();
+        qjson::Value().as<int8_t, true>();
         qjson::Value().as<uint8_t, true>();
         qjson::Value().asFloater<true>();
         qjson::Value().as<double, true>();
@@ -526,7 +509,6 @@ TEST_CLASS(Json) {
         std::string json(R"({
     "Dishes": [
         {
-            "Code": 0x8080,
             "Gluten Free": false,
             "Ingredients": [
                 "Salt",
@@ -536,7 +518,6 @@ TEST_CLASS(Json) {
             "Price": 5.45
         },
         {
-            "Code": 0xA034,
             "Gluten Free": true,
             "Ingredients": [
                 "Tuna"
@@ -545,7 +526,6 @@ TEST_CLASS(Json) {
             "Price": 14.99
         },
         {
-            "Code": 0x17E4,
             "Gluten Free": false,
             "Ingredients": [
                 "Salt",
