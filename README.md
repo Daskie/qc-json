@@ -1,5 +1,51 @@
-# QJson
-Simple, lightweight JSON endoder/decoder for C++17
+# QC Json
+A quick and simple JSON library for C++17
+
+### Some JSON
+
+```c++
+std::string_view jsonStr(
+    R"({
+        "Name": "18 Leg Bouquet",
+        "Price": 17.99,
+        "Ingredients": ["Crab", "Octopus", "Salt"],
+        "Stock": 12
+    })"sv
+);
+```
+
+### Decoding some JSON
+
+```c++
+// Decode the json string and get its object
+qc::json::Object obj(qc::json::decode(jsonStr).asObject());
+
+// Get the name
+std::cout << "Name: " << obj.at("Name").asString() << std::endl;
+
+// Get the price
+std::cout << "Price: " << obj.at("Price").asFloater() << std::endl;
+
+// Get the ingredients
+std::cout << "Ingredients:";
+for (qc::json::Value & val : obj.at("Ingredients")) {
+    std::cout << " " << val.asString();
+}
+std::cout << std::endl;
+
+// Get the stock
+std::cout << "Stock: " << obj.at("Stock").asInteger() << std::endl;
+```
+
+### Modifying some JSON
+
+```c++
+// Decrement the stock
+--obj.at("Stock").asInteger();
+
+// Add a new "Gluten Free" flag
+obj.add("Gluten Free", false);
+```
 
 ### Encoding example
 ```c++
