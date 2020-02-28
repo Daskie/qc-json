@@ -178,7 +178,7 @@ namespace qc {
 
             uint32_t m_type_capacity{uint32_t(Type::object)};
             uint32_t m_size{0};
-            alignas(8) Pair * m_pairs { nullptr };
+            alignas(8) Pair * m_pairs{nullptr};
 
             std::pair<const Pair *, bool> m_search(string_view key) const;
             std::pair<Pair *, bool> m_search(string_view key);
@@ -192,7 +192,8 @@ namespace qc {
             using iterator = Value *;
             using const_iterator = const Value *;
 
-            template <typename... Ts> Array(Ts &&... vals);
+            Array() = default;
+            template <typename T, typename... Ts> Array(T && val, Ts &&... vals);
 
             Array(const Array & other) = delete;
             Array(Array && other);
@@ -211,8 +212,13 @@ namespace qc {
             Value & add(Value && val);
 
             const Value & at(uint32_t i) const;
-
             Value & at(uint32_t i);
+
+            Value remove(uint32_t i);
+            Value remove(iterator it);
+            void remove(iterator it1, iterator it2);
+
+            void clear();
 
             const_iterator begin() const;
             iterator begin();
@@ -226,9 +232,9 @@ namespace qc {
 
             private:
 
-            uint32_t m_type_capacity;
-            uint32_t m_size;
-            alignas(8) Value * m_values;
+            uint32_t m_type_capacity{uint32_t(Type::array)};
+            uint32_t m_size{0};
+            alignas(8) Value * m_values{nullptr};
 
         };
 
@@ -811,21 +817,20 @@ namespace qc {
             return {const_cast<Pair *>(pos), found};
         }
 
-        template <typename... Ts>
-        inline Array::Array(Ts &&... vals) :
-            m_type_capacity(uint32_t(Type::array)), // For explicitly populated arrays, capacity is 0 (avoiding unneccessary allocation)
-            m_size(sizeof...(vals)),
-            m_values(sizeof...(Ts) > 0 ? static_cast<Value *>(::operator new(m_size * sizeof(Value))) : nullptr)
+        template <typename T, typename... Ts>
+        inline Array::Array(T && val, Ts &&... vals) :
+            m_type_capacity(uint32_t(Type::array) | (std::max(detail::ceil2(1 + sizeof...(Ts)), uint32_t(8)) >> 3)),
+            m_size(1 + sizeof...(Ts)),
+            m_values(static_cast<Value *>(::operator new(m_size * sizeof(Value))))
         {
-            if constexpr (sizeof...(Ts) > 0) {
-                // Populate `m_values` using fold expression
-                int index(0);
-                auto f([this, &index](auto && val) {
-                    new (m_values + index) Value(std::forward<decltype(val)>(val));
-                    ++index;
-                    });
-                (f(std::forward<Ts>(vals)), ...);
-            }
+            // Populate `m_values` using fold expression
+            int index(0);
+            auto f([this, &index](auto && val) {
+                new (m_values + index) Value(std::forward<decltype(val)>(val));
+                ++index;
+            });
+            f(std::forward<T>(val));
+            (f(std::forward<Ts>(vals)), ...);
         }
 
         inline Array::Array(Array && other) :
@@ -850,7 +855,7 @@ namespace qc {
 
         inline Array::~Array() {
             if (m_size > 0) {
-                for (uint32_t i(0); i < m_size; ++i) m_values[i].~Value();
+                clear();
                 ::operator delete(m_values);
             }
         }
@@ -869,15 +874,16 @@ namespace qc {
 
         inline Value & Array::add(Value && val) {
             // If this is the first value, allocate initial storage
-            if (m_size == 0) {
+            uint32_t capacity(capacity());
+            if (capacity == 0) {
                 m_values = static_cast<Value *>(::operator new(8 * sizeof(Value)));
                 m_type_capacity = uint32_t(Type::array) | 1u;
             }
             // If we're at capacity, expand
-            else if (uint32_t capacity(capacity()); m_size >= capacity) {
-                uint32_t newCapacity(capacity == 0 ? (m_size <= 4 ? 8 : detail::ceil2(m_size << 1)) : capacity << 1);
+            else if (m_size >= capacity) {
+                uint32_t newCapacity(capacity << 1);
                 Value * newValues(static_cast<Value *>(::operator new(newCapacity * sizeof(Value))));
-                std::copy(reinterpret_cast<const uint64_t *>(m_values), reinterpret_cast<const uint64_t *>(m_values + m_size), reinterpret_cast<uint64_t *>(newValues));
+                std::copy(reinterpret_cast<const uint64_t *>(m_values), reinterpret_cast<const uint64_t *>(end()), reinterpret_cast<uint64_t *>(newValues));
                 // Update our current state
                 ::operator delete(m_values);
                 m_values = newValues;
@@ -891,11 +897,46 @@ namespace qc {
             if (i >= m_size) {
                 throw std::out_of_range("Index out of bounds");
             }
+
             return m_values[i];
         }
 
         inline Value & Array::at(uint32_t i) {
             return const_cast<Value &>(const_cast<const Array &>(*this).at(i));
+        }
+
+        inline Value Array::remove(uint32_t i) {
+            if (i >= m_size) {
+                throw std::out_of_range("Index out of bounds");
+            }
+
+            Value val(std::move(m_values[i]));
+            m_values[i].~Value();
+
+            // Shift posterior elements forward
+            std::copy(reinterpret_cast<const uint64_t *>(m_values + i + 1), reinterpret_cast<const uint64_t *>(end()), reinterpret_cast<uint64_t *>(m_values + i));
+
+            --m_size;
+
+            return val;
+        }
+
+        inline Value Array::remove(iterator it) {
+            return remove(uint32_t(it - begin()));
+        }
+
+        inline void Array::remove(iterator it1, iterator it2) {
+            // Destruct the values
+            for (iterator it(it1); it != it2; ++it) it->~Value();
+
+            // Shift the posterior elements forward
+            std::copy(reinterpret_cast<const uint64_t *>(it2), reinterpret_cast<const uint64_t *>(end()), reinterpret_cast<uint64_t *>(it1));
+
+            m_size -= uint32_t(it2 - it1);
+        }
+
+        inline void Array::clear() {
+            remove(begin(), end());
         }
 
         inline Array::iterator Array::begin() {

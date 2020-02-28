@@ -459,19 +459,48 @@ TEST_CLASS(Json) {
             Assert::AreEqual(9u, arr2.size());
             Assert::AreEqual(16u, arr2.capacity());
             Assert::AreEqual(7, arr2.at(7).as<int>());
+            arr = std::move(arr2);
+        }
+        { // Removing middle
+            Assert::AreEqual(3, arr.remove(3).as<int>());
+            Assert::AreEqual(8u, arr.size());
+            Assert::AreEqual(4, arr.at(3).as<int>());
+        }
+        { // Removing first
+            Assert::AreEqual(0, arr.remove(arr.begin()).as<int>());
+            Assert::AreEqual(7u, arr.size());
+            Assert::AreEqual(1, arr.at(0).as<int>());
+        }
+        { // Removing last
+            Assert::AreEqual(8, arr.remove(arr.end() - 1).as<int>());
+            Assert::AreEqual(6u, arr.size());
+        }
+        { // Removing a section
+            arr.remove(arr.begin() + 1, arr.begin() + 4);
+            Assert::AreEqual(3u, arr.size());
+            Assert::AreEqual(6, arr.at(1).as<int>());
+        }
+        { // Clear
+            arr.clear();
+            Assert::AreEqual(0u, arr.size());
+            Assert::AreEqual(16u, arr.capacity());
         }
         { // Explicit instantiation
             arr = qc::json::Array(true, 6, "wow");
             Assert::AreEqual(3u, arr.size());
-            Assert::AreEqual(0u, arr.capacity());
+            Assert::AreEqual(8u, arr.capacity());
             Assert::AreEqual(true, arr.at(0).asBoolean());
             Assert::AreEqual(6, arr.at(1).as<int>());
             Assert::AreEqual("wow"sv, arr.at(2).asString());
 
-            arr.add(nullptr);
-            Assert::AreEqual(4u, arr.size());
+            arr = qc::json::Array(nullptr);
+            Assert::AreEqual(1u, arr.size());
             Assert::AreEqual(8u, arr.capacity());
-            Assert::AreEqual(nullptr, arr.at(3).asNull());
+            Assert::AreEqual(nullptr, arr.at(0).asNull());
+
+            arr = qc::json::Array(1, 2, 3, 4, 5, 6, 7, 8, 9);
+            Assert::AreEqual(9u, arr.size());
+            Assert::AreEqual(16u, arr.capacity());
         }
     }
 
