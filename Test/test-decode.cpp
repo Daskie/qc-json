@@ -1,10 +1,9 @@
 #include "CppUnitTest.h"
 
-#include <functional>
 #include <variant>
 #include <deque>
 
-#include "QJsonDecode.hpp"
+#include "qc-json-decode.hpp"
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 
@@ -112,54 +111,54 @@ TEST_CLASS(Decode) {
         { // Empty
             ExpectantDecoder decoder;
             decoder.expectObject().expectEnd();
-            qjson::decode(R"({})"sv, decoder, nullptr);
+            qc::json::decode(R"({})"sv, decoder, nullptr);
             Assert::IsTrue(decoder.isDone());
         }
         { // Single key
             ExpectantDecoder decoder;
             decoder.expectObject().expectKey("a"sv).expectNull().expectEnd();
-            qjson::decode(R"({ "a": null })"sv, decoder, nullptr);
+            qc::json::decode(R"({ "a": null })"sv, decoder, nullptr);
             Assert::IsTrue(decoder.isDone());
         }
         { // Multiple keys
             ExpectantDecoder decoder;
             decoder.expectObject().expectKey("a"sv).expectNull().expectKey("b"sv).expectNull().expectKey("c"sv).expectNull().expectEnd();
-            qjson::decode(R"({ "a": null, "b": null, "c": null })"sv, decoder, nullptr);
+            qc::json::decode(R"({ "a": null, "b": null, "c": null })"sv, decoder, nullptr);
             Assert::IsTrue(decoder.isDone());
         }
         { // No space
             ExpectantDecoder decoder;
             decoder.expectObject().expectKey("a"sv).expectNull().expectKey("b"sv).expectNull().expectEnd();
-            qjson::decode(R"({"a":null,"b":null})"sv, decoder, nullptr);
+            qc::json::decode(R"({"a":null,"b":null})"sv, decoder, nullptr);
             Assert::IsTrue(decoder.isDone());
         }
         { // Weird spacing
             ExpectantDecoder decoder;
             decoder.expectObject().expectKey("a"sv).expectNull().expectKey("b"sv).expectNull().expectEnd();
-            qjson::decode(R"({"a" :null ,"b" :null})"sv, decoder, nullptr);
+            qc::json::decode(R"({"a" :null ,"b" :null})"sv, decoder, nullptr);
             Assert::IsTrue(decoder.isDone());
         }
         { // Key not within quotes
-            Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"({ a: 0 })", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"({ a: 0 })", DummyDecoder(), nullptr); });
         }
         { // No colon after key
-            Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"({ "a" 0 })", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"({ "a" 0 })", DummyDecoder(), nullptr); });
         }
         { // Empty key
-            Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"({ "": 0 })", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"({ "": 0 })", DummyDecoder(), nullptr); });
         }
         { // Missing value
-            Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"({ "a": })", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"({ "a": })", DummyDecoder(), nullptr); });
         }
         { // No comma between elements
-            Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"({ "a": 0 "b": 1 })", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"({ "a": 0 "b": 1 })", DummyDecoder(), nullptr); });
         }
         { // Comma after last element
-            Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"({ "a": 0, })", DummyDecoder(), nullptr); });
-            Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"({ "a": 0, "b": 1, })", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"({ "a": 0, })", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"({ "a": 0, "b": 1, })", DummyDecoder(), nullptr); });
         }
         { // Empty entry
-            Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"({ "a": 0, , "b": 1 })", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"({ "a": 0, , "b": 1 })", DummyDecoder(), nullptr); });
         }
     }
 
@@ -167,42 +166,42 @@ TEST_CLASS(Decode) {
         { // Empty
             ExpectantDecoder decoder;
             decoder.expectArray().expectEnd();
-            qjson::decode(R"([])"sv, decoder, nullptr);
+            qc::json::decode(R"([])"sv, decoder, nullptr);
             Assert::IsTrue(decoder.isDone());
         }
         { // Single element
             ExpectantDecoder decoder;
             decoder.expectArray().expectNull().expectEnd();
-            qjson::decode(R"([ null ])"sv, decoder, nullptr);
+            qc::json::decode(R"([ null ])"sv, decoder, nullptr);
             Assert::IsTrue(decoder.isDone());
         }
         { // Multiple elements
             ExpectantDecoder decoder;
             decoder.expectArray().expectNull().expectNull().expectNull().expectEnd();
-            qjson::decode(R"([ null, null, null ])"sv, decoder, nullptr);
+            qc::json::decode(R"([ null, null, null ])"sv, decoder, nullptr);
             Assert::IsTrue(decoder.isDone());
         }
         { // No space
             ExpectantDecoder decoder;
             decoder.expectArray().expectNull().expectNull().expectEnd();
-            qjson::decode(R"([null,null])"sv, decoder, nullptr);
+            qc::json::decode(R"([null,null])"sv, decoder, nullptr);
             Assert::IsTrue(decoder.isDone());
         }
         { // Weird spacing
             ExpectantDecoder decoder;
             decoder.expectArray().expectNull().expectNull().expectEnd();
-            qjson::decode(R"([null ,null])"sv, decoder, nullptr);
+            qc::json::decode(R"([null ,null])"sv, decoder, nullptr);
             Assert::IsTrue(decoder.isDone());
         }
         { // No comma between elements
-            Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"([ 0 1 ])", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"([ 0 1 ])", DummyDecoder(), nullptr); });
         }
         { // Comma after last element
-            Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"([ 0, ])", DummyDecoder(), nullptr); });
-            Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"([ 0, 1, ])", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"([ 0, ])", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"([ 0, 1, ])", DummyDecoder(), nullptr); });
         }
         { // Empty entry
-            Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"([ 0, , 1 ])", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"([ 0, , 1 ])", DummyDecoder(), nullptr); });
         }
     }
 
@@ -210,51 +209,51 @@ TEST_CLASS(Decode) {
         { // Empty string
             ExpectantDecoder decoder;
             decoder.expectString(""sv);
-            qjson::decode(R"("")"sv, decoder, nullptr);
+            qc::json::decode(R"("")"sv, decoder, nullptr);
             Assert::IsTrue(decoder.isDone());
         }
         { // All printable
             ExpectantDecoder decoder;
             decoder.expectString(R"( !"#$%&'()*+,-.//0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~)"sv);
-            qjson::decode(R"(" !\"#$%&'()*+,-./\/0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~")"sv, decoder, nullptr);
+            qc::json::decode(R"(" !\"#$%&'()*+,-./\/0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~")"sv, decoder, nullptr);
             Assert::IsTrue(decoder.isDone());
         }
         { // Escape characters
             ExpectantDecoder decoder;
             decoder.expectString("\b\f\n\r\t"sv);
-            qjson::decode(R"("\b\f\n\r\t")"sv, decoder, nullptr);
+            qc::json::decode(R"("\b\f\n\r\t")"sv, decoder, nullptr);
             Assert::IsTrue(decoder.isDone());
         }
         { // Missing escape sequence
-            Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"("\")", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"("\")", DummyDecoder(), nullptr); });
         }
         { // Unknown escape sequence
-            Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"("\v")", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"("\v")", DummyDecoder(), nullptr); });
         }
         { // Unicode
             ExpectantDecoder decoder;
             decoder.expectString("\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\u000B\u000E\u000F\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001A\u001B\u001C\u001D\u001E\u001F\u007F"sv);
-            qjson::decode(R"("\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\u000B\u000E\u000F\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001A\u001B\u001C\u001D\u001E\u001F\u007F")"sv, decoder, nullptr);
+            qc::json::decode(R"("\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\u000B\u000E\u000F\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001A\u001B\u001C\u001D\u001E\u001F\u007F")"sv, decoder, nullptr);
             Assert::IsTrue(decoder.isDone());
         }
         { // Non-ascii unicode
-            Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"("\u0080")", DummyDecoder(), nullptr); });
-            Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"("\u0F00")", DummyDecoder(), nullptr); });
-            Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"("\uF000")", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"("\u0080")", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"("\u0F00")", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"("\uF000")", DummyDecoder(), nullptr); });
         }
         { // Missing all unicode digits
-            Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"("\u")", DummyDecoder(), nullptr); });
-            Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"("\u0")", DummyDecoder(), nullptr); });
-            Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"("\u00")", DummyDecoder(), nullptr); });
-            Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"("\u000")", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"("\u")", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"("\u0")", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"("\u00")", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"("\u000")", DummyDecoder(), nullptr); });
         }
         { // Missing end quote
-            Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"("abc)", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"("abc)", DummyDecoder(), nullptr); });
         }
         { // Unknown content
-            Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode("\"\n\"", DummyDecoder(), nullptr); });
-            Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode("\"\t\"", DummyDecoder(), nullptr); });
-            Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode("\"\0\"", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode("\"\n\"", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode("\"\t\"", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode("\"\0\"", DummyDecoder(), nullptr); });
         }
     }
 
@@ -262,43 +261,43 @@ TEST_CLASS(Decode) {
         { // Zero
             ExpectantDecoder decoder;
             decoder.expectInteger(0);
-            qjson::decode(R"(0)"sv, decoder, nullptr);
+            qc::json::decode(R"(0)"sv, decoder, nullptr);
             Assert::IsTrue(decoder.isDone());
         }
         { // Normal
             ExpectantDecoder decoder;
             decoder.expectInteger(123);
-            qjson::decode(R"(123)"sv, decoder, nullptr);
+            qc::json::decode(R"(123)"sv, decoder, nullptr);
             Assert::IsTrue(decoder.isDone());
         }
         { // Min
             ExpectantDecoder decoder;
             decoder.expectInteger(std::numeric_limits<int64_t>::min());
-            qjson::decode(R"(-9223372036854775808)"sv, decoder, nullptr);
+            qc::json::decode(R"(-9223372036854775808)"sv, decoder, nullptr);
             Assert::IsTrue(decoder.isDone());
         }
         { // Max
             ExpectantDecoder decoder;
             decoder.expectInteger(std::numeric_limits<int64_t>::max());
-            qjson::decode(R"(9223372036854775807)"sv, decoder, nullptr);
+            qc::json::decode(R"(9223372036854775807)"sv, decoder, nullptr);
             Assert::IsTrue(decoder.isDone());
         }
         { // Max unsigned
             ExpectantDecoder decoder;
             decoder.expectInteger(0xFFFFFFFFFFFFFFFF);
-            qjson::decode(R"(-1)"sv, decoder, nullptr);
+            qc::json::decode(R"(-1)"sv, decoder, nullptr);
             Assert::IsTrue(decoder.isDone());
         }
         { // Number too large
-            Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"(9223372036854775808)"sv, DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"(9223372036854775808)"sv, DummyDecoder(), nullptr); });
         }
         { // Invalid minus sign
-            Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"(-)", DummyDecoder(), nullptr); });
-            Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"(-A)", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"(-)", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"(-A)", DummyDecoder(), nullptr); });
         }
         { // Plus sign
-            Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"(+)", DummyDecoder(), nullptr); });
-            Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"(+123)", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"(+)", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"(+123)", DummyDecoder(), nullptr); });
         }
     }
 
@@ -306,88 +305,88 @@ TEST_CLASS(Decode) {
         { // Zero
             ExpectantDecoder decoder;
             decoder.expectFloater(0.0);
-            qjson::decode(R"(0.0)", decoder, nullptr);
+            qc::json::decode(R"(0.0)", decoder, nullptr);
             Assert::IsTrue(decoder.isDone());
         }
         { // Whole
             ExpectantDecoder decoder;
             decoder.expectFloater(123.0);
-            qjson::decode(R"(123.0)", decoder, nullptr);
+            qc::json::decode(R"(123.0)", decoder, nullptr);
             Assert::IsTrue(decoder.isDone());
         }
         { // Fractional
             ExpectantDecoder decoder;
             decoder.expectFloater(123.456);
-            qjson::decode(R"(123.456)", decoder, nullptr);
+            qc::json::decode(R"(123.456)", decoder, nullptr);
             Assert::IsTrue(decoder.isDone());
         }
         { // Exponent lowercase
             ExpectantDecoder decoder;
             decoder.expectFloater(123.456e17);
-            qjson::decode(R"(123.456e17)", decoder, nullptr);
+            qc::json::decode(R"(123.456e17)", decoder, nullptr);
             Assert::IsTrue(decoder.isDone());
         }
         { // Exponent uppercase
             ExpectantDecoder decoder;
             decoder.expectFloater(123.456e17);
-            qjson::decode(R"(123.456E17)", decoder, nullptr);
+            qc::json::decode(R"(123.456E17)", decoder, nullptr);
             Assert::IsTrue(decoder.isDone());
         }
         { // Positive exponent
             ExpectantDecoder decoder;
             decoder.expectFloater(123.456e17);
-            qjson::decode(R"(123.456e+17)", decoder, nullptr);
+            qc::json::decode(R"(123.456e+17)", decoder, nullptr);
             Assert::IsTrue(decoder.isDone());
         }
         { // Negative exponent
             ExpectantDecoder decoder;
             decoder.expectFloater(-123.456e-17);
-            qjson::decode(R"(-123.456e-17)", decoder, nullptr);
+            qc::json::decode(R"(-123.456e-17)", decoder, nullptr);
             Assert::IsTrue(decoder.isDone());
         }
         { // Exponent without fraction
             ExpectantDecoder decoder;
             decoder.expectFloater(123.0e34);
-            qjson::decode(R"(123e34)", decoder, nullptr);
+            qc::json::decode(R"(123e34)", decoder, nullptr);
             Assert::IsTrue(decoder.isDone());
         }
         { // Max integer
             ExpectantDecoder decoder;
             decoder.expectFloater(9007199254740991.0);
-            qjson::decode(R"(9007199254740991.0)", decoder, nullptr);
+            qc::json::decode(R"(9007199254740991.0)", decoder, nullptr);
             Assert::IsTrue(decoder.isDone());
         }
         { // infinity
             ExpectantDecoder decoder;
             decoder.expectFloater(std::numeric_limits<double>::infinity());
-            qjson::decode(R"(inf)", decoder, nullptr);
+            qc::json::decode(R"(inf)", decoder, nullptr);
             Assert::IsTrue(decoder.isDone());
         }
         { // -infinity
             ExpectantDecoder decoder;
             decoder.expectFloater(-std::numeric_limits<double>::infinity());
-            qjson::decode(R"(-inf)", decoder, nullptr);
+            qc::json::decode(R"(-inf)", decoder, nullptr);
             Assert::IsTrue(decoder.isDone());
         }
         { // NaN
             ExpectantDecoder decoder;
             decoder.expectFloater(std::numeric_limits<double>::quiet_NaN());
-            qjson::decode(R"(nan)", decoder, nullptr);
+            qc::json::decode(R"(nan)", decoder, nullptr);
             Assert::IsTrue(decoder.isDone());
         }
         { // Missing fractional component
-            Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"(0.)", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"(0.)", DummyDecoder(), nullptr); });
         }
         { // Missing exponent
-            Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"(0e)", DummyDecoder(), nullptr); });
-            Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"(0e+)", DummyDecoder(), nullptr); });
-            Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"(0e-)", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"(0e)", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"(0e+)", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"(0e-)", DummyDecoder(), nullptr); });
         }
         { // Magnitude too large
-            Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"(1e1000)", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"(1e1000)", DummyDecoder(), nullptr); });
         }
         { // Magnitude too small
-            Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"(1e-1000)", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"(1e-1000)", DummyDecoder(), nullptr); });
         }
     }
 
@@ -395,13 +394,13 @@ TEST_CLASS(Decode) {
         { // True
             ExpectantDecoder decoder;
             decoder.expectBoolean(true);
-            qjson::decode(R"(true)"sv, decoder, nullptr);
+            qc::json::decode(R"(true)"sv, decoder, nullptr);
             Assert::IsTrue(decoder.isDone());
         }
         { // False
             ExpectantDecoder decoder;
             decoder.expectBoolean(false);
-            qjson::decode(R"(false)"sv, decoder, nullptr);
+            qc::json::decode(R"(false)"sv, decoder, nullptr);
             Assert::IsTrue(decoder.isDone());
         }
     }
@@ -409,7 +408,7 @@ TEST_CLASS(Decode) {
     TEST_METHOD(Null) {
         ExpectantDecoder decoder;
         decoder.expectNull();
-        qjson::decode(R"(null)"sv, decoder, nullptr);
+        qc::json::decode(R"(null)"sv, decoder, nullptr);
         Assert::IsTrue(decoder.isDone());
     }
 
@@ -457,7 +456,7 @@ TEST_CLASS(Decode) {
             decoder.expectEnd();
             decoder.expectKey("Profit Margin").expectNull();
         decoder.expectEnd();
-        qjson::decode(
+        qc::json::decode(
 R"({
     "Name": "Salt's Crust",
     "Founded": 1964,
@@ -494,29 +493,29 @@ R"({
     TEST_METHOD(NoWhitespace) {
         ExpectantDecoder decoder;
         decoder.expectObject().expectKey("a"sv).expectArray().expectString("abc"sv).expectInteger(-123).expectFloater(-123.456e-78).expectBoolean(true).expectNull().expectEnd().expectEnd();
-        qjson::decode(R"({"a":["abc",-123,-123.456e-78,true,null]})"sv, decoder, nullptr);
+        qc::json::decode(R"({"a":["abc",-123,-123.456e-78,true,null]})"sv, decoder, nullptr);
         Assert::IsTrue(decoder.isDone());
     }
 
     TEST_METHOD(ExtraneousWhitespace) {
         ExpectantDecoder decoder;
         decoder.expectObject().expectEnd();
-        qjson::decode(" \t\n\r\v{} \t\n\r\v"sv, decoder, nullptr);
+        qc::json::decode(" \t\n\r\v{} \t\n\r\v"sv, decoder, nullptr);
         Assert::IsTrue(decoder.isDone());
     }
 
     TEST_METHOD(Misc) {
         { // Empty
-            Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"()", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"()", DummyDecoder(), nullptr); });
         }
         { // Only whitespace
-            Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"(   )", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"(   )", DummyDecoder(), nullptr); });
         }
         { // Unknown value
-            Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"(v)", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"(v)", DummyDecoder(), nullptr); });
         }
         { // Multiple root values
-            Assert::ExpectException<qjson::DecodeError>([]() { qjson::decode(R"(1 2)", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"(1 2)", DummyDecoder(), nullptr); });
         }
     }
 
