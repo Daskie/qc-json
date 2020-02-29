@@ -391,6 +391,26 @@ TEST_CLASS(Json) {
             Assert::AreEqual(9u, obj2.size());
             Assert::AreEqual(16u, obj2.capacity());
             Assert::IsTrue(obj2.contains("k7"sv));
+            obj = std::move(obj2);
+        }
+        { // Removing middle
+            Assert::AreEqual(3, obj.remove(obj.find("k3"sv)).second.as<int>());
+            Assert::AreEqual(8u, obj.size());
+            Assert::AreEqual(4, obj.cbegin()[3].second.as<int>());
+        }
+        { // Removing first
+            Assert::AreEqual(0, obj.remove(obj.begin()).second.as<int>());
+            Assert::AreEqual(7u, obj.size());
+            Assert::AreEqual(1, obj.cbegin()->second.as<int>());
+        }
+        { // Removing last
+            Assert::AreEqual(8, obj.remove(obj.end() - 1).second.as<int>());
+            Assert::AreEqual(6u, obj.size());
+        }
+        { // Clear
+            obj.clear();
+            Assert::AreEqual(0u, obj.size());
+            Assert::AreEqual(16u, obj.capacity());
         }
     }
 
@@ -484,6 +504,7 @@ TEST_CLASS(Json) {
             arr.clear();
             Assert::AreEqual(0u, arr.size());
             Assert::AreEqual(16u, arr.capacity());
+            Assert::ExpectException<std::out_of_range>([&arr]() { arr.remove(0u); });
         }
         { // Explicit instantiation
             arr = qc::json::Array(true, 6, "wow");

@@ -164,6 +164,10 @@ namespace qc {
             const_iterator find(string_view key) const;
             iterator find(string_view key);
 
+            Pair remove(iterator it);
+
+            void clear();
+
             const_iterator begin() const;
             iterator begin();
 
@@ -683,7 +687,7 @@ namespace qc {
 
         inline Object::~Object() {
             if (m_size > 0) {
-                for (uint32_t i(0); i < m_size; ++i) m_pairs[i].~pair();
+                clear();
                 ::operator delete(m_pairs);
             }
         }
@@ -701,11 +705,13 @@ namespace qc {
         }
 
         inline Object::Pair & Object::add(string && key, Value && val) {
-            if (m_size == 0) {
+            // If this is the first pair, allocate backing array
+            if (!m_pairs) {
                 m_pairs = static_cast<Pair *>(::operator new(8 * sizeof(Pair)));
                 m_type_capacity = uint32_t(Type::object) | 1u;
             }
 
+            // Find the position in the backing array where this pair should go
             auto [pos, found](m_search(key));
 
             // If key already exists, replace it
@@ -724,23 +730,25 @@ namespace qc {
                 // Copy the pairs before the one we're inserting
                 std::copy(reinterpret_cast<const uint64_t *>(m_pairs), reinterpret_cast<const uint64_t *>(pos), reinterpret_cast<uint64_t *>(newPairs));
                 // Copy the pairs after the one we're inserting, leaving a gap
-                std::copy(reinterpret_cast<const uint64_t *>(pos), reinterpret_cast<const uint64_t *>(m_pairs + m_size), reinterpret_cast<uint64_t *>(newPos + 1));
+                std::copy(reinterpret_cast<const uint64_t *>(pos), reinterpret_cast<const uint64_t *>(cend()), reinterpret_cast<uint64_t *>(newPos + 1));
                 // Update our current state
                 ::operator delete(m_pairs);
                 m_pairs = newPairs;
                 m_type_capacity = uint32_t(Type::object) | (newCapacity >> 3);
                 pos = newPos;
             }
-            // We've still got space
+            // Otherwise, we've still got space
             else {
                 // Shift back the pairs after the one we're inserting, leaving a gap
                 Pair * endPos(end());
                 std::copy_backward(reinterpret_cast<uint64_t *>(pos), reinterpret_cast<uint64_t *>(endPos), reinterpret_cast<uint64_t *>(endPos + 1));
             }
 
+            // Construct the new pair
             new (&pos->first) string(std::move(key));
             new (&pos->second) Value(std::move(val));
             ++m_size;
+
             return *pos;
         }
 
@@ -769,6 +777,25 @@ namespace qc {
             return const_cast<iterator>(const_cast<const Object &>(*this).find(key));
         }
 
+        inline Object::Pair Object::remove(iterator it) {
+            // Save off pair and destruct
+            Pair pair(std::move(*it));
+            it->~pair();
+
+            // Shift forward posterior pairs
+            std::copy(reinterpret_cast<const uint64_t *>(it + 1), reinterpret_cast<const uint64_t *>(cend()), reinterpret_cast<uint64_t *>(it));
+
+            --m_size;
+
+            return pair;
+        }
+
+        inline void Object::clear() {
+            // Destruct the pairs
+            for (Pair & pair : *this) pair.~pair();
+            m_size = 0;
+        }
+
         inline Object::iterator Object::begin() {
             return m_pairs;
         }
@@ -794,7 +821,7 @@ namespace qc {
         }
 
         inline std::pair<const Object::Pair *, bool> Object::m_search(string_view key) const {
-            const Pair * endPos(end());
+            const Pair * endPos(cend());
             const Pair * low(m_pairs), * high(endPos);
             while (low < high) {
                 const Pair * mid(low + ((high - low) >> 1));
@@ -874,16 +901,15 @@ namespace qc {
 
         inline Value & Array::add(Value && val) {
             // If this is the first value, allocate initial storage
-            uint32_t capacity(capacity());
-            if (capacity == 0) {
+            if (!m_values) {
                 m_values = static_cast<Value *>(::operator new(8 * sizeof(Value)));
                 m_type_capacity = uint32_t(Type::array) | 1u;
             }
             // If we're at capacity, expand
-            else if (m_size >= capacity) {
+            else if (uint32_t capacity(capacity());  m_size >= capacity) {
                 uint32_t newCapacity(capacity << 1);
                 Value * newValues(static_cast<Value *>(::operator new(newCapacity * sizeof(Value))));
-                std::copy(reinterpret_cast<const uint64_t *>(m_values), reinterpret_cast<const uint64_t *>(end()), reinterpret_cast<uint64_t *>(newValues));
+                std::copy(reinterpret_cast<const uint64_t *>(m_values), reinterpret_cast<const uint64_t *>(cend()), reinterpret_cast<uint64_t *>(newValues));
                 // Update our current state
                 ::operator delete(m_values);
                 m_values = newValues;
@@ -910,19 +936,20 @@ namespace qc {
                 throw std::out_of_range("Index out of bounds");
             }
 
-            Value val(std::move(m_values[i]));
-            m_values[i].~Value();
+            return remove(begin() + i);
+        }
+
+        inline Value Array::remove(iterator it) {
+            // Save off value and destruct
+            Value val(std::move(*it));
+            it->~Value();
 
             // Shift posterior elements forward
-            std::copy(reinterpret_cast<const uint64_t *>(m_values + i + 1), reinterpret_cast<const uint64_t *>(end()), reinterpret_cast<uint64_t *>(m_values + i));
+            std::copy(reinterpret_cast<const uint64_t *>(it + 1), reinterpret_cast<const uint64_t *>(end()), reinterpret_cast<uint64_t *>(it));
 
             --m_size;
 
             return val;
-        }
-
-        inline Value Array::remove(iterator it) {
-            return remove(uint32_t(it - begin()));
         }
 
         inline void Array::remove(iterator it1, iterator it2) {
@@ -930,7 +957,7 @@ namespace qc {
             for (iterator it(it1); it != it2; ++it) it->~Value();
 
             // Shift the posterior elements forward
-            std::copy(reinterpret_cast<const uint64_t *>(it2), reinterpret_cast<const uint64_t *>(end()), reinterpret_cast<uint64_t *>(it1));
+            std::copy(reinterpret_cast<const uint64_t *>(it2), reinterpret_cast<const uint64_t *>(cend()), reinterpret_cast<uint64_t *>(it1));
 
             m_size -= uint32_t(it2 - it1);
         }
