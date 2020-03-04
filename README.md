@@ -7,12 +7,12 @@
 {
     "Name": "18 Leg Bouquet",
     "Price": 17.99,
-    "Ingredients": ["Crab", "Octopus", "Breadcrumbs"],
+    "Ingredients": [ "Crab", "Octopus", "Breadcrumbs" ],
     "Sold": 68
 }
 ```
 
-Let's say it's in a string, `jsonStr`.
+Let's say it's in a string, `jsonStr`
 
 ### Decode some JSON
 
@@ -88,7 +88,7 @@ obj.add("Gluten Free", false);
 std::string newJsonStr(qc::json::encode(jsonVal));
 ```
 
-Now `newJsonStr` will contain:
+`newJsonStr` will contain:
 
 ```json
 {
@@ -99,6 +99,32 @@ Now `newJsonStr` will contain:
     ],
     "Name": "18 Leg Bouquet",
     "Price": 17.99,
+    "Sold": 69
+}
+```
+
+### Alternatively, encode some JSON directly
+
+```c++
+qc::json::Encoder encoder;
+encoder.object();
+    encoder.key("Name").val("18 Leg Bouquet");
+    encoder.key("Price").val(17.99);
+    encoder.key("Ingredients).array(true).val("Crab").val("Octopus").end();
+    encoder.key("Gluten Free").val(true);
+    encoder.key("Sold").val(69);
+encoder.end();
+std::string altJsonStr(encoder.finish());
+```
+
+`altJsonStr` will contain:
+
+```json
+{
+    "Name": "18 Leg Bouquet",
+    "Price": 17.99,
+    "Ingredients": [ "Crab", "Octopus" ],
+    "Gluten Free": true,
     "Sold": 69
 }
 ```
