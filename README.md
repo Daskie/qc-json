@@ -1,68 +1,108 @@
 # QC Json
-A quick and simple JSON library for C++17
+###### Clean, quick, and simple JSON library for C++17
 
 ### Some JSON
 
-```c++
-std::string_view jsonStr(
-    R"({
-        "Name": "18 Leg Bouquet",
-        "Price": 17.99,
-        "Ingredients": ["Crab", "Octopus", "Salt"],
-        "Stock": 12
-    })"sv
-);
+```json
+{
+    "Name": "18 Leg Bouquet",
+    "Price": 17.99,
+    "Ingredients": ["Crab", "Octopus", "Breadcrumbs"],
+    "Sold": 68
+}
 ```
 
-### Decoding some JSON
+Let's say it's in a string, `jsonStr`.
+
+### Decode some JSON
 
 ```c++
-// Decode the json string and get its object
-qc::json::Object obj(qc::json::decode(jsonStr).asObject());
+qc::json::Value jsonVal(qc::json::decode(jsonStr));
+```
 
-// Get the name
+Let's get a reference to our top level object for easy access
+
+```c++
+qc::json::Object & obj(jsonVal.asObject());
+```
+
+Print the name
+
+```c++
 std::cout << "Name: " << obj.at("Name").asString() << std::endl;
+```
 
-// Get the price
+> Name: 18 Leg Bouquet
+
+Print the price
+
+```c++
 std::cout << "Price: " << obj.at("Price").asFloater() << std::endl;
+```
 
-// Get the ingredients
+> Price: 17.99
+
+List the ingredients
+
+```c++
 std::cout << "Ingredients:";
-for (qc::json::Value & val : obj.at("Ingredients")) {
+for (qc::json::Value & val : obj.at("Ingredients").asArray()) {
     std::cout << " " << val.asString();
 }
 std::cout << std::endl;
-
-// Get the stock
-std::cout << "Stock: " << obj.at("Stock").asInteger() << std::endl;
 ```
 
-### Modifying some JSON
+> Ingredients: Crab Octopus Breadcrumbs
+
+Print the quantity sold
 
 ```c++
-// Decrement the stock
---obj.at("Stock").asInteger();
+std::cout << "Sold: " << obj.at("Sold").asInteger() << std::endl;
+```
 
-// Add a new "Gluten Free" flag
+> Sold: 68
+
+### Modify some JSON
+
+Increment the quantity sold
+
+```c++
+++obj.at("Sold").asInteger();
+```
+
+Remove breadcrumbs from the ingredients list
+
+```c++
+obj.at("Ingredients").asArray().remove(2);
+```
+
+Add a new "Gluten Free" field
+
+```c++
 obj.add("Gluten Free", false);
 ```
 
-### Encoding example
+### Encode some JSON
+
 ```c++
-qc::json::Writer writer();
-writer.key("Name").val("Roslin");
-writer.key("Favorite Books").array();
-writer.put("Dark Day");
-...
-writer.end();
-std::string jsonString(writer.finish());
+std::string newJsonStr(qc::json::encode(jsonVal));
 ```
 
-### Decoding example
-```c++
-qc::json::Object root(qc::json::read(myJsonString));
-const std::string & name(root["Price"]->asString()); // "Roslin"
-const qc::json::Array & favoriteBooks(root["Favorite Books"]->asArray());
-const std::string & bookTitle(favoriteBooks[0]->asString()); // "Dark Day"
-...
+Now `newJsonStr` will contain:
+
+```json
+{
+    "Gluten Free": true,
+    "Ingredients": [
+        "Crab",
+        "Octopus"
+    ],
+    "Name": "18 Leg Bouquet",
+    "Price": 17.99,
+    "Sold": 69
+}
 ```
+
+---
+
+Now for all the specifics...
