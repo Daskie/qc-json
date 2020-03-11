@@ -22,6 +22,7 @@ class DummyDecoder {
     void key(string && k, nullptr_t) {}
     void val(string_view v, nullptr_t) {}
     void val(int64_t v, nullptr_t) {}
+    void val(uint64_t v, nullptr_t) {}
     void val(double v, nullptr_t) {}
     void val(bool v, nullptr_t) {}
     void val(nullptr_t, nullptr_t) {}
@@ -37,7 +38,8 @@ class ExpectantDecoder {
     struct End {};
     struct Key { string_view k; };
     struct String { string_view v; };
-    struct Integer { int64_t v; };
+    struct SignedInteger { int64_t v; };
+    struct UnsignedInteger { uint64_t v; };
     struct Floater { double v; };
     struct Boolean { bool v; };
     struct Null {};
@@ -47,19 +49,21 @@ class ExpectantDecoder {
     friend bool operator==(const End &, const End &) { return true; }
     friend bool operator==(const Key & a, const Key & b) { return a.k == b.k; }
     friend bool operator==(const String & a, const String & b) { return a.v == b.v; }
-    friend bool operator==(const Integer & a, const Integer & b) { return a.v == b.v; }
+    friend bool operator==(const SignedInteger & a, const SignedInteger & b) { return a.v == b.v; }
+    friend bool operator==(const UnsignedInteger & a, const UnsignedInteger & b) { return a.v == b.v; }
     friend bool operator==(const Floater & a, const Floater & b) { return a.v == b.v || (std::isnan(a.v) && std::isnan(b.v)); }
     friend bool operator==(const Boolean & a, const Boolean & b) { return a.v == b.v; }
     friend bool operator==(const Null &, const Null &) { return true; }
 
-    using Element = std::variant<Object, Array, End, Key, String, Integer, Floater, Boolean, Null>;
+    using Element = std::variant<Object, Array, End, Key, String, SignedInteger, UnsignedInteger, Floater, Boolean, Null>;
 
     nullptr_t object(nullptr_t) { assertNextIs(Object{}); return nullptr; }
     nullptr_t array(nullptr_t) { assertNextIs(Array{}); return nullptr; }
     void end(nullptr_t, nullptr_t) { assertNextIs(End{}); }
     void key(string && k, nullptr_t) { assertNextIs(Key{k}); }
     void val(string_view v, nullptr_t) { assertNextIs(String{v}); }
-    void val(int64_t v, nullptr_t) { assertNextIs(Integer{v}); }
+    void val(int64_t v, nullptr_t) { assertNextIs(SignedInteger{v}); }
+    void val(uint64_t v, nullptr_t) { assertNextIs(UnsignedInteger{v}); }
     void val(double v, nullptr_t) { assertNextIs(Floater{v}); }
     void val(bool v, nullptr_t) { assertNextIs(Boolean{v}); }
     void val(nullptr_t, nullptr_t) { assertNextIs(Null{}); }
@@ -69,7 +73,8 @@ class ExpectantDecoder {
     ExpectantDecoder & expectEnd() { m_sequence.emplace_back(End{}); return *this; }
     ExpectantDecoder & expectKey(string_view k) { m_sequence.emplace_back(Key{k}); return *this; }
     ExpectantDecoder & expectString(string_view v) { m_sequence.emplace_back(String{v}); return *this; }
-    ExpectantDecoder & expectInteger(int64_t v) { m_sequence.emplace_back(Integer{v}); return *this; }
+    ExpectantDecoder & expectSignedInteger(int64_t v) { m_sequence.emplace_back(SignedInteger{v}); return *this; }
+    ExpectantDecoder & expectUnsignedInteger(uint64_t v) { m_sequence.emplace_back(UnsignedInteger{v}); return *this; }
     ExpectantDecoder & expectFloater(double v) { m_sequence.emplace_back(Floater{v}); return *this; }
     ExpectantDecoder & expectBoolean(bool v) { m_sequence.emplace_back(Boolean{v}); return *this; }
     ExpectantDecoder & expectNull() { m_sequence.emplace_back(Null{}); return *this; }
@@ -95,7 +100,8 @@ namespace Microsoft { namespace VisualStudio { namespace CppUnitTestFramework {
         else if (std::holds_alternative<ExpectantDecoder::End>(v)) return L"End"s;
         else if (std::holds_alternative<ExpectantDecoder::Key>(v)) return L"Key `"s + std::wstring(std::get<ExpectantDecoder::Key>(v).k.cbegin(), std::get<ExpectantDecoder::Key>(v).k.cend()) + L"`"s;
         else if (std::holds_alternative<ExpectantDecoder::String>(v)) return L"String `"s + std::wstring(std::get<ExpectantDecoder::String>(v).v.cbegin(), std::get<ExpectantDecoder::String>(v).v.cend()) + L"`"s;
-        else if (std::holds_alternative<ExpectantDecoder::Integer>(v)) return L"Integer `"s + std::to_wstring(std::get<ExpectantDecoder::Integer>(v).v) + L"`"s;
+        else if (std::holds_alternative<ExpectantDecoder::SignedInteger>(v)) return L"Signed Integer `"s + std::to_wstring(std::get<ExpectantDecoder::SignedInteger>(v).v) + L"`"s;
+        else if (std::holds_alternative<ExpectantDecoder::UnsignedInteger>(v)) return L"Unsigned Integer `"s + std::to_wstring(std::get<ExpectantDecoder::UnsignedInteger>(v).v) + L"`"s;
         else if (std::holds_alternative<ExpectantDecoder::Floater>(v)) return L"Floater `"s + std::to_wstring(std::get<ExpectantDecoder::Floater>(v).v) + L"`"s;
         else if (std::holds_alternative<ExpectantDecoder::Boolean>(v)) return L"Boolean `"s + (std::get<ExpectantDecoder::Boolean>(v).v ? L"true"s : L"false"s) + L"`"s;
         else if (std::holds_alternative<ExpectantDecoder::Null>(v)) return L"Null"s;
@@ -226,6 +232,7 @@ TEST_CLASS(Decode) {
         }
         { // Missing escape sequence
             Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"("\")", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"([ "\" ])", DummyDecoder(), nullptr); });
         }
         { // Unknown escape sequence
             Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"("\v")", DummyDecoder(), nullptr); });
@@ -243,12 +250,17 @@ TEST_CLASS(Decode) {
         }
         { // Missing all unicode digits
             Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"("\u")", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"([ "\u" ])", DummyDecoder(), nullptr); });
             Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"("\u0")", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"([ "\u0" ])", DummyDecoder(), nullptr); });
             Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"("\u00")", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"([ "\u00" ])", DummyDecoder(), nullptr); });
             Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"("\u000")", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"([ "\u000" ])", DummyDecoder(), nullptr); });
         }
         { // Missing end quote
             Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"("abc)", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"([ "abc ])", DummyDecoder(), nullptr); });
         }
         { // Unknown content
             Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode("\"\n\"", DummyDecoder(), nullptr); });
@@ -257,63 +269,85 @@ TEST_CLASS(Decode) {
         }
     }
 
-    TEST_METHOD(Integer) {
+    TEST_METHOD(SignedInteger) {
         { // Zero
             ExpectantDecoder decoder;
-            decoder.expectInteger(0);
+            decoder.expectSignedInteger(0);
             qc::json::decode(R"(0)"sv, decoder, nullptr);
             Assert::IsTrue(decoder.isDone());
         }
         { // Normal
             ExpectantDecoder decoder;
-            decoder.expectInteger(123);
+            decoder.expectSignedInteger(123);
             qc::json::decode(R"(123)"sv, decoder, nullptr);
             Assert::IsTrue(decoder.isDone());
         }
         { // Min
             ExpectantDecoder decoder;
-            decoder.expectInteger(std::numeric_limits<int64_t>::min());
+            decoder.expectSignedInteger(std::numeric_limits<int64_t>::min());
             qc::json::decode(R"(-9223372036854775808)"sv, decoder, nullptr);
             Assert::IsTrue(decoder.isDone());
         }
         { // Max
             ExpectantDecoder decoder;
-            decoder.expectInteger(std::numeric_limits<int64_t>::max());
+            decoder.expectSignedInteger(std::numeric_limits<int64_t>::max());
             qc::json::decode(R"(9223372036854775807)"sv, decoder, nullptr);
             Assert::IsTrue(decoder.isDone());
         }
-        { // Max unsigned
+        { // Trailing zeroes
             ExpectantDecoder decoder;
-            decoder.expectInteger(0xFFFFFFFFFFFFFFFF);
-            qc::json::decode(R"(-1)"sv, decoder, nullptr);
+            decoder.expectSignedInteger(123);
+            qc::json::decode(R"(123.000)"sv, decoder, nullptr);
             Assert::IsTrue(decoder.isDone());
-        }
-        { // Number too large
-            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"(9223372036854775808)"sv, DummyDecoder(), nullptr); });
         }
         { // Invalid minus sign
             Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"(-)", DummyDecoder(), nullptr); });
-            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"(-A)", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"([ - ])", DummyDecoder(), nullptr); });
         }
         { // Plus sign
             Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"(+)", DummyDecoder(), nullptr); });
             Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"(+123)", DummyDecoder(), nullptr); });
         }
+        { // Dangling decimal point
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"(123.)", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"([ 123. ])", DummyDecoder(), nullptr); });
+        }
+    }
+
+    TEST_METHOD(UnsignedInteger) {
+        { // Min unsigned
+            ExpectantDecoder decoder;
+            decoder.expectUnsignedInteger(uint64_t(std::numeric_limits<int64_t>::max()) + 1u);
+            qc::json::decode(R"(9223372036854775808)"sv, decoder, nullptr);
+            Assert::IsTrue(decoder.isDone());
+        }
+        { // Max unsigned
+            ExpectantDecoder decoder;
+            decoder.expectUnsignedInteger(std::numeric_limits<uint64_t>::max());
+            qc::json::decode(R"(18446744073709551615)"sv, decoder, nullptr);
+            Assert::IsTrue(decoder.isDone());
+        }
+        { // Trailing zeroes
+            ExpectantDecoder decoder;
+            decoder.expectUnsignedInteger(10000000000000000000u);
+            qc::json::decode(R"(10000000000000000000.000)"sv, decoder, nullptr);
+            Assert::IsTrue(decoder.isDone());
+        }
+        { // Invalid minus sign
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"(-)", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"([ - ])", DummyDecoder(), nullptr); });
+        }
+        { // Plus sign
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"(+)", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"(+123)", DummyDecoder(), nullptr); });
+        }
+        { // Dangling decimal point
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"(10000000000000000000.)", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"([ 10000000000000000000. ])", DummyDecoder(), nullptr); });
+        }
     }
 
     TEST_METHOD(Floater) {
-        { // Zero
-            ExpectantDecoder decoder;
-            decoder.expectFloater(0.0);
-            qc::json::decode(R"(0.0)", decoder, nullptr);
-            Assert::IsTrue(decoder.isDone());
-        }
-        { // Whole
-            ExpectantDecoder decoder;
-            decoder.expectFloater(123.0);
-            qc::json::decode(R"(123.0)", decoder, nullptr);
-            Assert::IsTrue(decoder.isDone());
-        }
         { // Fractional
             ExpectantDecoder decoder;
             decoder.expectFloater(123.456);
@@ -353,7 +387,19 @@ TEST_CLASS(Decode) {
         { // Max integer
             ExpectantDecoder decoder;
             decoder.expectFloater(9007199254740991.0);
-            qc::json::decode(R"(9007199254740991.0)", decoder, nullptr);
+            qc::json::decode(R"(9007199254740991.0e0)", decoder, nullptr);
+            Assert::IsTrue(decoder.isDone());
+        }
+        { // Oversized signed integer
+            ExpectantDecoder decoder;
+            decoder.expectFloater(-9223372036854775809.0);
+            qc::json::decode(R"(-9223372036854775809)", decoder, nullptr);
+            Assert::IsTrue(decoder.isDone());
+        }
+        { // Oversized unsigned integer
+            ExpectantDecoder decoder;
+            decoder.expectFloater(18446744073709551616.0);
+            qc::json::decode(R"(18446744073709551616)", decoder, nullptr);
             Assert::IsTrue(decoder.isDone());
         }
         { // infinity
@@ -374,13 +420,17 @@ TEST_CLASS(Decode) {
             qc::json::decode(R"(nan)", decoder, nullptr);
             Assert::IsTrue(decoder.isDone());
         }
-        { // Missing fractional component
+        { // Dangling decimal point
             Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"(0.)", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"([ 0. ])", DummyDecoder(), nullptr); });
         }
-        { // Missing exponent
+        { // Dangling exponent
             Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"(0e)", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"([ 0e ])", DummyDecoder(), nullptr); });
             Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"(0e+)", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"([ 0e+ ])", DummyDecoder(), nullptr); });
             Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"(0e-)", DummyDecoder(), nullptr); });
+            Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"([ 0e- ])", DummyDecoder(), nullptr); });
         }
         { // Magnitude too large
             Assert::ExpectException<qc::json::DecodeError>([]() { qc::json::decode(R"(1e1000)", DummyDecoder(), nullptr); });
@@ -416,22 +466,22 @@ TEST_CLASS(Decode) {
         ExpectantDecoder decoder;
         decoder.expectObject();
             decoder.expectKey("Name"sv).expectString("Salt's Crust"sv);
-            decoder.expectKey("Founded"sv).expectInteger(1964);
+            decoder.expectKey("Founded"sv).expectSignedInteger(1964);
             decoder.expectKey("Employees"sv).expectArray();
                 decoder.expectObject();
                     decoder.expectKey("Name"sv).expectString("Ol' Joe Fisher"sv);
                     decoder.expectKey("Title"sv).expectString("Fisherman"sv);
-                    decoder.expectKey("Age"sv).expectInteger(69);
+                    decoder.expectKey("Age"sv).expectSignedInteger(69);
                 decoder.expectEnd();
                 decoder.expectObject();
                     decoder.expectKey("Name"sv).expectString("Mark Rower"sv);
                     decoder.expectKey("Title"sv).expectString("Cook"sv);
-                    decoder.expectKey("Age"sv).expectInteger(41);
+                    decoder.expectKey("Age"sv).expectSignedInteger(41);
                 decoder.expectEnd();
                 decoder.expectObject();
                     decoder.expectKey("Name"sv).expectString("Phineas"sv);
                     decoder.expectKey("Title"sv).expectString("Server Boy"sv);
-                    decoder.expectKey("Age"sv).expectInteger(19);
+                    decoder.expectKey("Age"sv).expectSignedInteger(19);
                 decoder.expectEnd();
             decoder.expectEnd();
             decoder.expectKey("Dishes"sv).expectArray();
@@ -449,7 +499,7 @@ TEST_CLASS(Decode) {
                 decoder.expectEnd();
                 decoder.expectObject();
                     decoder.expectKey("Name"sv).expectString("18 Leg Bouquet"sv);
-                    decoder.expectKey("Price"sv).expectFloater(18.00);
+                    decoder.expectKey("Price"sv).expectFloater(18.18);
                     decoder.expectKey("Ingredients"sv).expectArray().expectString("Salt"sv).expectString("Octopus"sv).expectString("Crab"sv).expectEnd();
                     decoder.expectKey("Gluten Free"sv).expectBoolean(false);
                 decoder.expectEnd();
@@ -480,7 +530,7 @@ R"({
         },
         {
             "Name": "18 Leg Bouquet",
-            "Price": 18.00,
+            "Price": 18.18,
             "Ingredients": [ "Salt", "Octopus", "Crab" ],
             "Gluten Free": false
         }
@@ -492,7 +542,7 @@ R"({
 
     TEST_METHOD(NoWhitespace) {
         ExpectantDecoder decoder;
-        decoder.expectObject().expectKey("a"sv).expectArray().expectString("abc"sv).expectInteger(-123).expectFloater(-123.456e-78).expectBoolean(true).expectNull().expectEnd().expectEnd();
+        decoder.expectObject().expectKey("a"sv).expectArray().expectString("abc"sv).expectSignedInteger(-123).expectFloater(-123.456e-78).expectBoolean(true).expectNull().expectEnd().expectEnd();
         qc::json::decode(R"({"a":["abc",-123,-123.456e-78,true,null]})"sv, decoder, nullptr);
         Assert::IsTrue(decoder.isDone());
     }

@@ -400,7 +400,7 @@ TEST_CLASS(Encode) {
                 encoder.end();
                 encoder.object();
                     encoder.key("Name"sv).val("18 Leg Bouquet"sv);
-                    encoder.key("Price"sv).val(18.00);
+                    encoder.key("Price"sv).val(18.18);
                     encoder.key("Ingredients"sv).array(true).val("Salt"sv).val("Octopus"sv).val("Crab"sv).end();
                     encoder.key("Gluten Free"sv).val(false);
                 encoder.end();
@@ -431,7 +431,7 @@ TEST_CLASS(Encode) {
         },
         {
             "Name": "18 Leg Bouquet",
-            "Price": 18.0,
+            "Price": 18.18,
             "Ingredients": [ "Salt", "Octopus", "Crab" ],
             "Gluten Free": false
         }

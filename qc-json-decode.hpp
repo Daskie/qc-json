@@ -67,12 +67,19 @@ class MyComposer {
     //
     void val(string_view val, MyState & state);
 
-    // Called when an integer is parsed.
+    // Called when a signed integer is parsed.
     //
-    // `val` is the integer
+    // `val` is the signed integer
     // `state` is the state of the current object or array
     //
     void val(int64_t val, MyState & state);
+
+    // Called when an unsigned integer is parsed.
+    //
+    // `val` is the unsigned integer
+    // `state` is the state of the current object or array
+    //
+    void val(uint64_t val, MyState & state);
 
     // Called when a floating point number is parsed.
     //
@@ -113,7 +120,7 @@ class MyComposer {
 #include <utility>
 
 namespace qc {
-    
+
     namespace json {
 
         //
@@ -137,7 +144,7 @@ namespace qc {
 // IMPLEMENTATION //////////////////////////////////////////////////////////////////////////////////////////////////////
 
 namespace qc {
-    
+
     namespace json {
 
         using std::string;
@@ -235,12 +242,12 @@ namespace qc {
                             break;
                         }
                         case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': case '9': {
-                            m_ingestDecimal(state);
+                            m_ingestNumber(state);
                             break;
                         }
                         case '-': {
                             if (m_end - m_pos > 1 && std::isdigit(m_pos[1])) {
-                                m_ingestDecimal(state);
+                                m_ingestNumber(state);
                                 break;
                             }
                             else if (m_tryConsumeChars("-inf"sv)) {
@@ -405,27 +412,98 @@ namespace qc {
                     return val;
                 }
 
-                void m_ingestDecimal(State & state) {
-                    // Determine if integral or floating point
+                bool m_isInteger() const {
+                    // A precondition is that we know that the first character is either a digit or `-`
                     const char * pos(m_pos + 1);
+                    // Skip all remaining leading digits
                     while (pos < m_end && std::isdigit(*pos)) ++pos;
-                    if (pos == m_end || !(*pos == '.' || *pos == 'e' || *pos == 'E')) {
-                        m_ingestInteger(state);
+                    // If that's it, we're an integer
+                    if (pos >= m_end) {
+                        return true;
+                    }
+                    // If instead there is a decimal point...
+                    else if (*pos == '.') {
+                        ++pos;
+                        // Skip all zeroes
+                        while (pos < m_end && *pos == '0') ++pos;
+                        // If there's a digit or an exponent, we must be a floater
+                        if (pos < m_end && (std::isdigit(*pos) || *pos == 'e' || *pos == 'E')) {
+                           return false;
+                        }
+                        // Otherwise, we're an integer
+                        else {
+                            return true;
+                        }
+                    }
+                    // If instead there is an exponent, we must be a floater
+                    else if (*pos == 'e' || *pos == 'E') {
+                        return false;
+                    }
+                    // Otherwise, that's the end of the number, and we're an integer
+                    else {
+                        return true;
+                    }
+                }
+
+                void m_ingestNumber(State & state) {
+                    // Determine if integer or floater
+                    if (m_isInteger()) {
+                        // Determine if signed
+                        if (*m_pos == '-') {
+                            m_ingestInteger<true>(state);
+                        }
+                        else {
+                            m_ingestInteger<false>(state);
+                        }
                     }
                     else {
                         m_ingestFloater(state);
                     }
                 }
 
+                template <bool isSigned>
                 void m_ingestInteger(State & state) {
-                    int64_t val;
+                    std::conditional_t<isSigned, int64_t, uint64_t> val;
                     std::from_chars_result res(std::from_chars(m_pos, m_end, val));
 
+                    // There was an issue parsing
                     if (res.ec != std::errc()) {
-                        throw DecodeError("Invalid integer", m_pos - m_start);
+                        // If too large, parse as a floater instead
+                        if (res.ec == std::errc::result_out_of_range) {
+                            m_ingestFloater(state);
+                            return;
+                        }
+                        // Some other issue
+                        else {
+                            throw DecodeError("Invalid integer", m_pos - m_start);
+                        }
                     }
 
                     m_pos = res.ptr;
+
+                    // Skip trailing decimal zeroes
+                    if (m_pos < m_end && *m_pos == '.') {
+                        ++m_pos;
+
+                        // Check for dangling decimal point
+                        if (m_pos >= m_end || *m_pos != '0') {
+                            throw DecodeError("Dangling decimal point", m_pos - m_start);
+                        }
+                        ++m_pos;
+
+                        while (m_pos < m_end && *m_pos == '0') {
+                            ++m_pos;
+                        }
+                    }
+
+                    // If unsigned and the most significant bit is not set, we default to reporting it as signed
+                    if constexpr (!isSigned) {
+                        if (!(val & 0x8000000000000000u)) {
+                            m_composer.val(int64_t(val), state);
+                            return;
+                        }
+                    }
+
                     m_composer.val(val, state);
                 }
 
@@ -433,6 +511,7 @@ namespace qc {
                     double val;
                     std::from_chars_result res(std::from_chars(m_pos, m_end, val));
 
+                    // There was an issue parsing, or a trailing decimal point
                     if (res.ec != std::errc() || res.ptr[-1] == '.') {
                         throw DecodeError("Invalid floater", m_pos - m_start);
                     }

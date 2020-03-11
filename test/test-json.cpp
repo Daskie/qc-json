@@ -583,7 +583,7 @@ TEST_CLASS(Json) {
                 "Crab"
             ],
             "Name": "18 Leg Bouquet",
-            "Price": 18.0
+            "Price": 18.18
         }
     ],
     "Employees": [
