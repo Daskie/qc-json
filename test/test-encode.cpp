@@ -177,7 +177,7 @@ TEST_CLASS(Encode) {
         }
     }
 
-    TEST_METHOD(Integer) {
+    TEST_METHOD(SignedInteger) {
         { // Zero
             qc::json::Encoder encoder;
             encoder.val(int64_t(0));
@@ -198,11 +198,6 @@ TEST_CLASS(Encode) {
             encoder.val(std::numeric_limits<int64_t>::min());
             Assert::AreEqual(R"(-9223372036854775808)"s, encoder.finish());
         }
-        { // Max 64 unsigned
-            qc::json::Encoder encoder;
-            encoder.val(uint64_t(0xFFFFFFFFFFFFFFFFu));
-            Assert::AreEqual(R"(-1)"s, encoder.finish());
-        }
         { // Max 32
             qc::json::Encoder encoder;
             encoder.val(std::numeric_limits<int32_t>::max());
@@ -212,11 +207,6 @@ TEST_CLASS(Encode) {
             qc::json::Encoder encoder;
             encoder.val(std::numeric_limits<int32_t>::min());
             Assert::AreEqual(R"(-2147483648)"s, encoder.finish());
-        }
-        { // Max 32 unsigned
-            qc::json::Encoder encoder;
-            encoder.val(uint32_t(0xFFFFFFFFu));
-            Assert::AreEqual(R"(4294967295)"s, encoder.finish());
         }
         { // Max 16
             qc::json::Encoder encoder;
@@ -228,11 +218,6 @@ TEST_CLASS(Encode) {
             encoder.val(std::numeric_limits<int16_t>::min());
             Assert::AreEqual(R"(-32768)"s, encoder.finish());
         }
-        { // Max 16 unsigned
-            qc::json::Encoder encoder;
-            encoder.val(uint16_t(0xFFFFu));
-            Assert::AreEqual(R"(65535)"s, encoder.finish());
-        }
         { // Max 8
             qc::json::Encoder encoder;
             encoder.val(std::numeric_limits<int8_t>::max());
@@ -243,9 +228,37 @@ TEST_CLASS(Encode) {
             encoder.val(std::numeric_limits<int8_t>::min());
             Assert::AreEqual(R"(-128)"s, encoder.finish());
         }
-        { // Max 8 unsigned
+    }
+
+    TEST_METHOD(UnsignedInteger) {
+        { // Zero
             qc::json::Encoder encoder;
-            encoder.val(uint8_t(0xFFu));
+            encoder.val(0u);
+            Assert::AreEqual(R"(0)"s, encoder.finish());
+        }
+        { // Typical
+            qc::json::Encoder encoder;
+            encoder.val(123u);
+            Assert::AreEqual(R"(123)"s, encoder.finish());
+        }
+        { // Max 64
+            qc::json::Encoder encoder;
+            encoder.val(std::numeric_limits<uint64_t>::max());
+            Assert::AreEqual(R"(18446744073709551615)"s, encoder.finish());
+        }
+        { // Max 32
+            qc::json::Encoder encoder;
+            encoder.val(std::numeric_limits<uint32_t>::max());
+            Assert::AreEqual(R"(4294967295)"s, encoder.finish());
+        }
+        { // Max 16
+            qc::json::Encoder encoder;
+            encoder.val(std::numeric_limits<uint16_t>::max());
+            Assert::AreEqual(R"(65535)"s, encoder.finish());
+        }
+        { // Max 8
+            qc::json::Encoder encoder;
+            encoder.val(std::numeric_limits<uint8_t>::max());
             Assert::AreEqual(R"(255)"s, encoder.finish());
         }
     }
@@ -254,7 +267,7 @@ TEST_CLASS(Encode) {
         { // Zero
             qc::json::Encoder encoder;
             encoder.val(0.0);
-            Assert::AreEqual(R"(0.0)"s, encoder.finish());
+            Assert::AreEqual(R"(0)"s, encoder.finish());
         }
         { // Typical
             qc::json::Encoder encoder;
@@ -265,13 +278,13 @@ TEST_CLASS(Encode) {
             qc::json::Encoder encoder;
             uint64_t val(0b0'10000110011'1111111111111111111111111111111111111111111111111111u);
             encoder.val(reinterpret_cast<const double &>(val));
-            Assert::AreEqual(R"(9007199254740991.0)"s, encoder.finish());
+            Assert::AreEqual(R"(9007199254740991)"s, encoder.finish());
         }
         { // Max integer 32
             qc::json::Encoder encoder;
             uint32_t val(0b0'10010110'11111111111111111111111u);
             encoder.val(reinterpret_cast<const float &>(val));
-            Assert::AreEqual(R"(16777215.0)"s, encoder.finish());
+            Assert::AreEqual(R"(16777215)"s, encoder.finish());
         }
         { // Max 64
             qc::json::Encoder encoder;

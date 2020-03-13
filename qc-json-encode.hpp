@@ -89,12 +89,12 @@ namespace qc {
             Encoder & val(char * v);
             Encoder & val(char v);
             Encoder & val(int64_t v);
-            Encoder & val(uint64_t v);
             Encoder & val(int32_t v);
-            Encoder & val(uint32_t v);
             Encoder & val(int16_t v);
-            Encoder & val(uint16_t v);
             Encoder & val(int8_t v);
+            Encoder & val(uint64_t v);
+            Encoder & val(uint32_t v);
+            Encoder & val(uint16_t v);
             Encoder & val(uint8_t v);
             Encoder & val(double v);
             Encoder & val(float v);
@@ -126,6 +126,7 @@ namespace qc {
 
             void m_encode(std::string_view val);
             void m_encode(int64_t val);
+            void m_encode(uint64_t val);
             void m_encode(double val);
             void m_encode(bool val);
             void m_encode(nullptr_t);
@@ -234,15 +235,7 @@ namespace qc {
             return *this;
         }
 
-        inline Encoder & Encoder::val(uint64_t v) {
-            return val(int64_t(v));
-        }
-
         inline Encoder & Encoder::val(int32_t v) {
-            return val(int64_t(v));
-        }
-
-        inline Encoder & Encoder::val(uint32_t v) {
             return val(int64_t(v));
         }
 
@@ -250,16 +243,26 @@ namespace qc {
             return val(int64_t(v));
         }
 
-        inline Encoder & Encoder::val(uint16_t v) {
-            return val(int64_t(v));
-        }
-
         inline Encoder & Encoder::val(int8_t v) {
             return val(int64_t(v));
         }
 
+        inline Encoder & Encoder::val(uint64_t v) {
+            m_val(v);
+
+            return *this;
+        }
+
+        inline Encoder & Encoder::val(uint32_t v) {
+            return val(uint64_t(v));
+        }
+
+        inline Encoder & Encoder::val(uint16_t v) {
+            return val(uint64_t(v));
+        }
+
         inline Encoder & Encoder::val(uint8_t v) {
-            return val(int64_t(v));
+            return val(uint64_t(v));
         }
 
         inline Encoder & Encoder::val(double v) {
@@ -280,12 +283,14 @@ namespace qc {
 
         inline Encoder & Encoder::val(nullptr_t) {
             m_val(nullptr);
+
             return *this;
         }
 
         template <typename T>
         inline Encoder & Encoder::val(const T & v) {
             ::qc_json_encode(*this, v);
+
             return *this;
         }
 
@@ -419,30 +424,20 @@ namespace qc {
             m_oss << string_view(buffer, res.ptr - buffer);
         }
 
+        inline void Encoder::m_encode(uint64_t v) {
+            char buffer[24];
+
+            std::to_chars_result res(std::to_chars(buffer, buffer + sizeof(buffer), v));
+
+            m_oss << string_view(buffer, res.ptr - buffer);
+        }
+
         inline void Encoder::m_encode(double v) {
             char buffer[32];
 
             std::to_chars_result res(std::to_chars(buffer, buffer + sizeof(buffer), v));
-            int length(int(res.ptr - buffer));
 
-            // std::to_chars doesn't suffix whole number results with a ".0", so we have to do that ourselves
-            // Only if the result isn't "inf", "-inf", or "nan"
-            if (std::isdigit(buffer[length - 1])) {
-                bool needsDecimal(true);
-                for (int i(1); i < length - 1; ++i) {
-                    if (buffer[i] == '.' || buffer[i] == 'e') {
-                        needsDecimal = false;
-                        break;
-                    }
-                }
-                if (needsDecimal) {
-                    buffer[length] = '.';
-                    buffer[length + 1] = '0';
-                    length += 2;
-                }
-            }
-
-            m_oss << string_view(buffer, length);
+            m_oss << string_view(buffer, res.ptr - buffer);
         }
 
         inline void Encoder::m_encode(bool v) {
