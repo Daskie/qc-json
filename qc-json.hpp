@@ -113,19 +113,19 @@ namespace qc {
 
             template <typename T> bool is() const;
 
-            template <bool unsafe = false> const Object & asObject() const;
-            template <bool unsafe = false>       Object & asObject();
+            template <bool safe = true> const Object & asObject() const;
+            template <bool safe = true>       Object & asObject();
 
-            template <bool unsafe = false> const Array & asArray() const;
-            template <bool unsafe = false>       Array & asArray();
+            template <bool safe = true> const Array & asArray() const;
+            template <bool safe = true>       Array & asArray();
 
-            template <bool unsafe = false> std::string_view asString() const;
+            template <bool safe = true> std::string_view asString() const;
 
-            template <bool unsafe = false> std::variant<int64_t, uint64_t, double> asNumber() const;
+            template <bool safe = true> std::variant<int64_t, uint64_t, double> asNumber() const;
 
-            template <bool unsafe = false> bool asBoolean() const;
+            template <bool safe = true> bool asBoolean() const;
 
-            template <typename T, bool unsafe = false> T as() const;
+            template <typename T, bool safe = true> T as() const;
 
             private:
 
@@ -297,15 +297,15 @@ namespace qc {
 //
 // Specialize `qc_json_valueTo` to enable Value::as for custom types
 // Example:
-//      template <bool unsafe>
-//      struct qc_json_valueTo<std::pair<int, int>, unsafe> {
+//      template <bool safe>
+//      struct qc_json_valueTo<std::pair<int, int>, safe> {
 //          std::pair<int, int> operator()(const qc::json::Value & v) {
-//              const Array & arr(v.asArray<unsafe>());
-//              return {arr.at(0)->asInteger<unsafe>(), arr.at(1)->asInteger<unsafe>()};
+//              const Array & arr(v.asArray<safe>());
+//              return {arr.at(0)->asInteger<safe>(), arr.at(1)->asInteger<safe>()};
 //          }
 //      };
 //
-template <typename T, bool unsafe> struct qc_json_valueTo;
+template <typename T, bool safe> struct qc_json_valueTo;
 
 //
 // Specialize `qc_json_valueFrom` to enable Value construction from custom types
@@ -673,52 +673,52 @@ namespace qc {
             }
         }
 
-        template <bool unsafe>
+        template <bool safe>
         inline const Object & Value::asObject() const {
-            if constexpr (!unsafe) if (!isObject()) throw TypeError();
+            if constexpr (safe) if (!isObject()) throw TypeError();
             return reinterpret_cast<const Object &>(*this);
         }
 
-        template <bool unsafe>
+        template <bool safe>
         inline Object & Value::asObject() {
-            return const_cast<Object &>(const_cast<const Value &>(*this).asObject<unsafe>());
+            return const_cast<Object &>(const_cast<const Value &>(*this).asObject<safe>());
         }
 
-        template <bool unsafe>
+        template <bool safe>
         inline const Array & Value::asArray() const {
-            if constexpr (!unsafe) if (!isArray()) throw TypeError();
+            if constexpr (safe) if (!isArray()) throw TypeError();
             return reinterpret_cast<const Array &>(*this);
         }
 
-        template <bool unsafe>
+        template <bool safe>
         inline Array & Value::asArray() {
-            return const_cast<Array &>(const_cast<const Value &>(*this).asArray<unsafe>());
+            return const_cast<Array &>(const_cast<const Value &>(*this).asArray<safe>());
         }
 
-        template <bool unsafe>
+        template <bool safe>
         inline std::string_view Value::asString() const {
-            if constexpr (!unsafe) if (!isString()) throw TypeError();
+            if constexpr (safe) if (!isString()) throw TypeError();
             return reinterpret_cast<const String &>(*this).view();
         }
 
-        template <bool unsafe>
+        template <bool safe>
         inline std::variant<int64_t, uint64_t, double> Value::asNumber() const {
-            if constexpr (!unsafe) if (!isNumber()) throw TypeError();
+            if constexpr (safe) if (!isNumber()) throw TypeError();
             switch (m_numberType) {
                 case NumberType::signedInteger: return m_signedInteger;
                 case NumberType::unsignedInteger: return m_unsignedInteger;
                 case NumberType::floater: return m_floater;
-                default: if constexpr (!unsafe) throw TypeError(); else return m_signedInteger;
+                default: if constexpr (safe) throw TypeError(); else return m_signedInteger;
             }
         }
 
-        template <bool unsafe>
+        template <bool safe>
         inline bool Value::asBoolean() const {
-            if constexpr (!unsafe) if (type() != Type::boolean) throw TypeError();
+            if constexpr (safe) if (!isBoolean()) throw TypeError();
             return m_boolean;
         }
 
-        template <typename T, bool unsafe>
+        template <typename T, bool safe>
         inline T Value::as() const {
             using U = std::decay_t<T>;
 
@@ -736,35 +736,30 @@ namespace qc {
 
             // String
             if constexpr (std::is_same_v<U, string_view>) {
-                return asString<unsafe>();
+                return asString<safe>();
             }
             // Character
             else if constexpr (std::is_same_v<U, char>) {
-                if constexpr (!unsafe) if (!is<char>()) throw TypeError();
+                if constexpr (safe) if (!is<char>()) throw TypeError();
                 return asString<true>().front();
             }
             // Boolean
             else if constexpr (std::is_same_v<U, bool>) {
-                return asBoolean<unsafe>();
+                return asBoolean<safe>();
             }
-            // Signed integer
-            else if constexpr (std::is_integral_v<U> && std::is_signed_v<U>) {
-                if constexpr (!unsafe) if (!is<U>()) throw TypeError();
-                return m_numberType == NumberType::floater ? U(m_floater) : U(m_signedInteger);
-            }
-            // Unsigned integer
-            else if constexpr (std::is_integral_v<U> && std::is_unsigned_v<U>) {
-                if constexpr (!unsafe) if (!is<U>()) throw TypeError();
-                return m_numberType == NumberType::floater ? U(m_floater) : U(m_unsignedInteger);
-            }
-            // Floater
-            else if constexpr (std::is_floating_point_v<U>) {
-                if constexpr (!unsafe) if (!is<U>()) throw TypeError();
-                return m_numberType == NumberType::floater ? U(m_floater) : m_numberType == NumberType::signedInteger ? U(m_signedInteger) : U(m_unsignedInteger);
+            // Number
+            else if constexpr (std::is_arithmetic_v<U>) {
+                if constexpr (safe) if (!is<U>()) throw TypeError();
+                switch (m_numberType) {
+                    case NumberType::signedInteger: return U(m_signedInteger);
+                    case NumberType::unsignedInteger: return U(m_unsignedInteger);
+                    case NumberType::floater: return U(m_floater);
+                    default: if constexpr (safe) throw TypeError(); else return U(m_signedInteger);
+                }
             }
             // Other
             else {
-                return qc_json_valueTo<U, unsafe>()(*this);
+                return qc_json_valueTo<U, safe>()(*this);
             }
         }
 

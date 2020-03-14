@@ -24,11 +24,11 @@ namespace Microsoft {
     }
 }
 
-template <bool unsafe>
-struct qc_json_valueTo<CustomVal, unsafe> {
+template <bool safe>
+struct qc_json_valueTo<CustomVal, safe> {
     CustomVal operator()(const qc::json::Value & val) const {
-        const qc::json::Array & arr(val.asArray<unsafe>());
-        return {arr.at(0).as<int, unsafe>(), arr.at(1).as<int, unsafe>()};
+        const qc::json::Array & arr(val.asArray<safe>());
+        return {arr.at(0).as<int, safe>(), arr.at(1).as<int, safe>()};
     }
 };
 
@@ -216,8 +216,8 @@ TEST_CLASS(Json) {
             Assert::IsTrue(v.is<std::string_view>());
             v.asString<false>();
             v.asString<true>();
-            v.as<std::string_view, false>();
             v.as<std::string_view, true>();
+            v.as<std::string_view, false>();
         }
         { // Character
             qc::json::Value v('a');
@@ -227,30 +227,30 @@ TEST_CLASS(Json) {
             Assert::IsTrue(v.is<char>());
             v.asString<false>();
             v.asString<true>();
-            v.as<std::string_view, false>();
             v.as<std::string_view, true>();
-            v.as<char, false>();
+            v.as<std::string_view, false>();
             v.as<char, true>();
+            v.as<char, false>();
         }
         { // Number
             qc::json::Value v(123);
             Assert::AreEqual(qc::json::Type::number, v.type());
             Assert::IsTrue(v.isNumber());
             Assert::IsTrue(v.is<int>());
-            v.asNumber<false>();
             v.asNumber<true>();
-            v.as<int, false>();
+            v.asNumber<false>();
             v.as<int, true>();
+            v.as<int, false>();
         }
         { // Boolean
             qc::json::Value v(false);
             Assert::AreEqual(qc::json::Type::boolean, v.type());
             Assert::IsTrue(v.isBoolean());
             Assert::IsTrue(v.is<bool>());
-            v.asBoolean<false>();
             v.asBoolean<true>();
-            v.as<bool, false>();
+            v.asBoolean<false>();
             v.as<bool, true>();
+            v.as<bool, false>();
         }
         { // Null
             qc::json::Value v(nullptr);
@@ -1046,42 +1046,42 @@ TEST_CLASS(Json) {
 
     TEST_METHOD(ValueAs) {
         // Safe
-        Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().asObject<false>(); } );
-        Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().asArray<false>(); });
-        Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().asString<false>(); });
-        Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().as<std::string_view, false>(); });
-        Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().asNumber<false>(); });
-        Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().as<int64_t, false>(); });
-        Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().as<int32_t, false>(); });
-        Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().as<int16_t, false>(); });
-        Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().as<int8_t, false>(); });
-        Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().as<uint64_t, false>(); });
-        Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().as<uint32_t, false>(); });
-        Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().as<uint16_t, false>(); });
-        Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().as<uint8_t, false>(); });
-        Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().as<double, false>(); });
-        Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().as<float, false>(); });
-        Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().asBoolean<false>(); });
-        Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().as<bool, false>(); });
+        Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().asObject<true>(); } );
+        Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().asArray<true>(); });
+        Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().asString<true>(); });
+        Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().as<std::string_view, true>(); });
+        Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().asNumber<true>(); });
+        Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().as<int64_t, true>(); });
+        Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().as<int32_t, true>(); });
+        Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().as<int16_t, true>(); });
+        Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().as<int8_t, true>(); });
+        Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().as<uint64_t, true>(); });
+        Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().as<uint32_t, true>(); });
+        Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().as<uint16_t, true>(); });
+        Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().as<uint8_t, true>(); });
+        Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().as<double, true>(); });
+        Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().as<float, true>(); });
+        Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().asBoolean<true>(); });
+        Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().as<bool, true>(); });
 
         // Unsafe
-        qc::json::Value().asObject<true>();
-        qc::json::Value().asArray<true>();
-        qc::json::Value().asString<true>();
-        qc::json::Value().as<std::string_view, true>();
-        qc::json::Value().asNumber<true>();
-        qc::json::Value().as<int64_t, true>();
-        qc::json::Value().as<int32_t, true>();
-        qc::json::Value().as<int16_t, true>();
-        qc::json::Value().as<int8_t, true>();
-        qc::json::Value().as<uint64_t, true>();
-        qc::json::Value().as<uint32_t, true>();
-        qc::json::Value().as<uint16_t, true>();
-        qc::json::Value().as<uint8_t, true>();
-        qc::json::Value().as<double, true>();
-        qc::json::Value().as<float, true>();
-        qc::json::Value().asBoolean<true>();
-        qc::json::Value().as<bool, true>();
+        qc::json::Value().asObject<false>();
+        qc::json::Value().asArray<false>();
+        qc::json::Value().asString<false>();
+        qc::json::Value().as<std::string_view, false>();
+        qc::json::Value().asNumber<false>();
+        qc::json::Value().as<int64_t, false>();
+        qc::json::Value().as<int32_t, false>();
+        qc::json::Value().as<int16_t, false>();
+        qc::json::Value().as<int8_t, false>();
+        qc::json::Value().as<uint64_t, false>();
+        qc::json::Value().as<uint32_t, false>();
+        qc::json::Value().as<uint16_t, false>();
+        qc::json::Value().as<uint8_t, false>();
+        qc::json::Value().as<double, false>();
+        qc::json::Value().as<float, false>();
+        qc::json::Value().asBoolean<false>();
+        qc::json::Value().as<bool, false>();
     }
 
     TEST_METHOD(Object) {
