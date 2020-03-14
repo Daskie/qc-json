@@ -61,40 +61,48 @@ TEST_CLASS(Json) {
         thereAndBackAgain("\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\u000B\u000E\u000F\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001A\u001B\u001C\u001D\u001E\u001F\u007F"sv);
     }
 
-    TEST_METHOD(EncodeDecodeInteger) {
+    TEST_METHOD(EncodeDecodeSignedInteger) {
         // Zero
         thereAndBackAgain(0);
         // Typical
         thereAndBackAgain(123);
         // Max 64
-        thereAndBackAgain(int64_t(9223372036854775807));
+        thereAndBackAgain(std::numeric_limits<int64_t>::max());
         // Min 64
-        thereAndBackAgain(int64_t(9223372036854775808));
-        // Max 64 unsigned
-        thereAndBackAgain(uint64_t(0xFFFFFFFFFFFFFFFFu));
+        thereAndBackAgain(std::numeric_limits<int64_t>::min());
         // Max 32
-        thereAndBackAgain(int32_t(2147483647));
+        thereAndBackAgain(std::numeric_limits<int32_t>::max());
         // Min 32
-        thereAndBackAgain(int32_t(2147483648));
-        // Max 32 unsigned
-        thereAndBackAgain(uint32_t(0xFFFFFFFFu));
+        thereAndBackAgain(std::numeric_limits<int32_t>::min());
         // Max 16
-        thereAndBackAgain(int16_t(32767));
+        thereAndBackAgain(std::numeric_limits<int16_t>::max());
         // Min 16
-        thereAndBackAgain(int16_t(-32768));
-        // Max 16 unsigned
-        thereAndBackAgain(uint16_t(0xFFFFu));
+        thereAndBackAgain(std::numeric_limits<int16_t>::min());
         // Max 8
-        thereAndBackAgain(int8_t(127));
+        thereAndBackAgain(std::numeric_limits<int8_t>::max());
         // Min 8
-        thereAndBackAgain(int8_t(128));
-        // Max 8 unsigned
-        thereAndBackAgain(uint8_t(0xFFu));
+        thereAndBackAgain(std::numeric_limits<int8_t>::min());
+    }
+
+    TEST_METHOD(EncodeDecodeUnsignedInteger) {
+        // Zero
+        thereAndBackAgain(0u);
+        // Typical
+        thereAndBackAgain(123u);
+        // Max 64
+        thereAndBackAgain(std::numeric_limits<uint64_t>::max());
+        // Max 32
+        thereAndBackAgain(std::numeric_limits<uint32_t>::max());
+        // Max 16
+        thereAndBackAgain(std::numeric_limits<uint16_t>::max());
+        // Max 8
+        thereAndBackAgain(std::numeric_limits<uint8_t>::max());
     }
 
     TEST_METHOD(EncodeDecodeFloater) {
         uint64_t val64;
         uint32_t val32;
+
         // Zero
         thereAndBackAgain(0.0);
         // Typical
@@ -120,7 +128,7 @@ TEST_CLASS(Json) {
         // Negative infinity
         thereAndBackAgain(-std::numeric_limits<double>::infinity());
         // NaN
-        Assert::IsTrue(std::isnan(qc::json::decode(qc::json::encode(std::numeric_limits<double>::quiet_NaN())).asFloater()));
+        Assert::IsTrue(std::isnan(qc::json::decode(qc::json::encode(std::numeric_limits<double>::quiet_NaN())).as<double>()));
     }
 
     TEST_METHOD(EncodeDecodeBoolean) {
@@ -131,7 +139,7 @@ TEST_CLASS(Json) {
     }
 
     TEST_METHOD(EncodeDecodeNull) {
-        thereAndBackAgain(nullptr);
+        Assert::IsTrue(qc::json::decode(qc::json::encode(nullptr)).isNull());
     }
 
     TEST_METHOD(EncodeDecodeCustom) {
@@ -151,18 +159,17 @@ TEST_CLASS(Json) {
         Assert::AreEqual(qc::json::Type::string, qc::json::Value("abc").type());
         Assert::AreEqual(qc::json::Type::string, qc::json::Value(const_cast<char *>("abc")).type());
         Assert::AreEqual(qc::json::Type::string, qc::json::Value('a').type());
-        // Integer
-        Assert::AreEqual(qc::json::Type::integer, qc::json::Value(int64_t(0)).type());
-        Assert::AreEqual(qc::json::Type::integer, qc::json::Value(uint64_t(0)).type());
-        Assert::AreEqual(qc::json::Type::integer, qc::json::Value(int32_t(0)).type());
-        Assert::AreEqual(qc::json::Type::integer, qc::json::Value(uint32_t(0)).type());
-        Assert::AreEqual(qc::json::Type::integer, qc::json::Value(int16_t(0)).type());
-        Assert::AreEqual(qc::json::Type::integer, qc::json::Value(uint16_t(0)).type());
-        Assert::AreEqual(qc::json::Type::integer, qc::json::Value(int8_t(0)).type());
-        Assert::AreEqual(qc::json::Type::integer, qc::json::Value(uint8_t(0)).type());
-        // Floater
-        Assert::AreEqual(qc::json::Type::floater, qc::json::Value(0.0).type());
-        Assert::AreEqual(qc::json::Type::floater, qc::json::Value(0.0f).type());
+        // Number
+        Assert::AreEqual(qc::json::Type::number, qc::json::Value(int64_t(0)).type());
+        Assert::AreEqual(qc::json::Type::number, qc::json::Value(int32_t(0)).type());
+        Assert::AreEqual(qc::json::Type::number, qc::json::Value(int16_t(0)).type());
+        Assert::AreEqual(qc::json::Type::number, qc::json::Value(int8_t(0)).type());
+        Assert::AreEqual(qc::json::Type::number, qc::json::Value(uint64_t(0)).type());
+        Assert::AreEqual(qc::json::Type::number, qc::json::Value(uint32_t(0)).type());
+        Assert::AreEqual(qc::json::Type::number, qc::json::Value(uint16_t(0)).type());
+        Assert::AreEqual(qc::json::Type::number, qc::json::Value(uint8_t(0)).type());
+        Assert::AreEqual(qc::json::Type::number, qc::json::Value(0.0).type());
+        Assert::AreEqual(qc::json::Type::number, qc::json::Value(0.0f).type());
         // Boolean
         Assert::AreEqual(qc::json::Type::boolean, qc::json::Value(false).type());
         // Null
@@ -185,79 +192,855 @@ TEST_CLASS(Json) {
         Assert::AreEqual(qc::json::Type::null, v2.type());
     }
 
-    TEST_METHOD(ValueTyping) {
+    TEST_METHOD(ValueTypes) {
         { // Object
             qc::json::Value v(qc::json::Object{});
             Assert::AreEqual(qc::json::Type::object, v.type());
-            Assert::IsTrue(v.is(qc::json::Type::object));
+            Assert::IsTrue(v.isObject());
+            Assert::IsTrue(v.is<qc::json::Object>());
             v.asObject<false>();
             v.asObject<true>();
         }
         { // Array
             qc::json::Value v(qc::json::Array{});
             Assert::AreEqual(qc::json::Type::array, v.type());
-            Assert::IsTrue(v.is(qc::json::Type::array));
+            Assert::IsTrue(v.isArray());
+            Assert::IsTrue(v.is<qc::json::Array>());
             v.asArray<false>();
             v.asArray<true>();
         }
         { // String
             qc::json::Value v("abc"sv);
             Assert::AreEqual(qc::json::Type::string, v.type());
-            Assert::IsTrue(v.is(qc::json::Type::string));
+            Assert::IsTrue(v.isString());
+            Assert::IsTrue(v.is<std::string_view>());
             v.asString<false>();
             v.asString<true>();
             v.as<std::string_view, false>();
             v.as<std::string_view, true>();
         }
-        { // Integer
-            qc::json::Value v(0);
-            Assert::AreEqual(qc::json::Type::integer, v.type());
-            Assert::IsTrue(v.is(qc::json::Type::integer));
-            v.asInteger<false>();
-            v.asInteger<true>();
-            v.as<int64_t, false>();
-            v.as<int64_t, true>();
-            v.as<uint64_t, false>();
-            v.as<uint64_t, true>();
-            v.as<int32_t, false>();
-            v.as<int32_t, true>();
-            v.as<uint32_t, false>();
-            v.as<uint32_t, true>();
-            v.as<int16_t, false>();
-            v.as<int16_t, true>();
-            v.as<uint16_t, false>();
-            v.as<uint16_t, true>();
-            v.as<int8_t, false>();
-            v.as<int8_t, true>();
-            v.as<uint8_t, false>();
-            v.as<uint8_t, true>();
+        { // Character
+            qc::json::Value v('a');
+            Assert::AreEqual(qc::json::Type::string, v.type());
+            Assert::IsTrue(v.isString());
+            Assert::IsTrue(v.is<std::string_view>());
+            Assert::IsTrue(v.is<char>());
+            v.asString<false>();
+            v.asString<true>();
+            v.as<std::string_view, false>();
+            v.as<std::string_view, true>();
+            v.as<char, false>();
+            v.as<char, true>();
         }
-        { // Floater
-            qc::json::Value v(0.0);
-            Assert::AreEqual(qc::json::Type::floater, v.type());
-            Assert::IsTrue(v.is(qc::json::Type::floater));
-            v.asFloater<false>();
-            v.asFloater<true>();
-            v.as<double, false>();
-            v.as<double, true>();
-            v.as<float, false>();
-            v.as<float, true>();
+        { // Number
+            qc::json::Value v(123);
+            Assert::AreEqual(qc::json::Type::number, v.type());
+            Assert::IsTrue(v.isNumber());
+            Assert::IsTrue(v.is<int>());
+            v.asNumber<false>();
+            v.asNumber<true>();
+            v.as<int, false>();
+            v.as<int, true>();
         }
         { // Boolean
             qc::json::Value v(false);
             Assert::AreEqual(qc::json::Type::boolean, v.type());
-            Assert::IsTrue(v.is(qc::json::Type::boolean));
+            Assert::IsTrue(v.isBoolean());
+            Assert::IsTrue(v.is<bool>());
             v.asBoolean<false>();
             v.asBoolean<true>();
             v.as<bool, false>();
             v.as<bool, true>();
         }
         { // Null
-            qc::json::Value v;
+            qc::json::Value v(nullptr);
             Assert::AreEqual(qc::json::Type::null, v.type());
-            Assert::IsTrue(v.is(qc::json::Type::null));
-            v.as<nullptr_t, false>();
-            v.as<nullptr_t, true>();
+            Assert::IsTrue(v.isNull());
+        }
+    }
+
+    TEST_METHOD(ValueNumbers) {
+        { // Positive integer, given as signed integer
+            qc::json::Value v(127);
+            Assert::IsTrue(v.is<int64_t>());
+            Assert::IsTrue(v.is<int32_t>());
+            Assert::IsTrue(v.is<int16_t>());
+            Assert::IsTrue(v.is<int8_t>());
+            Assert::IsTrue(v.is<uint64_t>());
+            Assert::IsTrue(v.is<uint32_t>());
+            Assert::IsTrue(v.is<uint16_t>());
+            Assert::IsTrue(v.is<uint8_t>());
+            Assert::IsTrue(v.is<double>());
+            Assert::IsTrue(v.is<float>());
+            Assert::AreEqual(int64_t(127), v.as<int64_t>());
+            Assert::AreEqual(int32_t(127), v.as<int32_t>());
+            Assert::AreEqual(int16_t(127), v.as<int16_t>());
+            Assert::AreEqual(int8_t(127), v.as<int8_t>());
+            Assert::AreEqual(uint64_t(127), v.as<uint64_t>());
+            Assert::AreEqual(uint32_t(127), v.as<uint32_t>());
+            Assert::AreEqual(uint16_t(127), v.as<uint16_t>());
+            Assert::AreEqual(uint8_t(127), v.as<uint8_t>());
+            Assert::AreEqual(127.0, v.as<double>());
+            Assert::AreEqual(127.0f, v.as<float>());
+        }
+        { // Positive integer, given as unsigned integer
+            qc::json::Value v(127u);
+            Assert::IsTrue(v.is<int64_t>());
+            Assert::IsTrue(v.is<int32_t>());
+            Assert::IsTrue(v.is<int16_t>());
+            Assert::IsTrue(v.is<int8_t>());
+            Assert::IsTrue(v.is<uint64_t>());
+            Assert::IsTrue(v.is<uint32_t>());
+            Assert::IsTrue(v.is<uint16_t>());
+            Assert::IsTrue(v.is<uint8_t>());
+            Assert::IsTrue(v.is<double>());
+            Assert::IsTrue(v.is<float>());
+            Assert::AreEqual(int64_t(127), v.as<int64_t>());
+            Assert::AreEqual(int32_t(127), v.as<int32_t>());
+            Assert::AreEqual(int16_t(127), v.as<int16_t>());
+            Assert::AreEqual(int8_t(127), v.as<int8_t>());
+            Assert::AreEqual(uint64_t(127), v.as<uint64_t>());
+            Assert::AreEqual(uint32_t(127), v.as<uint32_t>());
+            Assert::AreEqual(uint16_t(127), v.as<uint16_t>());
+            Assert::AreEqual(uint8_t(127), v.as<uint8_t>());
+            Assert::AreEqual(127.0, v.as<double>());
+            Assert::AreEqual(127.0f, v.as<float>());
+        }
+        { // Positive integer, given as floater
+            qc::json::Value v(127.0);
+            Assert::IsTrue(v.is<int64_t>());
+            Assert::IsTrue(v.is<int32_t>());
+            Assert::IsTrue(v.is<int16_t>());
+            Assert::IsTrue(v.is<int8_t>());
+            Assert::IsTrue(v.is<uint64_t>());
+            Assert::IsTrue(v.is<uint32_t>());
+            Assert::IsTrue(v.is<uint16_t>());
+            Assert::IsTrue(v.is<uint8_t>());
+            Assert::IsTrue(v.is<double>());
+            Assert::IsTrue(v.is<float>());
+            Assert::AreEqual(int64_t(127), v.as<int64_t>());
+            Assert::AreEqual(int32_t(127), v.as<int32_t>());
+            Assert::AreEqual(int16_t(127), v.as<int16_t>());
+            Assert::AreEqual(int8_t(127), v.as<int8_t>());
+            Assert::AreEqual(uint64_t(127), v.as<uint64_t>());
+            Assert::AreEqual(uint32_t(127), v.as<uint32_t>());
+            Assert::AreEqual(uint16_t(127), v.as<uint16_t>());
+            Assert::AreEqual(uint8_t(127), v.as<uint8_t>());
+            Assert::AreEqual(127.0, v.as<double>());
+            Assert::AreEqual(127.0f, v.as<float>());
+        }
+        { // Positive integer too big for int8_t, given as signed integer
+            qc::json::Value v(128);
+            Assert::IsTrue(v.is<int64_t>());
+            Assert::IsTrue(v.is<int32_t>());
+            Assert::IsTrue(v.is<int16_t>());
+            Assert::IsFalse(v.is<int8_t>());
+            Assert::IsTrue(v.is<uint64_t>());
+            Assert::IsTrue(v.is<uint32_t>());
+            Assert::IsTrue(v.is<uint16_t>());
+            Assert::IsTrue(v.is<uint8_t>());
+            Assert::IsTrue(v.is<double>());
+            Assert::IsTrue(v.is<float>());
+            Assert::AreEqual(int64_t(128), v.as<int64_t>());
+            Assert::AreEqual(int32_t(128), v.as<int32_t>());
+            Assert::AreEqual(int16_t(128), v.as<int16_t>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int8_t>(); });
+            Assert::AreEqual(uint64_t(128), v.as<uint64_t>());
+            Assert::AreEqual(uint32_t(128), v.as<uint32_t>());
+            Assert::AreEqual(uint16_t(128), v.as<uint16_t>());
+            Assert::AreEqual(uint8_t(128), v.as<uint8_t>());
+            Assert::AreEqual(128.0, v.as<double>());
+            Assert::AreEqual(128.0f, v.as<float>());
+        }
+        { // Positive integer too big for int8_t, given as unsigned integer
+            qc::json::Value v(128u);
+            Assert::IsTrue(v.is<int64_t>());
+            Assert::IsTrue(v.is<int32_t>());
+            Assert::IsTrue(v.is<int16_t>());
+            Assert::IsFalse(v.is<int8_t>());
+            Assert::IsTrue(v.is<uint64_t>());
+            Assert::IsTrue(v.is<uint32_t>());
+            Assert::IsTrue(v.is<uint16_t>());
+            Assert::IsTrue(v.is<uint8_t>());
+            Assert::IsTrue(v.is<double>());
+            Assert::IsTrue(v.is<float>());
+            Assert::AreEqual(int64_t(128), v.as<int64_t>());
+            Assert::AreEqual(int32_t(128), v.as<int32_t>());
+            Assert::AreEqual(int16_t(128), v.as<int16_t>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int8_t>(); });
+            Assert::AreEqual(uint64_t(128), v.as<uint64_t>());
+            Assert::AreEqual(uint32_t(128), v.as<uint32_t>());
+            Assert::AreEqual(uint16_t(128), v.as<uint16_t>());
+            Assert::AreEqual(uint8_t(128), v.as<uint8_t>());
+            Assert::AreEqual(128.0, v.as<double>());
+            Assert::AreEqual(128.0f, v.as<float>());
+        }
+        { // Positive integer too big for int8_t, given as floater
+            qc::json::Value v(128.0);
+            Assert::IsTrue(v.is<int64_t>());
+            Assert::IsTrue(v.is<int32_t>());
+            Assert::IsTrue(v.is<int16_t>());
+            Assert::IsFalse(v.is<int8_t>());
+            Assert::IsTrue(v.is<uint64_t>());
+            Assert::IsTrue(v.is<uint32_t>());
+            Assert::IsTrue(v.is<uint16_t>());
+            Assert::IsTrue(v.is<uint8_t>());
+            Assert::IsTrue(v.is<double>());
+            Assert::IsTrue(v.is<float>());
+            Assert::AreEqual(int64_t(128), v.as<int64_t>());
+            Assert::AreEqual(int32_t(128), v.as<int32_t>());
+            Assert::AreEqual(int16_t(128), v.as<int16_t>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int8_t>(); });
+            Assert::AreEqual(uint64_t(128), v.as<uint64_t>());
+            Assert::AreEqual(uint32_t(128), v.as<uint32_t>());
+            Assert::AreEqual(uint16_t(128), v.as<uint16_t>());
+            Assert::AreEqual(uint8_t(128), v.as<uint8_t>());
+            Assert::AreEqual(128.0, v.as<double>());
+            Assert::AreEqual(128.0f, v.as<float>());
+        }
+        { // Positive integer too big for uint8_t, given as signed integer
+            qc::json::Value v(256);
+            Assert::IsTrue(v.is<int64_t>());
+            Assert::IsTrue(v.is<int32_t>());
+            Assert::IsTrue(v.is<int16_t>());
+            Assert::IsFalse(v.is<int8_t>());
+            Assert::IsTrue(v.is<uint64_t>());
+            Assert::IsTrue(v.is<uint32_t>());
+            Assert::IsTrue(v.is<uint16_t>());
+            Assert::IsFalse(v.is<uint8_t>());
+            Assert::IsTrue(v.is<double>());
+            Assert::IsTrue(v.is<float>());
+            Assert::AreEqual(int64_t(256), v.as<int64_t>());
+            Assert::AreEqual(int32_t(256), v.as<int32_t>());
+            Assert::AreEqual(int16_t(256), v.as<int16_t>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int8_t>(); });
+            Assert::AreEqual(uint64_t(256), v.as<uint64_t>());
+            Assert::AreEqual(uint32_t(256), v.as<uint32_t>());
+            Assert::AreEqual(uint16_t(256), v.as<uint16_t>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint8_t>(); });
+            Assert::AreEqual(256.0, v.as<double>());
+            Assert::AreEqual(256.0f, v.as<float>());
+        }
+        { // Positive integer too big for uint8_t, given as unsigned integer
+            qc::json::Value v(256u);
+            Assert::IsTrue(v.is<int64_t>());
+            Assert::IsTrue(v.is<int32_t>());
+            Assert::IsTrue(v.is<int16_t>());
+            Assert::IsFalse(v.is<int8_t>());
+            Assert::IsTrue(v.is<uint64_t>());
+            Assert::IsTrue(v.is<uint32_t>());
+            Assert::IsTrue(v.is<uint16_t>());
+            Assert::IsFalse(v.is<uint8_t>());
+            Assert::IsTrue(v.is<double>());
+            Assert::IsTrue(v.is<float>());
+            Assert::AreEqual(int64_t(256), v.as<int64_t>());
+            Assert::AreEqual(int32_t(256), v.as<int32_t>());
+            Assert::AreEqual(int16_t(256), v.as<int16_t>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int8_t>(); });
+            Assert::AreEqual(uint64_t(256), v.as<uint64_t>());
+            Assert::AreEqual(uint32_t(256), v.as<uint32_t>());
+            Assert::AreEqual(uint16_t(256), v.as<uint16_t>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint8_t>(); });
+            Assert::AreEqual(256.0, v.as<double>());
+            Assert::AreEqual(256.0f, v.as<float>());
+        }
+        { // Positive integer too big for uint8_t, given as floater
+            qc::json::Value v(256.0);
+            Assert::IsTrue(v.is<int64_t>());
+            Assert::IsTrue(v.is<int32_t>());
+            Assert::IsTrue(v.is<int16_t>());
+            Assert::IsFalse(v.is<int8_t>());
+            Assert::IsTrue(v.is<uint64_t>());
+            Assert::IsTrue(v.is<uint32_t>());
+            Assert::IsTrue(v.is<uint16_t>());
+            Assert::IsFalse(v.is<uint8_t>());
+            Assert::IsTrue(v.is<double>());
+            Assert::IsTrue(v.is<float>());
+            Assert::AreEqual(int64_t(256), v.as<int64_t>());
+            Assert::AreEqual(int32_t(256), v.as<int32_t>());
+            Assert::AreEqual(int16_t(256), v.as<int16_t>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int8_t>(); });
+            Assert::AreEqual(uint64_t(256), v.as<uint64_t>());
+            Assert::AreEqual(uint32_t(256), v.as<uint32_t>());
+            Assert::AreEqual(uint16_t(256), v.as<uint16_t>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint8_t>(); });
+            Assert::AreEqual(256.0, v.as<double>());
+            Assert::AreEqual(256.0f, v.as<float>());
+        }
+        { // Positive integer too big for int16_t, given as signed integer
+            qc::json::Value v(32768);
+            Assert::IsTrue(v.is<int64_t>());
+            Assert::IsTrue(v.is<int32_t>());
+            Assert::IsFalse(v.is<int16_t>());
+            Assert::IsFalse(v.is<int8_t>());
+            Assert::IsTrue(v.is<uint64_t>());
+            Assert::IsTrue(v.is<uint32_t>());
+            Assert::IsTrue(v.is<uint16_t>());
+            Assert::IsFalse(v.is<uint8_t>());
+            Assert::IsTrue(v.is<double>());
+            Assert::IsTrue(v.is<float>());
+            Assert::AreEqual(int64_t(32768), v.as<int64_t>());
+            Assert::AreEqual(int32_t(32768), v.as<int32_t>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int16_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int8_t>(); });
+            Assert::AreEqual(uint64_t(32768), v.as<uint64_t>());
+            Assert::AreEqual(uint32_t(32768), v.as<uint32_t>());
+            Assert::AreEqual(uint16_t(32768), v.as<uint16_t>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint8_t>(); });
+            Assert::AreEqual(32768.0, v.as<double>());
+            Assert::AreEqual(32768.0f, v.as<float>());
+        }
+        { // Positive integer too big for int16_t, given as unsigned integer
+            qc::json::Value v(32768u);
+            Assert::IsTrue(v.is<int64_t>());
+            Assert::IsTrue(v.is<int32_t>());
+            Assert::IsFalse(v.is<int16_t>());
+            Assert::IsFalse(v.is<int8_t>());
+            Assert::IsTrue(v.is<uint64_t>());
+            Assert::IsTrue(v.is<uint32_t>());
+            Assert::IsTrue(v.is<uint16_t>());
+            Assert::IsFalse(v.is<uint8_t>());
+            Assert::IsTrue(v.is<double>());
+            Assert::IsTrue(v.is<float>());
+            Assert::AreEqual(int64_t(32768), v.as<int64_t>());
+            Assert::AreEqual(int32_t(32768), v.as<int32_t>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int16_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int8_t>(); });
+            Assert::AreEqual(uint64_t(32768), v.as<uint64_t>());
+            Assert::AreEqual(uint32_t(32768), v.as<uint32_t>());
+            Assert::AreEqual(uint16_t(32768), v.as<uint16_t>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint8_t>(); });
+            Assert::AreEqual(32768.0, v.as<double>());
+            Assert::AreEqual(32768.0f, v.as<float>());
+        }
+        { // Positive integer too big for int16_t, given as floater
+            qc::json::Value v(32768.0);
+            Assert::IsTrue(v.is<int64_t>());
+            Assert::IsTrue(v.is<int32_t>());
+            Assert::IsFalse(v.is<int16_t>());
+            Assert::IsFalse(v.is<int8_t>());
+            Assert::IsTrue(v.is<uint64_t>());
+            Assert::IsTrue(v.is<uint32_t>());
+            Assert::IsTrue(v.is<uint16_t>());
+            Assert::IsFalse(v.is<uint8_t>());
+            Assert::IsTrue(v.is<double>());
+            Assert::IsTrue(v.is<float>());
+            Assert::AreEqual(int64_t(32768), v.as<int64_t>());
+            Assert::AreEqual(int32_t(32768), v.as<int32_t>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int16_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int8_t>(); });
+            Assert::AreEqual(uint64_t(32768), v.as<uint64_t>());
+            Assert::AreEqual(uint32_t(32768), v.as<uint32_t>());
+            Assert::AreEqual(uint16_t(32768), v.as<uint16_t>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint8_t>(); });
+            Assert::AreEqual(32768.0, v.as<double>());
+            Assert::AreEqual(32768.0f, v.as<float>());
+        }
+        { // Positive integer too big for uint16_t, given as signed integer
+            qc::json::Value v(65536);
+            Assert::IsTrue(v.is<int64_t>());
+            Assert::IsTrue(v.is<int32_t>());
+            Assert::IsFalse(v.is<int16_t>());
+            Assert::IsFalse(v.is<int8_t>());
+            Assert::IsTrue(v.is<uint64_t>());
+            Assert::IsTrue(v.is<uint32_t>());
+            Assert::IsFalse(v.is<uint16_t>());
+            Assert::IsFalse(v.is<uint8_t>());
+            Assert::IsTrue(v.is<double>());
+            Assert::IsTrue(v.is<float>());
+            Assert::AreEqual(int64_t(65536), v.as<int64_t>());
+            Assert::AreEqual(int32_t(65536), v.as<int32_t>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int16_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int8_t>(); });
+            Assert::AreEqual(uint64_t(65536), v.as<uint64_t>());
+            Assert::AreEqual(uint32_t(65536), v.as<uint32_t>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint16_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint8_t>(); });
+            Assert::AreEqual(65536.0, v.as<double>());
+            Assert::AreEqual(65536.0f, v.as<float>());
+        }
+        { // Positive integer too big for uint16_t, given as unsigned integer
+            qc::json::Value v(65536u);
+            Assert::IsTrue(v.is<int64_t>());
+            Assert::IsTrue(v.is<int32_t>());
+            Assert::IsFalse(v.is<int16_t>());
+            Assert::IsFalse(v.is<int8_t>());
+            Assert::IsTrue(v.is<uint64_t>());
+            Assert::IsTrue(v.is<uint32_t>());
+            Assert::IsFalse(v.is<uint16_t>());
+            Assert::IsFalse(v.is<uint8_t>());
+            Assert::IsTrue(v.is<double>());
+            Assert::IsTrue(v.is<float>());
+            Assert::AreEqual(int64_t(65536), v.as<int64_t>());
+            Assert::AreEqual(int32_t(65536), v.as<int32_t>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int16_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int8_t>(); });
+            Assert::AreEqual(uint64_t(65536), v.as<uint64_t>());
+            Assert::AreEqual(uint32_t(65536), v.as<uint32_t>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint16_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint8_t>(); });
+            Assert::AreEqual(65536.0, v.as<double>());
+            Assert::AreEqual(65536.0f, v.as<float>());
+        }
+        { // Positive integer too big for uint16_t, given as floater
+            qc::json::Value v(65536.0);
+            Assert::IsTrue(v.is<int64_t>());
+            Assert::IsTrue(v.is<int32_t>());
+            Assert::IsFalse(v.is<int16_t>());
+            Assert::IsFalse(v.is<int8_t>());
+            Assert::IsTrue(v.is<uint64_t>());
+            Assert::IsTrue(v.is<uint32_t>());
+            Assert::IsFalse(v.is<uint16_t>());
+            Assert::IsFalse(v.is<uint8_t>());
+            Assert::IsTrue(v.is<double>());
+            Assert::IsTrue(v.is<float>());
+            Assert::AreEqual(int64_t(65536), v.as<int64_t>());
+            Assert::AreEqual(int32_t(65536), v.as<int32_t>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int16_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int8_t>(); });
+            Assert::AreEqual(uint64_t(65536), v.as<uint64_t>());
+            Assert::AreEqual(uint32_t(65536), v.as<uint32_t>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint16_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint8_t>(); });
+            Assert::AreEqual(65536.0, v.as<double>());
+            Assert::AreEqual(65536.0f, v.as<float>());
+        }
+        { // Positive integer too big for int32_t, given as signed integer
+            qc::json::Value v(2147483648);
+            Assert::IsTrue(v.is<int64_t>());
+            Assert::IsFalse(v.is<int32_t>());
+            Assert::IsFalse(v.is<int16_t>());
+            Assert::IsFalse(v.is<int8_t>());
+            Assert::IsTrue(v.is<uint64_t>());
+            Assert::IsTrue(v.is<uint32_t>());
+            Assert::IsFalse(v.is<uint16_t>());
+            Assert::IsFalse(v.is<uint8_t>());
+            Assert::IsTrue(v.is<double>());
+            Assert::IsTrue(v.is<float>());
+            Assert::AreEqual(int64_t(2147483648), v.as<int64_t>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int32_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int16_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int8_t>(); });
+            Assert::AreEqual(uint64_t(2147483648), v.as<uint64_t>());
+            Assert::AreEqual(uint32_t(2147483648), v.as<uint32_t>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint16_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint8_t>(); });
+            Assert::AreEqual(2147483648.0, v.as<double>());
+            Assert::AreEqual(2147483648.0f, v.as<float>());
+        }
+        { // Positive integer too big for int32_t, given as unsigned integer
+            qc::json::Value v(2147483648u);
+            Assert::IsTrue(v.is<int64_t>());
+            Assert::IsFalse(v.is<int32_t>());
+            Assert::IsFalse(v.is<int16_t>());
+            Assert::IsFalse(v.is<int8_t>());
+            Assert::IsTrue(v.is<uint64_t>());
+            Assert::IsTrue(v.is<uint32_t>());
+            Assert::IsFalse(v.is<uint16_t>());
+            Assert::IsFalse(v.is<uint8_t>());
+            Assert::IsTrue(v.is<double>());
+            Assert::IsTrue(v.is<float>());
+            Assert::AreEqual(int64_t(2147483648), v.as<int64_t>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int32_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int16_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int8_t>(); });
+            Assert::AreEqual(uint64_t(2147483648), v.as<uint64_t>());
+            Assert::AreEqual(uint32_t(2147483648), v.as<uint32_t>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint16_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint8_t>(); });
+            Assert::AreEqual(2147483648.0, v.as<double>());
+            Assert::AreEqual(2147483648.0f, v.as<float>());
+        }
+        { // Positive integer too big for int32_t, given as floater
+            qc::json::Value v(2147483648.0);
+            Assert::IsTrue(v.is<int64_t>());
+            Assert::IsFalse(v.is<int32_t>());
+            Assert::IsFalse(v.is<int16_t>());
+            Assert::IsFalse(v.is<int8_t>());
+            Assert::IsTrue(v.is<uint64_t>());
+            Assert::IsTrue(v.is<uint32_t>());
+            Assert::IsFalse(v.is<uint16_t>());
+            Assert::IsFalse(v.is<uint8_t>());
+            Assert::IsTrue(v.is<double>());
+            Assert::IsTrue(v.is<float>());
+            Assert::AreEqual(int64_t(2147483648), v.as<int64_t>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int32_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int16_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int8_t>(); });
+            Assert::AreEqual(uint64_t(2147483648), v.as<uint64_t>());
+            Assert::AreEqual(uint32_t(2147483648), v.as<uint32_t>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint16_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint8_t>(); });
+            Assert::AreEqual(2147483648.0, v.as<double>());
+            Assert::AreEqual(2147483648.0f, v.as<float>());
+        }
+        { // Positive integer too big for uint32_t, given as signed integer
+            qc::json::Value v(4294967296);
+            Assert::IsTrue(v.is<int64_t>());
+            Assert::IsFalse(v.is<int32_t>());
+            Assert::IsFalse(v.is<int16_t>());
+            Assert::IsFalse(v.is<int8_t>());
+            Assert::IsTrue(v.is<uint64_t>());
+            Assert::IsFalse(v.is<uint32_t>());
+            Assert::IsFalse(v.is<uint16_t>());
+            Assert::IsFalse(v.is<uint8_t>());
+            Assert::IsTrue(v.is<double>());
+            Assert::IsTrue(v.is<float>());
+            Assert::AreEqual(int64_t(4294967296), v.as<int64_t>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int32_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int16_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int8_t>(); });
+            Assert::AreEqual(uint64_t(4294967296), v.as<uint64_t>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint32_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint16_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint8_t>(); });
+            Assert::AreEqual(4294967296.0, v.as<double>());
+            Assert::AreEqual(4294967296.0f, v.as<float>());
+        }
+        { // Positive integer too big for uint32_t, given as unsigned integer
+            qc::json::Value v(4294967296u);
+            Assert::IsTrue(v.is<int64_t>());
+            Assert::IsFalse(v.is<int32_t>());
+            Assert::IsFalse(v.is<int16_t>());
+            Assert::IsFalse(v.is<int8_t>());
+            Assert::IsTrue(v.is<uint64_t>());
+            Assert::IsFalse(v.is<uint32_t>());
+            Assert::IsFalse(v.is<uint16_t>());
+            Assert::IsFalse(v.is<uint8_t>());
+            Assert::IsTrue(v.is<double>());
+            Assert::IsTrue(v.is<float>());
+            Assert::AreEqual(int64_t(4294967296), v.as<int64_t>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int32_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int16_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int8_t>(); });
+            Assert::AreEqual(uint64_t(4294967296), v.as<uint64_t>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint32_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint16_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint8_t>(); });
+            Assert::AreEqual(4294967296.0, v.as<double>());
+            Assert::AreEqual(4294967296.0f, v.as<float>());
+        }
+        { // Positive integer too big for uint32_t, given as floater
+            qc::json::Value v(4294967296.0);
+            Assert::IsTrue(v.is<int64_t>());
+            Assert::IsFalse(v.is<int32_t>());
+            Assert::IsFalse(v.is<int16_t>());
+            Assert::IsFalse(v.is<int8_t>());
+            Assert::IsTrue(v.is<uint64_t>());
+            Assert::IsFalse(v.is<uint32_t>());
+            Assert::IsFalse(v.is<uint16_t>());
+            Assert::IsFalse(v.is<uint8_t>());
+            Assert::IsTrue(v.is<double>());
+            Assert::IsTrue(v.is<float>());
+            Assert::AreEqual(int64_t(4294967296), v.as<int64_t>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int32_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int16_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int8_t>(); });
+            Assert::AreEqual(uint64_t(4294967296), v.as<uint64_t>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint32_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint16_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint8_t>(); });
+            Assert::AreEqual(4294967296.0, v.as<double>());
+            Assert::AreEqual(4294967296.0f, v.as<float>());
+        }
+        { // Positive integer too big for int64_t, given as unsigned integer
+            qc::json::Value v(9223372036854775808u);
+            Assert::IsFalse(v.is<int64_t>());
+            Assert::IsFalse(v.is<int32_t>());
+            Assert::IsFalse(v.is<int16_t>());
+            Assert::IsFalse(v.is<int8_t>());
+            Assert::IsTrue(v.is<uint64_t>());
+            Assert::IsFalse(v.is<uint32_t>());
+            Assert::IsFalse(v.is<uint16_t>());
+            Assert::IsFalse(v.is<uint8_t>());
+            Assert::IsTrue(v.is<double>());
+            Assert::IsTrue(v.is<float>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int64_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int32_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int16_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int8_t>(); });
+            Assert::AreEqual(uint64_t(9223372036854775808), v.as<uint64_t>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint32_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint16_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint8_t>(); });
+            Assert::AreEqual(9223372036854775808.0, v.as<double>());
+            Assert::AreEqual(9223372036854775808.0f, v.as<float>());
+        }
+        { // Positive integer too big for int64_t, given as floater
+            qc::json::Value v(9223372036854775808.0);
+            Assert::IsFalse(v.is<int64_t>());
+            Assert::IsFalse(v.is<int32_t>());
+            Assert::IsFalse(v.is<int16_t>());
+            Assert::IsFalse(v.is<int8_t>());
+            Assert::IsTrue(v.is<uint64_t>());
+            Assert::IsFalse(v.is<uint32_t>());
+            Assert::IsFalse(v.is<uint16_t>());
+            Assert::IsFalse(v.is<uint8_t>());
+            Assert::IsTrue(v.is<double>());
+            Assert::IsTrue(v.is<float>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int64_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int32_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int16_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int8_t>(); });
+            Assert::AreEqual(uint64_t(9223372036854775808), v.as<uint64_t>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint32_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint16_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint8_t>(); });
+            Assert::AreEqual(9223372036854775808.0, v.as<double>());
+            Assert::AreEqual(9223372036854775808.0f, v.as<float>());
+        }
+        { // Positive integer too big for uint64_t, given as floater
+            qc::json::Value v(20000000000000000000.0);
+            Assert::IsFalse(v.is<int64_t>());
+            Assert::IsFalse(v.is<int32_t>());
+            Assert::IsFalse(v.is<int16_t>());
+            Assert::IsFalse(v.is<int8_t>());
+            Assert::IsFalse(v.is<uint64_t>());
+            Assert::IsFalse(v.is<uint32_t>());
+            Assert::IsFalse(v.is<uint16_t>());
+            Assert::IsFalse(v.is<uint8_t>());
+            Assert::IsTrue(v.is<double>());
+            Assert::IsTrue(v.is<float>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int64_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int32_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int16_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int8_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint64_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint32_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint16_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint8_t>(); });
+            Assert::AreEqual(20000000000000000000.0, v.as<double>());
+            Assert::AreEqual(20000000000000000000.0f, v.as<float>());
+        }
+        { // Negative integer, given as signed integer
+            qc::json::Value v(-128);
+            Assert::IsTrue(v.is<int64_t>());
+            Assert::IsTrue(v.is<int32_t>());
+            Assert::IsTrue(v.is<int16_t>());
+            Assert::IsTrue(v.is<int8_t>());
+            Assert::IsFalse(v.is<uint64_t>());
+            Assert::IsFalse(v.is<uint32_t>());
+            Assert::IsFalse(v.is<uint16_t>());
+            Assert::IsFalse(v.is<uint8_t>());
+            Assert::IsTrue(v.is<double>());
+            Assert::IsTrue(v.is<float>());
+            Assert::AreEqual(int64_t(-128), v.as<int64_t>());
+            Assert::AreEqual(int32_t(-128), v.as<int32_t>());
+            Assert::AreEqual(int16_t(-128), v.as<int16_t>());
+            Assert::AreEqual(int8_t(-128), v.as<int8_t>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint64_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint32_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint16_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint8_t>(); });
+            Assert::AreEqual(-128.0, v.as<double>());
+            Assert::AreEqual(-128.0f, v.as<float>());
+        }
+        { // Negative integer, given as floater
+            qc::json::Value v(-128);
+            Assert::IsTrue(v.is<int64_t>());
+            Assert::IsTrue(v.is<int32_t>());
+            Assert::IsTrue(v.is<int16_t>());
+            Assert::IsTrue(v.is<int8_t>());
+            Assert::IsFalse(v.is<uint64_t>());
+            Assert::IsFalse(v.is<uint32_t>());
+            Assert::IsFalse(v.is<uint16_t>());
+            Assert::IsFalse(v.is<uint8_t>());
+            Assert::IsTrue(v.is<double>());
+            Assert::IsTrue(v.is<float>());
+            Assert::AreEqual(int64_t(-128), v.as<int64_t>());
+            Assert::AreEqual(int32_t(-128), v.as<int32_t>());
+            Assert::AreEqual(int16_t(-128), v.as<int16_t>());
+            Assert::AreEqual(int8_t(-128), v.as<int8_t>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint64_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint32_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint16_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint8_t>(); });
+            Assert::AreEqual(-128.0, v.as<double>());
+            Assert::AreEqual(-128.0f, v.as<float>());
+        }
+        { // Negative integer too small for int8_t, given as signed integer
+            qc::json::Value v(-129);
+            Assert::IsTrue(v.is<int64_t>());
+            Assert::IsTrue(v.is<int32_t>());
+            Assert::IsTrue(v.is<int16_t>());
+            Assert::IsFalse(v.is<int8_t>());
+            Assert::IsFalse(v.is<uint64_t>());
+            Assert::IsFalse(v.is<uint32_t>());
+            Assert::IsFalse(v.is<uint16_t>());
+            Assert::IsFalse(v.is<uint8_t>());
+            Assert::IsTrue(v.is<double>());
+            Assert::IsTrue(v.is<float>());
+            Assert::AreEqual(int64_t(-129), v.as<int64_t>());
+            Assert::AreEqual(int32_t(-129), v.as<int32_t>());
+            Assert::AreEqual(int16_t(-129), v.as<int16_t>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int8_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint64_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint32_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint16_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint8_t>(); });
+            Assert::AreEqual(-129.0, v.as<double>());
+            Assert::AreEqual(-129.0f, v.as<float>());
+        }
+        { // Negative integer too small for int8_t, given as floater
+            qc::json::Value v(-129.0);
+            Assert::IsTrue(v.is<int64_t>());
+            Assert::IsTrue(v.is<int32_t>());
+            Assert::IsTrue(v.is<int16_t>());
+            Assert::IsFalse(v.is<int8_t>());
+            Assert::IsFalse(v.is<uint64_t>());
+            Assert::IsFalse(v.is<uint32_t>());
+            Assert::IsFalse(v.is<uint16_t>());
+            Assert::IsFalse(v.is<uint8_t>());
+            Assert::IsTrue(v.is<double>());
+            Assert::IsTrue(v.is<float>());
+            Assert::AreEqual(int64_t(-129), v.as<int64_t>());
+            Assert::AreEqual(int32_t(-129), v.as<int32_t>());
+            Assert::AreEqual(int16_t(-129), v.as<int16_t>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int8_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint64_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint32_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint16_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint8_t>(); });
+            Assert::AreEqual(-129.0, v.as<double>());
+            Assert::AreEqual(-129.0f, v.as<float>());
+        }
+        { // Negative integer too small for int16_t, given as signed integer
+            qc::json::Value v(-32769);
+            Assert::IsTrue(v.is<int64_t>());
+            Assert::IsTrue(v.is<int32_t>());
+            Assert::IsFalse(v.is<int16_t>());
+            Assert::IsFalse(v.is<int8_t>());
+            Assert::IsFalse(v.is<uint64_t>());
+            Assert::IsFalse(v.is<uint32_t>());
+            Assert::IsFalse(v.is<uint16_t>());
+            Assert::IsFalse(v.is<uint8_t>());
+            Assert::IsTrue(v.is<double>());
+            Assert::IsTrue(v.is<float>());
+            Assert::AreEqual(int64_t(-32769), v.as<int64_t>());
+            Assert::AreEqual(int32_t(-32769), v.as<int32_t>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int16_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int8_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint64_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint32_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint16_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint8_t>(); });
+            Assert::AreEqual(-32769.0, v.as<double>());
+            Assert::AreEqual(-32769.0f, v.as<float>());
+        }
+        { // Negative integer too small for int16_t, given as floater
+            qc::json::Value v(-32769.0);
+            Assert::IsTrue(v.is<int64_t>());
+            Assert::IsTrue(v.is<int32_t>());
+            Assert::IsFalse(v.is<int16_t>());
+            Assert::IsFalse(v.is<int8_t>());
+            Assert::IsFalse(v.is<uint64_t>());
+            Assert::IsFalse(v.is<uint32_t>());
+            Assert::IsFalse(v.is<uint16_t>());
+            Assert::IsFalse(v.is<uint8_t>());
+            Assert::IsTrue(v.is<double>());
+            Assert::IsTrue(v.is<float>());
+            Assert::AreEqual(int64_t(-32769), v.as<int64_t>());
+            Assert::AreEqual(int32_t(-32769), v.as<int32_t>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int16_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int8_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint64_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint32_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint16_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint8_t>(); });
+            Assert::AreEqual(-32769.0, v.as<double>());
+            Assert::AreEqual(-32769.0f, v.as<float>());
+        }
+        { // Negative integer too small for int32_t, given as signed integer
+            qc::json::Value v(-2147483649LL);
+            Assert::IsTrue(v.is<int64_t>());
+            Assert::IsFalse(v.is<int32_t>());
+            Assert::IsFalse(v.is<int16_t>());
+            Assert::IsFalse(v.is<int8_t>());
+            Assert::IsFalse(v.is<uint64_t>());
+            Assert::IsFalse(v.is<uint32_t>());
+            Assert::IsFalse(v.is<uint16_t>());
+            Assert::IsFalse(v.is<uint8_t>());
+            Assert::IsTrue(v.is<double>());
+            Assert::IsTrue(v.is<float>());
+            Assert::AreEqual(int64_t(-2147483649LL), v.as<int64_t>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int32_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int16_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int8_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint64_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint32_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint16_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint8_t>(); });
+            Assert::AreEqual(-2147483649.0, v.as<double>());
+            Assert::AreEqual(-2147483649.0f, v.as<float>());
+        }
+        { // Negative integer too small for int32_t, given as floater
+            qc::json::Value v(-2147483649.0);
+            Assert::IsTrue(v.is<int64_t>());
+            Assert::IsFalse(v.is<int32_t>());
+            Assert::IsFalse(v.is<int16_t>());
+            Assert::IsFalse(v.is<int8_t>());
+            Assert::IsFalse(v.is<uint64_t>());
+            Assert::IsFalse(v.is<uint32_t>());
+            Assert::IsFalse(v.is<uint16_t>());
+            Assert::IsFalse(v.is<uint8_t>());
+            Assert::IsTrue(v.is<double>());
+            Assert::IsTrue(v.is<float>());
+            Assert::AreEqual(int64_t(-2147483649LL), v.as<int64_t>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int32_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int16_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int8_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint64_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint32_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint16_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint8_t>(); });
+            Assert::AreEqual(-2147483649.0, v.as<double>());
+            Assert::AreEqual(-2147483649.0f, v.as<float>());
+        }
+        { // Negative integer too small for int64_t, given as floater
+            qc::json::Value v(-10000000000000000000.0);
+            Assert::IsFalse(v.is<int64_t>());
+            Assert::IsFalse(v.is<int32_t>());
+            Assert::IsFalse(v.is<int16_t>());
+            Assert::IsFalse(v.is<int8_t>());
+            Assert::IsFalse(v.is<uint64_t>());
+            Assert::IsFalse(v.is<uint32_t>());
+            Assert::IsFalse(v.is<uint16_t>());
+            Assert::IsFalse(v.is<uint8_t>());
+            Assert::IsTrue(v.is<double>());
+            Assert::IsTrue(v.is<float>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int64_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int32_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int16_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int8_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint64_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint32_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint16_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint8_t>(); });
+            Assert::AreEqual(-10000000000000000000.0, v.as<double>());
+            Assert::AreEqual(-10000000000000000000.0f, v.as<float>());
+        }
+        { // Floating point number
+            qc::json::Value v(123.4);
+            Assert::IsFalse(v.is<int64_t>());
+            Assert::IsFalse(v.is<int32_t>());
+            Assert::IsFalse(v.is<int16_t>());
+            Assert::IsFalse(v.is<int8_t>());
+            Assert::IsFalse(v.is<uint64_t>());
+            Assert::IsFalse(v.is<uint32_t>());
+            Assert::IsFalse(v.is<uint16_t>());
+            Assert::IsFalse(v.is<uint8_t>());
+            Assert::IsTrue(v.is<double>());
+            Assert::IsTrue(v.is<float>());
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int64_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int32_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int16_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<int8_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint64_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint32_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint16_t>(); });
+            Assert::ExpectException<qc::json::TypeError>([&v]() { v.as<uint8_t>(); });
+            Assert::AreEqual(123.4, v.as<double>());
+            Assert::AreEqual(123.4f, v.as<float>());
         }
     }
 
@@ -267,44 +1050,38 @@ TEST_CLASS(Json) {
         Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().asArray<false>(); });
         Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().asString<false>(); });
         Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().as<std::string_view, false>(); });
-        Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().asInteger<false>(); });
+        Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().asNumber<false>(); });
         Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().as<int64_t, false>(); });
-        Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().as<uint64_t, false>(); });
         Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().as<int32_t, false>(); });
-        Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().as<uint32_t, false>(); });
         Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().as<int16_t, false>(); });
-        Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().as<uint16_t, false>(); });
         Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().as<int8_t, false>(); });
+        Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().as<uint64_t, false>(); });
+        Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().as<uint32_t, false>(); });
+        Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().as<uint16_t, false>(); });
         Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().as<uint8_t, false>(); });
-        Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().asFloater<false>(); });
         Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().as<double, false>(); });
         Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().as<float, false>(); });
         Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().asBoolean<false>(); });
         Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value().as<bool, false>(); });
-        Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value(0).asNull<false>(); });
-        Assert::ExpectException<qc::json::TypeError>([]() { qc::json::Value(0).as<nullptr_t, false>(); });
 
         // Unsafe
         qc::json::Value().asObject<true>();
         qc::json::Value().asArray<true>();
         qc::json::Value().asString<true>();
         qc::json::Value().as<std::string_view, true>();
-        qc::json::Value().asInteger<true>();
+        qc::json::Value().asNumber<true>();
         qc::json::Value().as<int64_t, true>();
-        qc::json::Value().as<uint64_t, true>();
         qc::json::Value().as<int32_t, true>();
-        qc::json::Value().as<uint32_t, true>();
         qc::json::Value().as<int16_t, true>();
-        qc::json::Value().as<uint16_t, true>();
         qc::json::Value().as<int8_t, true>();
+        qc::json::Value().as<uint64_t, true>();
+        qc::json::Value().as<uint32_t, true>();
+        qc::json::Value().as<uint16_t, true>();
         qc::json::Value().as<uint8_t, true>();
-        qc::json::Value().asFloater<true>();
         qc::json::Value().as<double, true>();
         qc::json::Value().as<float, true>();
         qc::json::Value().asBoolean<true>();
         qc::json::Value().as<bool, true>();
-        qc::json::Value(0).asNull<true>();
-        qc::json::Value(0).as<nullptr_t, true>();
     }
 
     TEST_METHOD(Object) {
@@ -517,7 +1294,7 @@ TEST_CLASS(Json) {
             arr = qc::json::Array(nullptr);
             Assert::AreEqual(1u, arr.size());
             Assert::AreEqual(8u, arr.capacity());
-            Assert::AreEqual(nullptr, arr.at(0).asNull());
+            Assert::IsTrue(arr.at(0).isNull());
 
             arr = qc::json::Array(1, 2, 3, 4, 5, 6, 7, 8, 9);
             Assert::AreEqual(9u, arr.size());

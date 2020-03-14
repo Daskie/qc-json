@@ -22,6 +22,7 @@
 #include <string_view>
 #include <type_traits>
 #include <utility>
+#include <variant>
 
 #include "qc-json-decode.hpp"
 #include "qc-json-encode.hpp"
@@ -45,13 +46,18 @@ namespace qc {
         };
 
         enum class Type : uint32_t {
-            null = 0b000'00000'00000000'00000000'00000000u,
-            object = 0b001'00000'00000000'00000000'00000000u,
-            array = 0b010'00000'00000000'00000000'00000000u,
-            string = 0b011'00000'00000000'00000000'00000000u,
-            integer = 0b100'00000'00000000'00000000'00000000u,
-            floater = 0b101'00000'00000000'00000000'00000000u,
-            boolean = 0b110'00000'00000000'00000000'00000000u
+            null,
+            object,
+            array,
+            string,
+            number,
+            boolean
+        };
+
+        enum class NumberType : uint32_t {
+            signedInteger,
+            unsignedInteger,
+            floater
         };
 
         class Object;
@@ -70,12 +76,12 @@ namespace qc {
             Value(char * val);
             Value(char val);
             Value(int64_t val);
-            Value(uint64_t val);
             Value(int32_t val);
-            Value(uint32_t val);
             Value(int16_t val);
-            Value(uint16_t val);
             Value(int8_t val);
+            Value(uint64_t val);
+            Value(uint32_t val);
+            Value(uint16_t val);
             Value(uint8_t val);
             Value(double val);
             Value(float val);
@@ -93,7 +99,19 @@ namespace qc {
 
             Type type() const;
 
-            bool is(Type t) const;
+            bool isObject() const;
+
+            bool isArray() const;
+
+            bool isString() const;
+
+            bool isNumber() const;
+
+            bool isBoolean() const;
+
+            bool isNull() const;
+
+            template <typename T> bool is() const;
 
             template <bool unsafe = false> const Object & asObject() const;
             template <bool unsafe = false>       Object & asObject();
@@ -103,26 +121,23 @@ namespace qc {
 
             template <bool unsafe = false> std::string_view asString() const;
 
-            template <bool unsafe = false> const int64_t & asInteger() const;
-            template <bool unsafe = false>       int64_t & asInteger();
+            template <bool unsafe = false> std::variant<int64_t, uint64_t, double> asNumber() const;
 
-            template <bool unsafe = false> const double & asFloater() const;
-            template <bool unsafe = false>       double & asFloater();
-
-            template <bool unsafe = false> const bool & asBoolean() const;
-            template <bool unsafe = false>       bool & asBoolean();
-
-            template <bool unsafe = false> nullptr_t asNull() const;
+            template <bool unsafe = false> bool asBoolean() const;
 
             template <typename T, bool unsafe = false> T as() const;
 
             private:
 
             uint32_t m_type_data0{0};
-            uint32_t m_data1{0};
+            union {
+                uint32_t m_data1{0};
+                NumberType m_numberType;
+            };
             union {
                 uint64_t m_data2{0};
-                int64_t m_integer;
+                int64_t m_signedInteger;
+                uint64_t m_unsignedInteger;
                 double m_floater;
                 bool m_boolean;
             };
@@ -180,7 +195,7 @@ namespace qc {
 
             private:
 
-            uint32_t m_type_capacity{uint32_t(Type::object)};
+            uint32_t m_type_capacity{uint32_t(Type::object) << 29};
             uint32_t m_size{0};
             alignas(8) Pair * m_pairs{nullptr};
 
@@ -236,7 +251,7 @@ namespace qc {
 
             private:
 
-            uint32_t m_type_capacity{uint32_t(Type::array)};
+            uint32_t m_type_capacity{uint32_t(Type::array) << 29};
             uint32_t m_size{0};
             alignas(8) Value * m_values{nullptr};
 
@@ -414,12 +429,8 @@ namespace qc {
                         encoder.val(val.asString<true>());
                         break;
                     }
-                    case Type::integer: {
-                        encoder.val(val.asInteger<true>());
-                        break;
-                    }
-                    case Type::floater: {
-                        encoder.val(val.asFloater<true>());
+                    case Type::number: {
+                        std::visit([&encoder](auto v) { encoder.val(v); }, val.asNumber<true>());
                         break;
                     }
                     case Type::boolean: {
@@ -460,20 +471,12 @@ namespace qc {
         {}
 
         inline Value::Value(int64_t val) :
-            m_type_data0(uint32_t(Type::integer)),
-            m_data1(),
-            m_integer(val)
-        {}
-
-        inline Value::Value(uint64_t val) :
-            Value(int64_t(val))
+            m_type_data0(uint32_t(Type::number) << 29),
+            m_numberType(NumberType::signedInteger),
+            m_signedInteger(val)
         {}
 
         inline Value::Value(int32_t val) :
-            Value(int64_t(val))
-        {}
-
-        inline Value::Value(uint32_t val) :
             Value(int64_t(val))
         {}
 
@@ -481,21 +484,31 @@ namespace qc {
             Value(int64_t(val))
         {}
 
-        inline Value::Value(uint16_t val) :
-            Value(int64_t(val))
-        {}
-
         inline Value::Value(int8_t val) :
             Value(int64_t(val))
         {}
 
+        inline Value::Value(uint64_t val) :
+            m_type_data0(uint32_t(Type::number) << 29),
+            m_numberType(NumberType::unsignedInteger),
+            m_unsignedInteger(val)
+        {}
+
+        inline Value::Value(uint32_t val) :
+            Value(uint64_t(val))
+        {}
+
+        inline Value::Value(uint16_t val) :
+            Value(uint64_t(val))
+        {}
+
         inline Value::Value(uint8_t val) :
-            Value(int64_t(val))
+            Value(uint64_t(val))
         {}
 
         inline Value::Value(double val) :
-            m_type_data0(uint32_t(Type::floater)),
-            m_data1(),
+            m_type_data0(uint32_t(Type::number) << 29),
+            m_numberType(NumberType::floater),
             m_floater(val)
         {}
 
@@ -504,7 +517,7 @@ namespace qc {
         {}
 
         inline Value::Value(bool val) :
-            m_type_data0(uint32_t(Type::boolean)),
+            m_type_data0(uint32_t(Type::boolean) << 29),
             m_data1(),
             m_boolean(val)
         {}
@@ -516,6 +529,30 @@ namespace qc {
         template <typename T>
         inline Value::Value(const T & val) :
             Value(qc_json_valueFrom<T>()(val))
+        {}
+
+        // Here to catch the case of neither int32_t nor int64_t being of type long
+        template <>
+        inline Value::Value(const long & val) :
+            Value(long long(val))
+        {}
+
+        // Here to catch the case of neither int32_t nor int64_t being of type long long
+        template <>
+        inline Value::Value(const long long & val) :
+            Value(long(val))
+        {}
+
+        // Here to catch the case of neither uint32_t nor uint64_t being of type unsigned long
+        template <>
+        inline Value::Value(const unsigned long & val) :
+            Value(unsigned long long(val))
+        {}
+
+        // Here to catch the case of neither uint32_t nor uint64_t being of type unsigned long long
+        template <>
+        inline Value::Value(const unsigned long long & val) :
+            Value(unsigned long(val))
         {}
 
         inline Value::Value(Value && other) :
@@ -553,16 +590,92 @@ namespace qc {
         }
 
         inline Type Value::type() const {
-            return Type(m_type_data0 & 0b111'00000'00000000'00000000'00000000u);
+            return Type(m_type_data0 >> 29);
         }
 
-        inline bool Value::is(Type t) const {
-            return type() == t;
+        inline bool Value::isObject() const {
+            return type() == Type::object;
+        }
+
+        inline bool Value::isArray() const {
+            return type() == Type::array;
+        }
+
+        inline bool Value::isString() const {
+            return type() == Type::string;
+        }
+
+        inline bool Value::isNumber() const {
+            return type() == Type::number;
+        }
+
+        inline bool Value::isBoolean() const {
+            return type() == Type::boolean;
+        }
+
+        inline bool Value::isNull() const {
+            return type() == Type::null;
+        }
+
+        template <typename T>
+        inline bool Value::is() const {
+            using U = std::decay_t<T>;
+
+            // Type should not be `std::string`, `const char *`, or `char *`
+            static_assert(
+                !(std::is_same_v<U, string> || std::is_same_v<U, const char *> || std::is_same_v<U, char *>),
+                "Use `qc::json::Value::isString` or `qc::json::Value::is<std::string_view>` instead"
+            );
+
+            // Object
+            if constexpr (std::is_same_v<U, Object>) {
+                return isObject();
+            }
+            // Array
+            else if constexpr (std::is_same_v<U, Array>) {
+                return isArray();
+            }
+            // String
+            else if constexpr (std::is_same_v<U, String> || std::is_same_v<U, string_view>) {
+                return isString();
+            }
+            // Character
+            else if constexpr (std::is_same_v<U, char>) {
+                return isString() && reinterpret_cast<const String &>(*this).size() == 1u;
+            }
+            // Boolean
+            else if constexpr (std::is_same_v<U, bool>) {
+                return isBoolean();
+            }
+            // Signed integer
+            else if constexpr (std::is_integral_v<U> && std::is_signed_v<U>) {
+                return isNumber() && (
+                    m_numberType == NumberType::signedInteger && m_signedInteger <= std::numeric_limits<U>::max() && m_signedInteger >= std::numeric_limits<U>::min() ||
+                    m_numberType == NumberType::unsignedInteger && m_unsignedInteger <= uint64_t(std::numeric_limits<U>::max()) ||
+                    m_numberType == NumberType::floater && U(m_floater) == m_floater
+                );
+            }
+            // Unsigned integer
+            else if constexpr (std::is_integral_v<U> && std::is_unsigned_v<U>) {
+                return isNumber() && (
+                    m_numberType == NumberType::unsignedInteger && m_unsignedInteger <= std::numeric_limits<U>::max() ||
+                    m_numberType == NumberType::signedInteger && m_signedInteger >= 0 && uint64_t(m_signedInteger) <= std::numeric_limits<U>::max() ||
+                    m_numberType == NumberType::floater && U(m_floater) == m_floater
+                );
+            }
+            // Floater
+            else if constexpr (std::is_floating_point_v<U>) {
+                return isNumber();
+            }
+            // Other
+            else {
+                return false;
+            }
         }
 
         template <bool unsafe>
         inline const Object & Value::asObject() const {
-            if constexpr (!unsafe) if (type() != Type::object) throw TypeError();
+            if constexpr (!unsafe) if (!isObject()) throw TypeError();
             return reinterpret_cast<const Object &>(*this);
         }
 
@@ -573,7 +686,7 @@ namespace qc {
 
         template <bool unsafe>
         inline const Array & Value::asArray() const {
-            if constexpr (!unsafe) if (type() != Type::array) throw TypeError();
+            if constexpr (!unsafe) if (!isArray()) throw TypeError();
             return reinterpret_cast<const Array &>(*this);
         }
 
@@ -584,84 +697,74 @@ namespace qc {
 
         template <bool unsafe>
         inline std::string_view Value::asString() const {
-            if constexpr (!unsafe) if (type() != Type::string) throw TypeError();
+            if constexpr (!unsafe) if (!isString()) throw TypeError();
             return reinterpret_cast<const String &>(*this).view();
         }
 
         template <bool unsafe>
-        inline const int64_t & Value::asInteger() const {
-            if constexpr (!unsafe) if (type() != Type::integer) throw TypeError();
-            return m_integer;
+        inline std::variant<int64_t, uint64_t, double> Value::asNumber() const {
+            if constexpr (!unsafe) if (!isNumber()) throw TypeError();
+            switch (m_numberType) {
+                case NumberType::signedInteger: return m_signedInteger;
+                case NumberType::unsignedInteger: return m_unsignedInteger;
+                case NumberType::floater: return m_floater;
+                default: if constexpr (!unsafe) throw TypeError(); else return m_signedInteger;
+            }
         }
 
         template <bool unsafe>
-        inline int64_t & Value::asInteger() {
-            return const_cast<int64_t &>(const_cast<const Value &>(*this).asInteger<unsafe>());
-        }
-
-        template <bool unsafe>
-        inline nullptr_t Value::asNull() const {
-            if constexpr (!unsafe) if (type() != Type::null) throw TypeError();
-            return nullptr;
-        }
-
-        template <bool unsafe>
-        inline const double & Value::asFloater() const {
-            if constexpr (!unsafe) if (type() != Type::floater) throw TypeError();
-            return m_floater;
-        }
-
-        template <bool unsafe>
-        inline double & Value::asFloater() {
-            return const_cast<double &>(const_cast<const Value &>(*this).asFloater<unsafe>());
-        }
-
-        template <bool unsafe>
-        inline const bool & Value::asBoolean() const {
+        inline bool Value::asBoolean() const {
             if constexpr (!unsafe) if (type() != Type::boolean) throw TypeError();
             return m_boolean;
         }
 
-        template <bool unsafe>
-        inline bool & Value::asBoolean() {
-            return const_cast<bool &>(const_cast<const Value &>(*this).asBoolean<unsafe>());
-        }
-
         template <typename T, bool unsafe>
         inline T Value::as() const {
-            // `T` should not be `qc::json::Object`
-            static_assert(!std::is_same_v<T, Object>, "Use `qc::json::Value::asObject` instead, as this function must return by value");
-            // `T` should not be `qc::json::Array`
-            static_assert(!std::is_same_v<T, Object>, "Use `qc::json::Value::asArray` instead, as this function must return by value");
-            // `T` should not be `std::string`, `const char *`, `char *`, `char`, or `qc::json::String`
+            using U = std::decay_t<T>;
+
+            // Type should not be `qc::json::Object`
+            static_assert(!std::is_same_v<U, Object>, "Use `qc::json::Value::asObject` instead, as this function must return by value");
+
+            // Type should not be `qc::json::Array`
+            static_assert(!std::is_same_v<U, Object>, "Use `qc::json::Value::asArray` instead, as this function must return by value");
+
+            // Type should not be `std::string`, `const char *`, `char *`, or `qc::json::String`
             static_assert(
-                !(std::is_same_v<T, string> || std::is_same_v<T, const char *> || std::is_same_v<T, char *> || std::is_same_v<T, char> || std::is_same_v<T, String>),
+                !(std::is_same_v<U, string> || std::is_same_v<U, const char *> || std::is_same_v<U, char *> || std::is_same_v<U, String>),
                 "Use `qc::json::Value::asString` or `qc::json::Value::as<std::string_view>` instead"
-                );
+            );
 
             // String
-            if constexpr (std::is_same_v<T, string_view>) {
+            if constexpr (std::is_same_v<U, string_view>) {
                 return asString<unsafe>();
             }
+            // Character
+            else if constexpr (std::is_same_v<U, char>) {
+                if constexpr (!unsafe) if (!is<char>()) throw TypeError();
+                return asString<true>().front();
+            }
             // Boolean
-            else if constexpr (std::is_same_v<T, bool>) {
+            else if constexpr (std::is_same_v<U, bool>) {
                 return asBoolean<unsafe>();
             }
-            // Integer
-            else if constexpr (std::is_integral_v<T>) {
-                return T(asInteger<unsafe>());
+            // Signed integer
+            else if constexpr (std::is_integral_v<U> && std::is_signed_v<U>) {
+                if constexpr (!unsafe) if (!is<U>()) throw TypeError();
+                return m_numberType == NumberType::floater ? U(m_floater) : U(m_signedInteger);
+            }
+            // Unsigned integer
+            else if constexpr (std::is_integral_v<U> && std::is_unsigned_v<U>) {
+                if constexpr (!unsafe) if (!is<U>()) throw TypeError();
+                return m_numberType == NumberType::floater ? U(m_floater) : U(m_unsignedInteger);
             }
             // Floater
-            else if constexpr (std::is_floating_point_v<T>) {
-                return T(asFloater<unsafe>());
-            }
-            // Null
-            else if constexpr (std::is_same_v<T, nullptr_t>) {
-                return asNull<unsafe>();
+            else if constexpr (std::is_floating_point_v<U>) {
+                if constexpr (!unsafe) if (!is<U>()) throw TypeError();
+                return m_numberType == NumberType::floater ? U(m_floater) : m_numberType == NumberType::signedInteger ? U(m_signedInteger) : U(m_unsignedInteger);
             }
             // Other
             else {
-                return qc_json_valueTo<T, unsafe>()(*this);
+                return qc_json_valueTo<U, unsafe>()(*this);
             }
         }
 
@@ -670,7 +773,7 @@ namespace qc {
             m_size(other.m_size),
             m_pairs(other.m_pairs)
         {
-            other.m_type_capacity = uint32_t(Type::object);
+            other.m_type_capacity = uint32_t(Type::object) << 29;
             other.m_size = 0;
             other.m_pairs = nullptr;
         }
@@ -679,7 +782,7 @@ namespace qc {
             m_type_capacity = other.m_type_capacity;
             m_size = other.m_size;
             m_pairs = other.m_pairs;
-            other.m_type_capacity = uint32_t(Type::object);
+            other.m_type_capacity = uint32_t(Type::object) << 29;
             other.m_size = 0;
             other.m_pairs = nullptr;
             return *this;
@@ -708,7 +811,7 @@ namespace qc {
             // If this is the first pair, allocate backing array
             if (!m_pairs) {
                 m_pairs = static_cast<Pair *>(::operator new(8 * sizeof(Pair)));
-                m_type_capacity = uint32_t(Type::object) | 1u;
+                m_type_capacity = (uint32_t(Type::object) << 29) | 1u;
             }
 
             // Find the position in the backing array where this pair should go
@@ -734,7 +837,7 @@ namespace qc {
                 // Update our current state
                 ::operator delete(m_pairs);
                 m_pairs = newPairs;
-                m_type_capacity = uint32_t(Type::object) | (newCapacity >> 3);
+                m_type_capacity = (uint32_t(Type::object) << 29) | (newCapacity >> 3);
                 pos = newPos;
             }
             // Otherwise, we've still got space
@@ -846,7 +949,7 @@ namespace qc {
 
         template <typename T, typename... Ts>
         inline Array::Array(T && val, Ts &&... vals) :
-            m_type_capacity(uint32_t(Type::array) | (std::max(detail::ceil2(1 + sizeof...(Ts)), uint32_t(8)) >> 3)),
+            m_type_capacity((uint32_t(Type::array) << 29) | (std::max(detail::ceil2(1 + sizeof...(Ts)), uint32_t(8)) >> 3)),
             m_size(1 + sizeof...(Ts)),
             m_values(static_cast<Value *>(::operator new(m_size * sizeof(Value))))
         {
@@ -865,7 +968,7 @@ namespace qc {
             m_size(other.m_size),
             m_values(other.m_values)
         {
-            other.m_type_capacity = uint32_t(Type::array);
+            other.m_type_capacity = uint32_t(Type::array) << 29;
             other.m_size = 0;
             other.m_values = nullptr;
         }
@@ -874,7 +977,7 @@ namespace qc {
             m_type_capacity = other.m_type_capacity;
             m_size = other.m_size;
             m_values = other.m_values;
-            other.m_type_capacity = uint32_t(Type::array);
+            other.m_type_capacity = uint32_t(Type::array) << 29;
             other.m_size = 0;
             other.m_values = nullptr;
             return *this;
@@ -903,7 +1006,7 @@ namespace qc {
             // If this is the first value, allocate initial storage
             if (!m_values) {
                 m_values = static_cast<Value *>(::operator new(8 * sizeof(Value)));
-                m_type_capacity = uint32_t(Type::array) | 1u;
+                m_type_capacity = (uint32_t(Type::array) << 29) | 1u;
             }
             // If we're at capacity, expand
             else if (uint32_t capacity(capacity());  m_size >= capacity) {
@@ -913,7 +1016,7 @@ namespace qc {
                 // Update our current state
                 ::operator delete(m_values);
                 m_values = newValues;
-                m_type_capacity = uint32_t(Type::array) | (newCapacity >> 3);
+                m_type_capacity = (uint32_t(Type::array) << 29) | (newCapacity >> 3);
             }
 
             return *(new (m_values + m_size++) Value(std::move(val)));
@@ -991,7 +1094,7 @@ namespace qc {
         }
 
         inline String::String(std::string_view str) :
-            m_type_size(uint32_t(Type::string) | uint32_t(str.size())),
+            m_type_size((uint32_t(Type::string) << 29) | uint32_t(str.size())),
             m_inlineChars0(),
             m_inlineChars1()
         {
@@ -1009,7 +1112,7 @@ namespace qc {
             m_inlineChars0(other.m_inlineChars0),
             m_inlineChars1(other.m_inlineChars1)
         {
-            other.m_type_size = uint32_t(Type::string);
+            other.m_type_size = uint32_t(Type::string) << 29;
             other.m_inlineChars0 = 0;
             other.m_inlineChars1 = 0;
         }
@@ -1018,7 +1121,7 @@ namespace qc {
             m_type_size = other.m_type_size;
             m_inlineChars0 = other.m_inlineChars0;
             m_inlineChars1 = other.m_inlineChars1;
-            other.m_type_size = uint32_t(Type::string);
+            other.m_type_size = uint32_t(Type::string) << 29;
             other.m_inlineChars0 = 0;
             other.m_inlineChars1 = 0;
             return *this;
