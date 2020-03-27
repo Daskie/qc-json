@@ -1,43 +1,12 @@
 #pragma once
 
 //
-// QJson 1.1.0
+// QJson 1.2.0
 // Austin Quick
-// July 2019 - February 2020
+// July 2019 - March 2020
+// https://github.com/Daskie/QC-Json
 //
-// Basic, lightweight JSON encoder.
-//
-// Encodes a json string.
-//
-// Basic Usage:
-//
-//      qc::json::Encoder encoder;
-//      encoder.object();
-//      encoder.key("Name").val("Roslin");
-//      encoder.key("Favorite Books").array(true).val("Dark Day").end();
-//      ...
-//      encoder.end();
-//
-//      std::string jsonString(encoder.finish());
-//
-// To allow custom types to be passed to `Encoder::val`, specialize the
-// `qc::json_encode` function.
-//
-// Example:
-//
-//      // Specialized for std::pair<int, int>
-//      void qc_json_encode(qc::json::Encoder & encoder, const std::pair<int, int> & v) {
-//          encoder.array(true).val(v.first).val(v.second).end();
-//      }
-//
-//      ...
-//
-//      // You are then able to pass std::pair<int, int> to `val`
-//      encoder.val(std::pair<int, int>{69, 420}); // -> encodes to "[ 69, 420 ]"
-//
-//  QC-Json
-//
-//  QcJson
+// Encodes to a JSON string.
 //
 
 #include <cctype>
@@ -59,10 +28,13 @@ namespace qc {
         //
         struct EncodeError : public std::runtime_error {
 
-            EncodeError(const std::string & msg) : std::runtime_error(msg) {}
+            EncodeError(const std::string & msg);
 
         };
 
+        //
+        // Instantiate this class to do the encoding.
+        //
         class Encoder {
 
             public:
@@ -147,6 +119,10 @@ namespace qc {
         using std::string_view;
         using namespace std::string_literals;
         using namespace std::string_view_literals;
+
+        inline EncodeError::EncodeError(const std::string & msg) :
+            std::runtime_error(msg)
+        {}
 
         inline Encoder::Encoder(Encoder && other) :
             m_oss(std::move(other.m_oss)),

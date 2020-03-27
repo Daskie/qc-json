@@ -1,18 +1,10 @@
 #pragma once
 
 //
-// QJson 1.1.0
+// QJson 1.2.0
 // Austin Quick
-// July 2019 - February 2020
-//
-// Basic, lightweight JSON decoder.
-//
-// Example:
-//      qc::json::Object root(qc::json::decode(myJsonString));
-//      const std::string & name(root["Price"]->asString());
-//      const qc::json::Array & favoriteBooks(root["Favorite Books"]->asArray());
-//      const std::string & bookTitle(favoriteBooks[0]->asString());
-//      ...
+// July 2019 - March 2020
+// https://github.com/Daskie/QC-Json
 //
 
 #include <algorithm>
@@ -41,10 +33,13 @@ namespace qc {
         //
         struct TypeError : public std::runtime_error {
 
-            TypeError() : std::runtime_error(nullptr) {}
+            TypeError();
 
         };
 
+        //
+        // The type of the JSON value.
+        //
         enum class Type : uint32_t {
             null,
             object,
@@ -54,6 +49,10 @@ namespace qc {
             boolean
         };
 
+        //
+        // Indicates how a number is stored internally, not necessarily what type it may be accessed as.
+        // Ignore this.
+        //
         enum class NumberType : uint32_t {
             signedInteger,
             unsignedInteger,
@@ -113,6 +112,10 @@ namespace qc {
 
             template <typename T> bool is() const;
 
+            // In the following methods, `safe` indicates whether the type is checked.
+            // If `safe` is true, and the value's type does not match the type requested, a `TypeError` is thrown.
+            // If `safe` is false, no checks are done, and if there is a type mismatch then enjoy your segfault.
+
             template <bool safe = true> const Object & asObject() const;
             template <bool safe = true>       Object & asObject();
 
@@ -125,6 +128,30 @@ namespace qc {
 
             template <bool safe = true> bool asBoolean() const;
 
+            //
+            // Retrieves the value as the given type.
+            // If the actual type does not match the requested type and `safe` is true, a `TypeError` is thrown.
+            //
+            // If `T` is `std::string_view`, this call is equivalent to `asString`.
+            //
+            // If `T` is `bool`, this call is equivalent to `asBoolean`.
+            //
+            // If `T` is `char`, a single character string will try to be fetched. Note that in c++ `char`,
+            // `signed char`, and `unsigned char` are distinct types. Asking for a `signed char` or `unsigned char` will
+            // instead try to fetch a number as type `int8_t` or `uint8_t` respectively.
+            //
+            // If `T` is a numeric type...
+            // ...and the value is a positive integer, it may be accessed as:
+            //   - any floater type (`double`, `float`)
+            //   - any signed integer type (`int64_t`, `int32_t`, `int16_t`, `int8_t`), but only if it can fit
+            //   - any unsigned integer type (`uint64_t`, `uint32_t`, `uint16_t`, `uint8_t`), but only if it can fit
+            // ...and the value is a negative integer, it may be accessed as:
+            //   - any floater type (`double`, `float`)
+            //   - any signed integer type (`int64_t`, `int32_t`, `int16_t`, `int8_t`), but only if it can fit
+            // ...and the value is not an integer, it may only be accessed as a floater (`double`, `float`)
+            //
+            // If `T` is an unrecognized type, then we attempt to use the specialized `qc_json_valueTo` struct.
+            //
             template <typename T, bool safe = true> T as() const;
 
             private:
@@ -295,7 +322,7 @@ namespace qc {
 }
 
 //
-// Specialize `qc_json_valueTo` to enable Value::as for custom types
+// Specialize `qc_json_valueTo` to enable Value::as for custom types.
 // Example:
 //      template <bool safe>
 //      struct qc_json_valueTo<std::pair<int, int>, safe> {
@@ -442,6 +469,8 @@ namespace qc {
 
         }
 
+        inline TypeError::TypeError() : std::runtime_error(nullptr) {}
+
         inline Value::Value(Object && val) :
             Value(reinterpret_cast<Value &&>(val))
         {}
@@ -529,30 +558,6 @@ namespace qc {
         template <typename T>
         inline Value::Value(const T & val) :
             Value(qc_json_valueFrom<T>()(val))
-        {}
-
-        // Here to catch the case of neither int32_t nor int64_t being of type long
-        template <>
-        inline Value::Value(const long & val) :
-            Value(long long(val))
-        {}
-
-        // Here to catch the case of neither int32_t nor int64_t being of type long long
-        template <>
-        inline Value::Value(const long long & val) :
-            Value(long(val))
-        {}
-
-        // Here to catch the case of neither uint32_t nor uint64_t being of type unsigned long
-        template <>
-        inline Value::Value(const unsigned long & val) :
-            Value(unsigned long long(val))
-        {}
-
-        // Here to catch the case of neither uint32_t nor uint64_t being of type unsigned long long
-        template <>
-        inline Value::Value(const unsigned long long & val) :
-            Value(unsigned long(val))
         {}
 
         inline Value::Value(Value && other) :

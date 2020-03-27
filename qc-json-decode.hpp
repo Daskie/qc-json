@@ -1,28 +1,17 @@
 #pragma once
 
 //
-// QJson 1.1.0
+// QJson 1.2.0
 // Austin Quick
-// July 2019 - February 2020
+// July 2019 - March 2020
+// https://github.com/Daskie/QC-Json
 //
-// Basic, lightweight JSON decoder.
+// Decodes from a JSON string.
 //
-// Decodes a json string and sends its json constituents to the Composer
-// provided in a SAX fashion.
+// Sends its json constituents to the provided Composer in a SAX fashion.
 //
-// Basic usage:
-//
-//      try {
-//          qc::json::decode(myJsonString, myComposer, myState);
-//      }
-//      catch (const qc::json::DecoderError & e) {
-//          std::cerr << "Error decoding json" << std::endl;
-//          std::cerr << "What: " << e.what() << std::endl;
-//          std::cerr << "Where: " << e.position << std::endl;
-//      }
-//
-// A composer class must provide a set of methods that will be called from the
-// `decode` function. An example prototype class is provided below:
+// A composer class must provide a set of methods that will be called from the `decode` function. An example prototype
+// class is provided below:
 //
 #if 0
 
@@ -32,20 +21,21 @@ class MyComposer {
         // Some useful data
     };
 
+    //
     // Called when a json object is encountered.
     //
-    // `outerState` is the state at the level containing the object
-    // returns the new state to use for within the object
+    // `outerState` is the state at the level containing the object returns the new state to use for within the object
     //
     MyState object(MyState & outerState);
 
+    //
     // Called when an array is encountered.
     //
-    // `outerState` is the state at the level containing the array
-    // returns the new state to use for within the array
+    // `outerState` is the state at the level containing the array returns the new state to use for within the array
     //
     MyState array(MyState & outerState);
 
+    //
     // Called at then end of an object or array.
     //
     // `innerState` is the state that existed within the object or array
@@ -53,6 +43,7 @@ class MyComposer {
     //
     void end(MyState && innerState, MyState & outerState);
 
+    //
     // Called when an object key is parsed.
     //
     // `key` is the key string
@@ -60,6 +51,7 @@ class MyComposer {
     //
     void key(std::string && key, MyState & state);
 
+    //
     // Called when a string is parsed.
     //
     // `val` is the string
@@ -67,27 +59,32 @@ class MyComposer {
     //
     void val(string_view val, MyState & state);
 
-    // Called when a signed integer is parsed.
+    //
+    // Called when an integer number is parsed that can fit within int64_t.
     //
     // `val` is the signed integer
     // `state` is the state of the current object or array
     //
     void val(int64_t val, MyState & state);
 
-    // Called when an unsigned integer is parsed.
+    //
+    // Called when a positive integer number is parsed that is too large for int64_t.
     //
     // `val` is the unsigned integer
     // `state` is the state of the current object or array
     //
     void val(uint64_t val, MyState & state);
 
-    // Called when a floating point number is parsed.
+    //
+    // Called when a number is parsed that has a fractional component, an exponential component, or is an integer that
+    // is too large/small for either int64_t or uint64_t.
     //
     // `val` is the floating point number
     // `state` is the state of the current object or array
     //
     void val(double val, MyState & state);
 
+    //
     // Called when a boolean is parsed.
     //
     // `val` is the boolean
@@ -95,6 +92,7 @@ class MyComposer {
     //
     void val(bool val, MyState & state);
 
+    //
     // Called when a `null` is parsed.
     //
     // `state` is the state of the current object or array
@@ -105,9 +103,8 @@ class MyComposer {
 
 #endif
 //
-// The state object is not strictly necessary, but will be useful, if not
-// essential, for most functional decoders. But if you really don't need it,
-// just pass nullptr.
+// The state object is not strictly necessary, but will be useful, if not essential, for most "actual" composers. But if
+// you really don't need it, just pass nullptr.
 //
 
 #include <cctype>
@@ -131,11 +128,24 @@ namespace qc {
 
             size_t position;
 
-            DecodeError(const std::string & msg, size_t position) : std::runtime_error(msg), position(position) {}
+            DecodeError(const std::string & msg, size_t position);
 
         };
 
-        template <typename Composer, typename State> void decode(std::string_view json, Composer & decoder, State initialState);
+        //
+        // Decodes the JSON string.
+        //
+        // A note on numbers:
+        // A number will be parsed and sent to the composer as either a `int64_t`, a `uint64_t`, or a `double`.
+        // - `int64_t` if the number is an integer (a fractional component of zero is okay) and can fit in a `int64_t`
+        // - `uint64_t` if the number is a positive integer, can fit in a `uint64_t`, but cannot fit in a `int64_t`
+        // - `double` if the number has a non-zero fractional component, has an exponent, or is an integer that is too large to fit in a `int64_t` or `uint64_t`
+        //
+        // @param json the string to decode
+        // @param composer the contents of the JSON are decoded in order and passed to this to do something with
+        // @param initialState the initial state object to be passed to the composer
+        //
+        template <typename Composer, typename State> void decode(std::string_view json, Composer & composer, State initialState);
 
     }
 
@@ -154,17 +164,17 @@ namespace qc {
 
         namespace detail {
 
-            // A helper class to keep track of state
+            // This functionality is wrapped in a class as a convenient way to keep track of state
             template <typename Composer, typename State>
-            class DecodeHelper {
+            class Decoder {
 
                 public:
 
-                DecodeHelper(string_view str, Composer & decoder) :
+                Decoder(string_view str, Composer & composer) :
                     m_start(str.data()),
                     m_end(m_start + str.length()),
                     m_pos(m_start),
-                    m_composer(decoder),
+                    m_composer(composer),
                     m_stringBuffer()
                 {}
 
@@ -403,7 +413,8 @@ namespace qc {
                         throw DecodeError("Invalid unicode", m_pos - m_start);
                     }
 
-                    if (val & 0xFFFFFF80) {
+                    // Is the high bit set?
+                    if (val & ~0x7Fu) {
                         throw DecodeError("Non-ASCII unicode is unsupported", m_pos - m_start);
                     }
 
@@ -524,9 +535,14 @@ namespace qc {
 
         }
 
+        inline DecodeError::DecodeError(const std::string & msg, size_t position) :
+            std::runtime_error(msg),
+            position(position)
+        {}
+
         template <typename Composer, typename State>
-        inline void decode(string_view json, Composer & decoder, State initialState) {
-            return detail::DecodeHelper<Composer, State>(json, decoder)(initialState);
+        inline void decode(string_view json, Composer & composer, State initialState) {
+            return detail::Decoder<Composer, State>(json, composer)(initialState);
         }
 
     }
