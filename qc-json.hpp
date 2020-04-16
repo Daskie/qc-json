@@ -3,8 +3,15 @@
 //
 // QJson 1.2.0
 // Austin Quick
-// July 2019 - March 2020
+// July 2019 - April 2020
 // https://github.com/Daskie/QC-Json
+//
+// Provides an interface for decoding a JSON strings to JSON objects, creating/manipulating JSON objects, and encoding
+// JSON objects to a JSON string.
+//
+// Uses `qc-json-encode.hpp` to do the encoding and `qc-json-decode.hpp` to do the decoding.
+//
+// See the GitHub link above for more info and examples.
 //
 
 #include <algorithm>

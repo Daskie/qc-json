@@ -3,10 +3,12 @@
 //
 // QJson 1.2.0
 // Austin Quick
-// July 2019 - March 2020
+// July 2019 - April 2020
 // https://github.com/Daskie/QC-Json
 //
-// Encodes to a JSON string.
+// Encodes data into a JSON string.
+//
+// See the GitHub link above for more info and examples.
 //
 
 #include <cctype>

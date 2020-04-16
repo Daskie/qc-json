@@ -3,108 +3,12 @@
 //
 // QJson 1.2.0
 // Austin Quick
-// July 2019 - March 2020
+// July 2019 - April 2020
 // https://github.com/Daskie/QC-Json
 //
-// Decodes from a JSON string.
+// Decodes data from a JSON string and sends it to the provided `Composer`.
 //
-// Sends its json constituents to the provided Composer in a SAX fashion.
-//
-// A composer class must provide a set of methods that will be called from the `decode` function. An example prototype
-// class is provided below:
-//
-#if 0
-
-class MyComposer {
-
-    struct MyState {
-        // Some useful data
-    };
-
-    //
-    // Called when a json object is encountered.
-    //
-    // `outerState` is the state at the level containing the object returns the new state to use for within the object
-    //
-    MyState object(MyState & outerState);
-
-    //
-    // Called when an array is encountered.
-    //
-    // `outerState` is the state at the level containing the array returns the new state to use for within the array
-    //
-    MyState array(MyState & outerState);
-
-    //
-    // Called at then end of an object or array.
-    //
-    // `innerState` is the state that existed within the object or array
-    // `outerState` is the state at the level containing the object or array
-    //
-    void end(MyState && innerState, MyState & outerState);
-
-    //
-    // Called when an object key is parsed.
-    //
-    // `key` is the key string
-    // `state` is the state of the current object
-    //
-    void key(std::string && key, MyState & state);
-
-    //
-    // Called when a string is parsed.
-    //
-    // `val` is the string
-    // `state` is the state of the current object or array
-    //
-    void val(string_view val, MyState & state);
-
-    //
-    // Called when an integer number is parsed that can fit within int64_t.
-    //
-    // `val` is the signed integer
-    // `state` is the state of the current object or array
-    //
-    void val(int64_t val, MyState & state);
-
-    //
-    // Called when a positive integer number is parsed that is too large for int64_t.
-    //
-    // `val` is the unsigned integer
-    // `state` is the state of the current object or array
-    //
-    void val(uint64_t val, MyState & state);
-
-    //
-    // Called when a number is parsed that has a fractional component, an exponential component, or is an integer that
-    // is too large/small for either int64_t or uint64_t.
-    //
-    // `val` is the floating point number
-    // `state` is the state of the current object or array
-    //
-    void val(double val, MyState & state);
-
-    //
-    // Called when a boolean is parsed.
-    //
-    // `val` is the boolean
-    // `state` is the state of the current object or array
-    //
-    void val(bool val, MyState & state);
-
-    //
-    // Called when a `null` is parsed.
-    //
-    // `state` is the state of the current object or array
-    //
-    void val(nullptr_t, MyState & state);
-
-};
-
-#endif
-//
-// The state object is not strictly necessary, but will be useful, if not essential, for most "actual" composers. But if
-// you really don't need it, just pass nullptr.
+// See the GitHub link above for more info and examples.
 //
 
 #include <cctype>
