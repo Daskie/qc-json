@@ -1,9 +1,9 @@
 #pragma once
 
 //
-// QJson 1.2.1
+// QC Json 1.2.1
 // Austin Quick
-// July 2019 - April 2020
+// July 2019 - May 2020
 // https://github.com/Daskie/QC-Json
 //
 // Decodes data from a JSON string and sends it to the provided `Composer`.
