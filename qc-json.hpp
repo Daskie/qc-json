@@ -33,7 +33,7 @@ namespace qc::json {
     //
     struct TypeError : public std::runtime_error {
 
-        TypeError();
+        TypeError() noexcept;
 
     };
 
@@ -66,67 +66,67 @@ namespace qc::json {
 
         public:
 
-        Value() = default;
-        Value(Object && val);
-        Value(Array && val);
-        Value(string_view val);
-        Value(const string & val);
+        Value() noexcept = default;
+        Value(Object && val) noexcept;
+        Value(Array && val) noexcept;
+        Value(string_view val) noexcept;
+        Value(const string & val) noexcept;
         Value(const char * val);
         Value(char * val);
-        Value(char val);
-        Value(int64_t val);
-        Value(int32_t val);
-        Value(int16_t val);
-        Value(int8_t val);
-        Value(uint64_t val);
-        Value(uint32_t val);
-        Value(uint16_t val);
-        Value(uint8_t val);
-        Value(double val);
-        Value(float val);
-        Value(bool val);
-        Value(nullptr_t);
+        Value(char val) noexcept;
+        Value(int64_t val) noexcept;
+        Value(int32_t val) noexcept;
+        Value(int16_t val) noexcept;
+        Value(int8_t val) noexcept;
+        Value(uint64_t val) noexcept;
+        Value(uint32_t val) noexcept;
+        Value(uint16_t val) noexcept;
+        Value(uint8_t val) noexcept;
+        Value(double val) noexcept;
+        Value(float val) noexcept;
+        Value(bool val) noexcept;
+        Value(nullptr_t) noexcept;
         template <typename T> Value(const T & val);
 
         Value(const Value &) = delete;
-        Value(Value && other);
+        Value(Value && other) noexcept;
 
         Value & operator=(const Value &) = delete;
-        Value & operator=(Value && other);
+        Value & operator=(Value && other) noexcept;
 
-        ~Value();
+        ~Value() noexcept;
 
-        Type type() const;
+        Type type() const noexcept;
 
-        bool isObject() const;
+        bool isObject() const noexcept;
 
-        bool isArray() const;
+        bool isArray() const noexcept;
 
-        bool isString() const;
+        bool isString() const noexcept;
 
-        bool isNumber() const;
+        bool isNumber() const noexcept;
 
-        bool isBoolean() const;
+        bool isBoolean() const noexcept;
 
-        bool isNull() const;
+        bool isNull() const noexcept;
 
-        template <typename T> bool is() const;
+        template <typename T> bool is() const noexcept;
 
         // In the following methods, `safe` indicates whether the type is checked.
         // If `safe` is true, and the value's type does not match the type requested, a `TypeError` is thrown.
         // If `safe` is false, no checks are done, and if there is a type mismatch then enjoy your segfault.
 
-        template <bool safe = true> const Object & asObject() const;
-        template <bool safe = true>       Object & asObject();
+        template <bool safe = true> const Object & asObject() const noexcept(!safe);
+        template <bool safe = true>       Object & asObject() noexcept(!safe);
 
-        template <bool safe = true> const Array & asArray() const;
-        template <bool safe = true>       Array & asArray();
+        template <bool safe = true> const Array & asArray() const noexcept(!safe);
+        template <bool safe = true>       Array & asArray() noexcept(!safe);
 
-        template <bool safe = true> string_view asString() const;
+        template <bool safe = true> string_view asString() const noexcept(!safe);
 
-        template <bool safe = true> std::variant<int64_t, uint64_t, double> asNumber() const;
+        template <bool safe = true> std::variant<int64_t, uint64_t, double> asNumber() const noexcept(!safe);
 
-        template <bool safe = true> bool asBoolean() const;
+        template <bool safe = true> bool asBoolean() const noexcept(!safe);
 
         //
         // Retrieves the value as the given type.
@@ -180,21 +180,21 @@ namespace qc::json {
         using iterator = Pair *;
         using const_iterator = const Pair *;
 
-        Object() = default;
+        Object() noexcept = default;
 
         Object(const Object &) = delete;
-        Object(Object && other);
+        Object(Object && other) noexcept;
 
         Object & operator=(const Object &) = delete;
-        Object & operator=(Object && other);
+        Object & operator=(Object && other) noexcept;
 
-        ~Object();
+        ~Object() noexcept;
 
-        uint32_t size() const;
+        uint32_t size() const noexcept;
 
-        uint32_t capacity() const;
+        uint32_t capacity() const noexcept;
 
-        bool empty() const;
+        bool empty() const noexcept;
 
         Pair & add(string && key, Value && val);
 
@@ -206,19 +206,19 @@ namespace qc::json {
         const_iterator find(string_view key) const;
         iterator find(string_view key);
 
-        Pair remove(iterator it);
+        Pair remove(iterator it) noexcept;
 
-        void clear();
+        void clear() noexcept;
 
-        const_iterator begin() const;
-        iterator begin();
+        const_iterator begin() const noexcept;
+        iterator begin() noexcept;
 
-        const_iterator cbegin() const;
+        const_iterator cbegin() const noexcept;
 
-        const_iterator end() const;
-        iterator end();
+        const_iterator end() const noexcept;
+        iterator end() noexcept;
 
-        const_iterator cend() const;
+        const_iterator cend() const noexcept;
 
         private:
 
@@ -238,43 +238,43 @@ namespace qc::json {
         using iterator = Value *;
         using const_iterator = const Value *;
 
-        Array() = default;
+        Array() noexcept = default;
         template <typename T, typename... Ts> Array(T && val, Ts &&... vals);
 
         Array(const Array & other) = delete;
-        Array(Array && other);
+        Array(Array && other) noexcept;
 
         Array & operator=(const Array &) = delete;
-        Array & operator=(Array && other);
+        Array & operator=(Array && other) noexcept;
 
-        ~Array();
+        ~Array() noexcept;
 
-        uint32_t size() const;
+        uint32_t size() const noexcept;
 
-        uint32_t capacity() const;
+        uint32_t capacity() const noexcept;
 
-        bool empty() const;
+        bool empty() const noexcept;
 
-        Value & add(Value && val);
+        Value & add(Value && val) noexcept;
 
         const Value & at(uint32_t i) const;
         Value & at(uint32_t i);
 
         Value remove(uint32_t i);
-        Value remove(iterator it);
-        void remove(iterator it1, iterator it2);
+        Value remove(iterator it) noexcept;
+        void remove(iterator it1, iterator it2) noexcept;
 
-        void clear();
+        void clear() noexcept;
 
-        const_iterator begin() const;
-        iterator begin();
+        const_iterator begin() const noexcept;
+        iterator begin() noexcept;
 
-        const_iterator cbegin() const;
+        const_iterator cbegin() const noexcept;
 
-        const_iterator end() const;
-        iterator end();
+        const_iterator end() const noexcept;
+        iterator end() noexcept;
 
-        const_iterator cend() const;
+        const_iterator cend() const noexcept;
 
         private:
 
@@ -288,19 +288,19 @@ namespace qc::json {
 
         public:
 
-        String(string_view str);
+        String(string_view str) noexcept;
 
         String(const String &) = delete;
-        String(String && other);
+        String(String && other) noexcept;
 
         String & operator=(const String &) = delete;
-        String & operator=(String && other);
+        String & operator=(String && other) noexcept;
 
-        ~String();
+        ~String() noexcept;
 
-        uint32_t size() const;
+        uint32_t size() const noexcept;
 
-        string_view view() const;
+        string_view view() const noexcept;
 
         private:
 
@@ -348,7 +348,7 @@ template <typename T> struct qc_json_valueFrom;
 
 namespace qc::json::detail {
 
-    constexpr uint32_t ceil2(uint32_t v) {
+    constexpr uint32_t ceil2(uint32_t v) noexcept {
         --v;
         v |= v >> 1;
         v |= v >> 2;
@@ -465,21 +465,23 @@ namespace qc::json::detail {
 
 namespace qc::json {
 
-    inline TypeError::TypeError() : std::runtime_error(nullptr) {}
+    inline TypeError::TypeError() noexcept :
+        std::runtime_error(nullptr)
+    {}
 
-    inline Value::Value(Object && val) :
+    inline Value::Value(Object && val) noexcept :
         Value(reinterpret_cast<Value &&>(val))
     {}
 
-    inline Value::Value(Array && val) :
+    inline Value::Value(Array && val) noexcept :
         Value(reinterpret_cast<Value &&>(val))
     {}
 
-    inline Value::Value(string_view val) :
+    inline Value::Value(string_view val) noexcept :
         Value(reinterpret_cast<Value &&>(String(val)))
     {}
 
-    inline Value::Value(const string & val) :
+    inline Value::Value(const string & val) noexcept :
         Value(string_view(val))
     {}
 
@@ -491,63 +493,63 @@ namespace qc::json {
         Value(string_view(val))
     {}
 
-    inline Value::Value(char val) :
+    inline Value::Value(char val) noexcept :
         Value(string_view(&val, 1))
     {}
 
-    inline Value::Value(int64_t val) :
+    inline Value::Value(int64_t val) noexcept :
         m_type_data0(uint32_t(Type::number) << 29),
         m_numberType(NumberType::signedInteger),
         m_signedInteger(val)
     {}
 
-    inline Value::Value(int32_t val) :
+    inline Value::Value(int32_t val) noexcept :
         Value(int64_t(val))
     {}
 
-    inline Value::Value(int16_t val) :
+    inline Value::Value(int16_t val) noexcept :
         Value(int64_t(val))
     {}
 
-    inline Value::Value(int8_t val) :
+    inline Value::Value(int8_t val) noexcept :
         Value(int64_t(val))
     {}
 
-    inline Value::Value(uint64_t val) :
+    inline Value::Value(uint64_t val) noexcept :
         m_type_data0(uint32_t(Type::number) << 29),
         m_numberType(NumberType::unsignedInteger),
         m_unsignedInteger(val)
     {}
 
-    inline Value::Value(uint32_t val) :
+    inline Value::Value(uint32_t val) noexcept :
         Value(uint64_t(val))
     {}
 
-    inline Value::Value(uint16_t val) :
+    inline Value::Value(uint16_t val) noexcept :
         Value(uint64_t(val))
     {}
 
-    inline Value::Value(uint8_t val) :
+    inline Value::Value(uint8_t val) noexcept :
         Value(uint64_t(val))
     {}
 
-    inline Value::Value(double val) :
+    inline Value::Value(double val) noexcept :
         m_type_data0(uint32_t(Type::number) << 29),
         m_numberType(NumberType::floater),
         m_floater(val)
     {}
 
-    inline Value::Value(float val) :
+    inline Value::Value(float val) noexcept :
         Value(double(val))
     {}
 
-    inline Value::Value(bool val) :
+    inline Value::Value(bool val) noexcept :
         m_type_data0(uint32_t(Type::boolean) << 29),
         m_data1(),
         m_boolean(val)
     {}
 
-    inline Value::Value(nullptr_t) :
+    inline Value::Value(nullptr_t) noexcept :
         Value()
     {}
 
@@ -556,7 +558,7 @@ namespace qc::json {
         Value(qc_json_valueFrom<T>()(val))
     {}
 
-    inline Value::Value(Value && other) :
+    inline Value::Value(Value && other) noexcept :
         m_type_data0(other.m_type_data0),
         m_data1(other.m_data1),
         m_data2(other.m_data2)
@@ -566,7 +568,7 @@ namespace qc::json {
         other.m_data2 = 0;
     }
 
-    inline Value & Value::operator=(Value && other) {
+    inline Value & Value::operator=(Value && other) noexcept {
         m_type_data0 = other.m_type_data0;
         m_data1 = other.m_data1;
         m_data2 = other.m_data2;
@@ -576,7 +578,7 @@ namespace qc::json {
         return *this;
     }
 
-    inline Value::~Value() {
+    inline Value::~Value() noexcept {
         switch (type()) {
             case Type::object:
                 reinterpret_cast<Object &>(*this).~Object();
@@ -590,36 +592,36 @@ namespace qc::json {
         }
     }
 
-    inline Type Value::type() const {
+    inline Type Value::type() const noexcept {
         return Type(m_type_data0 >> 29);
     }
 
-    inline bool Value::isObject() const {
+    inline bool Value::isObject() const noexcept {
         return type() == Type::object;
     }
 
-    inline bool Value::isArray() const {
+    inline bool Value::isArray() const noexcept {
         return type() == Type::array;
     }
 
-    inline bool Value::isString() const {
+    inline bool Value::isString() const noexcept {
         return type() == Type::string;
     }
 
-    inline bool Value::isNumber() const {
+    inline bool Value::isNumber() const noexcept {
         return type() == Type::number;
     }
 
-    inline bool Value::isBoolean() const {
+    inline bool Value::isBoolean() const noexcept {
         return type() == Type::boolean;
     }
 
-    inline bool Value::isNull() const {
+    inline bool Value::isNull() const noexcept {
         return type() == Type::null;
     }
 
     template <typename T>
-    inline bool Value::is() const {
+    inline bool Value::is() const noexcept {
         using U = std::decay_t<T>;
 
         // Type should not be `std::string`, `const char *`, or `char *`
@@ -675,35 +677,35 @@ namespace qc::json {
     }
 
     template <bool safe>
-    inline const Object & Value::asObject() const {
+    inline const Object & Value::asObject() const noexcept(!safe) {
         if constexpr (safe) if (!isObject()) throw TypeError();
         return reinterpret_cast<const Object &>(*this);
     }
 
     template <bool safe>
-    inline Object & Value::asObject() {
+    inline Object & Value::asObject() noexcept(!safe) {
         return const_cast<Object &>(const_cast<const Value &>(*this).asObject<safe>());
     }
 
     template <bool safe>
-    inline const Array & Value::asArray() const {
+    inline const Array & Value::asArray() const noexcept(!safe) {
         if constexpr (safe) if (!isArray()) throw TypeError();
         return reinterpret_cast<const Array &>(*this);
     }
 
     template <bool safe>
-    inline Array & Value::asArray() {
+    inline Array & Value::asArray() noexcept(!safe) {
         return const_cast<Array &>(const_cast<const Value &>(*this).asArray<safe>());
     }
 
     template <bool safe>
-    inline string_view Value::asString() const {
+    inline string_view Value::asString() const noexcept(!safe) {
         if constexpr (safe) if (!isString()) throw TypeError();
         return reinterpret_cast<const String &>(*this).view();
     }
 
     template <bool safe>
-    inline std::variant<int64_t, uint64_t, double> Value::asNumber() const {
+    inline std::variant<int64_t, uint64_t, double> Value::asNumber() const noexcept(!safe) {
         if constexpr (safe) if (!isNumber()) throw TypeError();
         switch (m_numberType) {
             case NumberType::signedInteger: return m_signedInteger;
@@ -714,7 +716,7 @@ namespace qc::json {
     }
 
     template <bool safe>
-    inline bool Value::asBoolean() const {
+    inline bool Value::asBoolean() const noexcept(!safe) {
         if constexpr (safe) if (!isBoolean()) throw TypeError();
         return m_boolean;
     }
@@ -764,7 +766,7 @@ namespace qc::json {
         }
     }
 
-    inline Object::Object(Object && other) :
+    inline Object::Object(Object && other) noexcept :
         m_type_capacity(other.m_type_capacity),
         m_size(other.m_size),
         m_pairs(other.m_pairs)
@@ -774,7 +776,7 @@ namespace qc::json {
         other.m_pairs = nullptr;
     }
 
-    inline Object & Object::operator=(Object && other) {
+    inline Object & Object::operator=(Object && other) noexcept {
         m_type_capacity = other.m_type_capacity;
         m_size = other.m_size;
         m_pairs = other.m_pairs;
@@ -784,22 +786,22 @@ namespace qc::json {
         return *this;
     }
 
-    inline Object::~Object() {
+    inline Object::~Object() noexcept {
         if (m_size > 0) {
             clear();
             ::operator delete(m_pairs);
         }
     }
 
-    inline uint32_t Object::size() const {
+    inline uint32_t Object::size() const noexcept {
         return m_size;
     }
 
-    inline uint32_t Object::capacity() const {
+    inline uint32_t Object::capacity() const noexcept {
         return m_type_capacity << 3;
     }
 
-    inline bool Object::empty() const {
+    inline bool Object::empty() const noexcept {
         return m_size == 0;
     }
 
@@ -876,7 +878,7 @@ namespace qc::json {
         return const_cast<iterator>(const_cast<const Object &>(*this).find(key));
     }
 
-    inline Object::Pair Object::remove(iterator it) {
+    inline Object::Pair Object::remove(iterator it) noexcept {
         // Save off pair and destruct
         Pair pair(std::move(*it));
         it->~pair();
@@ -889,34 +891,34 @@ namespace qc::json {
         return pair;
     }
 
-    inline void Object::clear() {
+    inline void Object::clear() noexcept {
         // Destruct the pairs
         for (Pair & pair : *this) pair.~pair();
         m_size = 0;
     }
 
-    inline Object::iterator Object::begin() {
+    inline Object::iterator Object::begin() noexcept {
         return m_pairs;
     }
 
-    inline Object::const_iterator Object::begin() const {
+    inline Object::const_iterator Object::begin() const noexcept {
         return m_pairs;
     }
 
-    inline Object::const_iterator Object::cbegin() const {
-        return m_pairs;
+    inline Object::const_iterator Object::cbegin() const noexcept {
+        return begin();
     }
 
-    inline Object::iterator Object::end() {
+    inline Object::iterator Object::end() noexcept {
         return m_pairs + m_size;
     }
 
-    inline Object::const_iterator Object::end() const {
+    inline Object::const_iterator Object::end() const noexcept {
         return m_pairs + m_size;
     }
 
-    inline Object::const_iterator Object::cend() const {
-        return m_pairs + m_size;
+    inline Object::const_iterator Object::cend() const noexcept {
+        return end();
     }
 
     inline std::pair<const Object::Pair *, bool> Object::m_search(string_view key) const {
@@ -959,7 +961,7 @@ namespace qc::json {
         (f(std::forward<Ts>(vals)), ...);
     }
 
-    inline Array::Array(Array && other) :
+    inline Array::Array(Array && other) noexcept :
         m_type_capacity(other.m_type_capacity),
         m_size(other.m_size),
         m_values(other.m_values)
@@ -969,7 +971,7 @@ namespace qc::json {
         other.m_values = nullptr;
     }
 
-    inline Array & Array::operator=(Array && other) {
+    inline Array & Array::operator=(Array && other) noexcept {
         m_type_capacity = other.m_type_capacity;
         m_size = other.m_size;
         m_values = other.m_values;
@@ -979,26 +981,26 @@ namespace qc::json {
         return *this;
     }
 
-    inline Array::~Array() {
+    inline Array::~Array() noexcept {
         if (m_size > 0) {
             clear();
             ::operator delete(m_values);
         }
     }
 
-    inline uint32_t Array::size() const {
+    inline uint32_t Array::size() const noexcept {
         return m_size;
     }
 
-    inline uint32_t Array::capacity() const {
+    inline uint32_t Array::capacity() const noexcept {
         return m_type_capacity << 3;
     }
 
-    inline bool Array::empty() const {
+    inline bool Array::empty() const noexcept {
         return m_size == 0;
     }
 
-    inline Value & Array::add(Value && val) {
+    inline Value & Array::add(Value && val) noexcept {
         // If this is the first value, allocate initial storage
         if (!m_values) {
             m_values = static_cast<Value *>(::operator new(8 * sizeof(Value)));
@@ -1038,7 +1040,7 @@ namespace qc::json {
         return remove(begin() + i);
     }
 
-    inline Value Array::remove(iterator it) {
+    inline Value Array::remove(iterator it) noexcept {
         // Save off value and destruct
         Value val(std::move(*it));
         it->~Value();
@@ -1051,7 +1053,7 @@ namespace qc::json {
         return val;
     }
 
-    inline void Array::remove(iterator it1, iterator it2) {
+    inline void Array::remove(iterator it1, iterator it2) noexcept {
         // Destruct the values
         for (iterator it(it1); it != it2; ++it) it->~Value();
 
@@ -1061,35 +1063,35 @@ namespace qc::json {
         m_size -= uint32_t(it2 - it1);
     }
 
-    inline void Array::clear() {
+    inline void Array::clear() noexcept {
         remove(begin(), end());
     }
 
-    inline Array::iterator Array::begin() {
+    inline Array::iterator Array::begin() noexcept {
         return m_values;
     }
 
-    inline Array::const_iterator Array::begin() const {
+    inline Array::const_iterator Array::begin() const noexcept {
         return m_values;
     }
 
-    inline Array::const_iterator Array::cbegin() const {
-        return m_values;
+    inline Array::const_iterator Array::cbegin() const noexcept {
+        return begin();
     }
 
-    inline Array::iterator Array::end() {
+    inline Array::iterator Array::end() noexcept {
         return m_values + m_size;
     }
 
-    inline Array::const_iterator Array::end() const {
+    inline Array::const_iterator Array::end() const noexcept {
         return m_values + m_size;
     }
 
-    inline Array::const_iterator Array::cend() const {
-        return m_values + m_size;
+    inline Array::const_iterator Array::cend() const noexcept {
+        return end();
     }
 
-    inline String::String(string_view str) :
+    inline String::String(string_view str) noexcept :
         m_type_size((uint32_t(Type::string) << 29) | uint32_t(str.size())),
         m_inlineChars0(),
         m_inlineChars1()
@@ -1103,7 +1105,7 @@ namespace qc::json {
         }
     }
 
-    inline String::String(String && other) :
+    inline String::String(String && other) noexcept :
         m_type_size(other.m_type_size),
         m_inlineChars0(other.m_inlineChars0),
         m_inlineChars1(other.m_inlineChars1)
@@ -1113,7 +1115,7 @@ namespace qc::json {
         other.m_inlineChars1 = 0;
     }
 
-    inline String & String::operator=(String && other) {
+    inline String & String::operator=(String && other) noexcept {
         m_type_size = other.m_type_size;
         m_inlineChars0 = other.m_inlineChars0;
         m_inlineChars1 = other.m_inlineChars1;
@@ -1123,15 +1125,15 @@ namespace qc::json {
         return *this;
     }
 
-    inline String::~String() {
+    inline String::~String() noexcept {
         if (size() > 12) ::operator delete(m_dynamicChars);
     }
 
-    inline uint32_t String::size() const {
+    inline uint32_t String::size() const noexcept {
         return m_type_size & 0b000'11111'11111111'11111111'11111111u;
     }
 
-    inline string_view String::view() const {
+    inline string_view String::view() const noexcept {
         uint32_t size(size());
         return {size > 12 ? m_dynamicChars : reinterpret_cast<const char *>(&m_inlineChars0), size};
     }

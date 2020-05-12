@@ -35,7 +35,7 @@ namespace qc::json {
 
         size_t position;
 
-        DecodeError(const string & msg, size_t position);
+        DecodeError(const string & msg, size_t position) noexcept;
 
     };
 
@@ -433,7 +433,7 @@ namespace qc::json::detail {
 
 namespace qc::json {
 
-    inline DecodeError::DecodeError(const string & msg, size_t position) :
+    inline DecodeError::DecodeError(const string & msg, size_t position) noexcept :
         std::runtime_error(msg),
         position(position)
     {}

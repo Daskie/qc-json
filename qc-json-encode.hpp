@@ -37,7 +37,7 @@ namespace qc::json {
     //
     struct EncodeError : public std::runtime_error {
 
-        EncodeError(const string & msg);
+        EncodeError(const string & msg) noexcept;
 
     };
 
@@ -120,7 +120,7 @@ namespace qc::json {
 
 namespace qc::json {
 
-    inline EncodeError::EncodeError(const string & msg) :
+    inline EncodeError::EncodeError(const string & msg) noexcept :
         std::runtime_error(msg)
     {}
 
