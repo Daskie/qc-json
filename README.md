@@ -73,7 +73,7 @@ Increment the quantity sold
 Remove breadcrumbs from the ingredients list
 
 ```c++
-obj.at("Ingredients").asArray().remove(2);
+obj.at("Ingredients").asArray().remove(2); // `2` is the array index
 ```
 
 Add a new "Gluten Free" field
