@@ -73,7 +73,7 @@ Increment the quantity sold
 Remove breadcrumbs from the ingredients list
 
 ```c++
-obj.at("Ingredients").asArray().remove(2); // `2` is the array index
+obj.at("Ingredients").asArray().remove(2); // Here, 2 is the array index
 ```
 
 Add a new "Gluten Free" field
@@ -131,4 +131,66 @@ std::string altJsonStr(encoder.finish());
 
 ---
 
-Now for all the specifics...
+## Features (in no particular order)
+
+### Remember, `char` is a different type from `signed char` or `unsigned char`
+
+In C++, there are three distinct character types, `char`, `signed char`, and `unsigned char`. This is in contrast to the other integer types which only have two, e.g. `int` is just shorthand for `signed int`.
+
+This is important because we treat `signed char` and `unsigned char` as integer types (`int8_t` and `uint8_t` respectively), but treats straight `char` as an actual character, that is, a length 1 string.
+
+So `qc::json::encode('A')` produces `"A"`, whereas `qc::json::encode(signed char('A'))` produces `65`.
+
+### Internal number storage
+
+In JSON, all numbers have the same type. That is, `10`, `10.000`, and `1e1` are all simply `Number`s. In C++ however, numbers come in three "flavors": signed integral, unsigned integral, and floating point. Since we want the greatest precision possible, we use the `int64_t`, `uint64_t`, and `double` types respectively. Unfortunately, no one type can capture all possible values of the others. This means, if we want to correctly encode/decode all possible numeric values, which we do, we need to utilize all three of these types under the hood.
+
+Encoding is easy. The encoder is passed some value, which already has a numeric type, and it goes from there. The only thing to note here is that other numeric types are promoted to their largest variants first, so a `int16_t` will be promoted to `int64_t`, a `float` will be promoted to a `double`, etc. Since we strictly upcast and don't cross "flavor" boundaries, there is no funny business.
+
+Decoding is another story. We start with just a string, and no trivial method of testing what type is the best choice. For example:
+
+- `"1"` can be stored as all three
+- `"1.000000"` can also be stored as all three
+- `"1.000001"` can only be stored as `double`, however
+- `"1000000000000000"` can be stored as all three, as it is less than 2<sup>53</sup>
+- `"10000000000000000"` can only be stored as `int64_t` or `uint64_t`, as it is greater than 2<sup>53</sup>
+- `"10000000000000000000"` can only be stored as `uint64_t`, as it is greater than 2<sup>63</sup>
+- `"100000000000000000000"` can't be stored exactly by any, as it is greater than 2<sup>64</sup>
+
+Long story short, the decoder prefers `int64_t` over `uint64_t` over `double`. If the number can be stored exactly as `int64_t`, it will be. Otherwise, if it can be stored exactly as `uint64_t`, it will be. Otherwise, it will be stored as `double`.
+
+Then, when the user accesses that number as a certain arithmetic type, we check if it can be exactly represented by that type. If so, we convert from our internal type to that type (if necessary), and everyone's happy. If not, we throw a `TypeError`. This includes lower precision types, so accessing a value of `10` as `uint8_t` is fine, but acessing a value of `1000` as `uint8_t` is not.
+
+This seems like a good time to point out that every. single. edge case involving these numeric conversions and machinations has been tested. This can be found in the number portion of each test file.
+
+### New C++17 [charconv](https://abseil.io/about/design/charconv) library used for number/string conversion
+
+It's the new best-on-the-block solution for converting strings to numbers and vice-versa. Much faster than existing solutions, while being fully correct/reliable.
+
+### Unsafe `Value` accessors
+
+The `Value::as` set of methods take a boolean template type `safe` that determines whether the type is checked before the underlying data is returned. If the type does not match, a `TypeError` is thrown.
+
+This is good in the general case, but there are situations in which that type check is an uneccessary resource drain. Take for example:
+
+```c++
+if (val.isString()) {
+    name = val.asString();
+}
+else if (val.is<int>()) {
+    name = "#" + std::to_string(val.as<int>());
+}
+```
+
+In this example, the type is already checked, rendering the internal type check in the `as` methods redundant. This code can be safely changed to the following to be just a bit more performant:
+
+```c++
+if (val.isString()) {
+    name = val.asString<false>();
+}
+else if (val.is<int>()) {
+    name = "#" + std::to_string(val.as<int, false>());
+}
+```
+
+Beware, when using unsafe accessors, **NO** checks are done. So you can totally access a `Boolean` as an `Array`, or a `String` as an `int`. So be certain your assumptions are correct, lest you arrive at segfault city.
