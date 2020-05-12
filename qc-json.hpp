@@ -4,7 +4,7 @@
 // QC Json 1.2.1
 // Austin Quick
 // July 2019 - May 2020
-// https://github.com/Daskie/QC-Json
+// https://github.com/Daskie/qc-json
 //
 // Provides an interface for decoding a JSON strings to JSON objects, creating/manipulating JSON objects, and encoding
 // JSON objects to a JSON string.
