@@ -1,7 +1,7 @@
 #pragma once
 
 //
-// QC Json 1.2.1
+// QC Json 1.2.2
 // Austin Quick
 // July 2019 - May 2020
 // https://github.com/Daskie/qc-json
@@ -89,28 +89,28 @@ namespace qc::json {
 
         private:
 
-        struct m_State { bool array, compact, content; };
+        struct _State { bool array, compact, content; };
 
-        std::ostringstream m_oss;
-        std::vector<m_State> m_state;
-        int m_indentation{0};
-        bool m_isKey{false};
-        bool m_isComplete{false};
+        std::ostringstream _oss;
+        std::vector<_State> _state;
+        int _indentation{0};
+        bool _isKey{false};
+        bool _isComplete{false};
 
-        template <typename T> void m_val(T v);
+        template <typename T> void _val(T v);
 
-        void m_prefix();
+        void _prefix();
 
-        void m_indent();
+        void _indent();
 
-        void m_checkPre() const;
+        void _checkPre() const;
 
-        void m_encode(string_view val);
-        void m_encode(int64_t val);
-        void m_encode(uint64_t val);
-        void m_encode(double val);
-        void m_encode(bool val);
-        void m_encode(nullptr_t);
+        void _encode(string_view val);
+        void _encode(int64_t val);
+        void _encode(uint64_t val);
+        void _encode(double val);
+        void _encode(bool val);
+        void _encode(nullptr_t);
 
     };
 
@@ -125,66 +125,66 @@ namespace qc::json {
     {}
 
     inline Encoder::Encoder(Encoder && other) :
-        m_oss(std::move(other.m_oss)),
-        m_state(std::move(other.m_state)),
-        m_indentation(other.m_indentation),
-        m_isKey(other.m_isKey),
-        m_isComplete(other.m_isComplete)
+        _oss(std::move(other._oss)),
+        _state(std::move(other._state)),
+        _indentation(other._indentation),
+        _isKey(other._isKey),
+        _isComplete(other._isComplete)
     {
-        other.m_indentation = 0;
-        other.m_isKey = false;
-        other.m_isComplete = false;
+        other._indentation = 0;
+        other._isKey = false;
+        other._isComplete = false;
     }
 
     inline Encoder & Encoder::object(bool compact) {
-        m_checkPre();
-        m_prefix();
-        m_oss << '{';
-        if (!m_state.empty()) {
-            m_state.back().content = true;
-            m_isKey = false;
-            compact = compact || m_state.back().compact;
+        _checkPre();
+        _prefix();
+        _oss << '{';
+        if (!_state.empty()) {
+            _state.back().content = true;
+            _isKey = false;
+            compact = compact || _state.back().compact;
         }
-        m_state.push_back(m_State{false, compact, false});
+        _state.push_back(_State{false, compact, false});
 
         return *this;
     }
 
     inline Encoder & Encoder::array(bool compact) {
-        m_checkPre();
-        m_prefix();
-        m_oss << '[';
-        if (!m_state.empty()) {
-            m_state.back().content = true;
-            m_isKey = false;
-            compact = compact || m_state.back().compact;
+        _checkPre();
+        _prefix();
+        _oss << '[';
+        if (!_state.empty()) {
+            _state.back().content = true;
+            _isKey = false;
+            compact = compact || _state.back().compact;
         }
-        m_state.push_back(m_State{true, compact, false});
+        _state.push_back(_State{true, compact, false});
 
         return *this;
     }
 
     inline Encoder & Encoder::key(string_view key) {
-        if (m_isKey) {
+        if (_isKey) {
             throw EncodeError("A key has already been given");
         }
-        if (m_state.empty() || m_state.back().array) {
+        if (_state.empty() || _state.back().array) {
             throw EncodeError("A key may only be givin within an object");
         }
         if (key.empty()) {
             throw EncodeError("Key must not be empty");
         }
 
-        m_prefix();
-        m_encode(key);
-        m_oss << ": "sv;
-        m_isKey = true;
+        _prefix();
+        _encode(key);
+        _oss << ": "sv;
+        _isKey = true;
 
         return *this;
     }
 
     inline Encoder & Encoder::val(string_view v) {
-        m_val(v);
+        _val(v);
 
         return *this;
     }
@@ -206,7 +206,7 @@ namespace qc::json {
     }
 
     inline Encoder & Encoder::val(int64_t v) {
-        m_val(v);
+        _val(v);
 
         return *this;
     }
@@ -224,7 +224,7 @@ namespace qc::json {
     }
 
     inline Encoder & Encoder::val(uint64_t v) {
-        m_val(v);
+        _val(v);
 
         return *this;
     }
@@ -242,7 +242,7 @@ namespace qc::json {
     }
 
     inline Encoder & Encoder::val(double v) {
-        m_val(v);
+        _val(v);
 
         return *this;
     }
@@ -252,13 +252,13 @@ namespace qc::json {
     }
 
     inline Encoder & Encoder::val(bool v) {
-        m_val(v);
+        _val(v);
 
         return *this;
     }
 
     inline Encoder & Encoder::val(nullptr_t) {
-        m_val(nullptr);
+        _val(nullptr);
 
         return *this;
     }
@@ -271,116 +271,116 @@ namespace qc::json {
     }
 
     inline Encoder & Encoder::end() {
-        if (m_state.empty()) {
+        if (_state.empty()) {
             throw EncodeError("No object or array to end");
         }
-        if (m_isKey) {
+        if (_isKey) {
             throw EncodeError("Cannot end object with a dangling key");
         }
 
-        const m_State & state(m_state.back());
+        const _State & state(_state.back());
         if (state.content) {
             if (state.compact) {
-                m_oss << ' ';
+                _oss << ' ';
             }
             else {
-                m_oss << '\n';
-                --m_indentation;
-                m_indent();
+                _oss << '\n';
+                --_indentation;
+                _indent();
             }
         }
-        m_oss << (state.array ? ']' : '}');
-        m_state.pop_back();
+        _oss << (state.array ? ']' : '}');
+        _state.pop_back();
 
-        if (m_state.empty()) {
-            m_isComplete = true;
+        if (_state.empty()) {
+            _isComplete = true;
         }
 
         return *this;
     }
 
     inline string Encoder::finish() {
-        if (!m_isComplete) {
+        if (!_isComplete) {
             throw EncodeError("Cannot finish, JSON is not yet complete");
         }
 
-        string str(m_oss.str());
+        string str(_oss.str());
 
         // Reset state
-        m_oss.str(""s);
-        m_oss.clear();
-        m_isComplete = false;
+        _oss.str(""s);
+        _oss.clear();
+        _isComplete = false;
 
         return str;
     }
 
     template <typename T>
-    inline void Encoder::m_val(T t) {
-        m_checkPre();
-        m_prefix();
-        m_encode(t);
+    inline void Encoder::_val(T t) {
+        _checkPre();
+        _prefix();
+        _encode(t);
 
-        if (m_state.empty()) {
-            m_isComplete = true;
+        if (_state.empty()) {
+            _isComplete = true;
         }
         else {
-            m_state.back().content = true;
-            m_isKey = false;
+            _state.back().content = true;
+            _isKey = false;
         }
     }
 
-    inline void Encoder::m_prefix() {
-        if (!m_isKey && !m_state.empty()) {
-            const m_State & state(m_state.back());
+    inline void Encoder::_prefix() {
+        if (!_isKey && !_state.empty()) {
+            const _State & state(_state.back());
             if (state.content) {
-                m_oss << ',';
+                _oss << ',';
             }
             if (state.compact) {
-                m_oss << ' ';
+                _oss << ' ';
             }
             else {
-                m_oss << '\n';
-                m_indentation += !state.content;
-                m_indent();
+                _oss << '\n';
+                _indentation += !state.content;
+                _indent();
             }
         }
     }
 
-    inline void Encoder::m_indent() {
-        for (int i(0); i < m_indentation; ++i) {
-            m_oss << "    "sv;
+    inline void Encoder::_indent() {
+        for (int i(0); i < _indentation; ++i) {
+            _oss << "    "sv;
         }
     }
 
-    inline void Encoder::m_checkPre() const {
-        if (m_isComplete) {
+    inline void Encoder::_checkPre() const {
+        if (_isComplete) {
             throw EncodeError("Cannot add value to complete JSON");
         }
-        if (!m_isKey && !(m_state.empty() || m_state.back().array)) {
+        if (!_isKey && !(_state.empty() || _state.back().array)) {
             throw EncodeError("Cannot add value to object without first providing a key");
         }
     }
 
-    inline void Encoder::m_encode(string_view v) {
-        static constexpr char s_hexChars[16]{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
+    inline void Encoder::_encode(string_view v) {
+        static constexpr char hexChars[16]{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
 
-        m_oss << '"';
+        _oss << '"';
 
         for (unsigned char c : v) {
             if (std::isprint(c)) {
-                if (c == '"' || c == '\\') m_oss << '\\';
-                m_oss << c;
+                if (c == '"' || c == '\\') _oss << '\\';
+                _oss << c;
             }
             else {
                 switch (c) {
-                    case '\b': m_oss << R"(\b)"; break;
-                    case '\f': m_oss << R"(\f)"; break;
-                    case '\n': m_oss << R"(\n)"; break;
-                    case '\r': m_oss << R"(\r)"; break;
-                    case '\t': m_oss << R"(\t)"; break;
+                    case '\b': _oss << R"(\b)"; break;
+                    case '\f': _oss << R"(\f)"; break;
+                    case '\n': _oss << R"(\n)"; break;
+                    case '\r': _oss << R"(\r)"; break;
+                    case '\t': _oss << R"(\t)"; break;
                     default:
                         if (c < 128) {
-                            m_oss << R"(\u00)" << s_hexChars[(c >> 4) & 0xF] << s_hexChars[c & 0xF];
+                            _oss << R"(\u00)" << hexChars[(c >> 4) & 0xF] << hexChars[c & 0xF];
                         }
                         else {
                             throw EncodeError("Non-ASCII unicode is not supported");
@@ -389,39 +389,39 @@ namespace qc::json {
             }
         }
 
-        m_oss << '"';
+        _oss << '"';
     }
 
-    inline void Encoder::m_encode(int64_t v) {
+    inline void Encoder::_encode(int64_t v) {
         char buffer[24];
 
         std::to_chars_result res(std::to_chars(buffer, buffer + sizeof(buffer), v));
 
-        m_oss << string_view(buffer, res.ptr - buffer);
+        _oss << string_view(buffer, res.ptr - buffer);
     }
 
-    inline void Encoder::m_encode(uint64_t v) {
+    inline void Encoder::_encode(uint64_t v) {
         char buffer[24];
 
         std::to_chars_result res(std::to_chars(buffer, buffer + sizeof(buffer), v));
 
-        m_oss << string_view(buffer, res.ptr - buffer);
+        _oss << string_view(buffer, res.ptr - buffer);
     }
 
-    inline void Encoder::m_encode(double v) {
+    inline void Encoder::_encode(double v) {
         char buffer[32];
 
         std::to_chars_result res(std::to_chars(buffer, buffer + sizeof(buffer), v));
 
-        m_oss << string_view(buffer, res.ptr - buffer);
+        _oss << string_view(buffer, res.ptr - buffer);
     }
 
-    inline void Encoder::m_encode(bool v) {
-        m_oss << (v ? "true"sv : "false"sv);
+    inline void Encoder::_encode(bool v) {
+        _oss << (v ? "true"sv : "false"sv);
     }
 
-    inline void Encoder::m_encode(nullptr_t) {
-        m_oss << "null"sv;
+    inline void Encoder::_encode(nullptr_t) {
+        _oss << "null"sv;
     }
 
 }
