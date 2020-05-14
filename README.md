@@ -174,6 +174,7 @@ The `Value::as` set of methods take a boolean template type `safe` that determin
 This is good in the general case, but there are situations in which that type check is an uneccessary resource drain. Take for example:
 
 ```c++
+// Here, `val` is a `qc::json::Value`
 if (val.isString()) {
     name = val.asString();
 }
@@ -185,6 +186,7 @@ else if (val.is<int>()) {
 In this example, the type is already checked, rendering the internal type check in the `as` methods redundant. This code can be safely changed to the following to be just a bit more performant:
 
 ```c++
+// Here, `val` is a `qc::json::Value`
 if (val.isString()) {
     name = val.asString<false>();
 }
