@@ -1,7 +1,7 @@
 #pragma once
 
 //
-// QC Json 1.2.2
+// QC Json 1.2.3
 // Austin Quick
 // July 2019 - May 2020
 // https://github.com/Daskie/qc-json
@@ -127,14 +127,10 @@ namespace qc::json {
     inline Encoder::Encoder(Encoder && other) :
         _oss(std::move(other._oss)),
         _state(std::move(other._state)),
-        _indentation(other._indentation),
-        _isKey(other._isKey),
-        _isComplete(other._isComplete)
-    {
-        other._indentation = 0;
-        other._isKey = false;
-        other._isComplete = false;
-    }
+        _indentation(std::exchange(other._indentation, 0)),
+        _isKey(std::exchange(other._isKey, false)),
+        _isComplete(std::exchange(other._isComplete, false))
+    {}
 
     inline Encoder & Encoder::object(bool compact) {
         _checkPre();

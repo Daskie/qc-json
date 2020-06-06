@@ -1,7 +1,7 @@
 #pragma once
 
 //
-// QC Json 1.2.2
+// QC Json 1.2.3
 // Austin Quick
 // July 2019 - May 2020
 // https://github.com/Daskie/qc-json
@@ -112,9 +112,11 @@ namespace qc::json {
 
         template <typename T> bool is() const noexcept;
 
+        //
         // In the following methods, `safe` indicates whether the type is checked.
         // If `safe` is true, and the value's type does not match the type requested, a `TypeError` is thrown.
         // If `safe` is false, no checks are done, and if there is a type mismatch then enjoy your segfault.
+        //
 
         template <bool safe = true> const Object & asObject() const noexcept(!safe);
         template <bool safe = true>       Object & asObject() noexcept(!safe);
@@ -555,22 +557,15 @@ namespace qc::json {
     {}
 
     inline Value::Value(Value && other) noexcept :
-        _type_data0(other._type_data0),
-        _data1(other._data1),
-        _data2(other._data2)
-    {
-        other._type_data0 = 0;
-        other._data1 = 0;
-        other._data2 = 0;
-    }
+        _type_data0(std::exchange(other._type_data0, 0)),
+        _data1(std::exchange(other._data1, 0)),
+        _data2(std::exchange(other._data2, 0))
+    {}
 
     inline Value & Value::operator=(Value && other) noexcept {
-        _type_data0 = other._type_data0;
-        _data1 = other._data1;
-        _data2 = other._data2;
-        other._type_data0 = 0;
-        other._data1 = 0;
-        other._data2 = 0;
+        _type_data0 = std::exchange(other._type_data0, 0);
+        _data1 = std::exchange(other._data1, 0);
+        _data2 = std::exchange(other._data2, 0);
         return *this;
     }
 
@@ -763,22 +758,15 @@ namespace qc::json {
     }
 
     inline Object::Object(Object && other) noexcept :
-        _type_capacity(other._type_capacity),
-        _size(other._size),
-        _pairs(other._pairs)
-    {
-        other._type_capacity = uint32_t(Type::object) << 29;
-        other._size = 0;
-        other._pairs = nullptr;
-    }
+        _type_capacity(std::exchange(other._type_capacity, uint32_t(Type::object) << 29)),
+        _size(std::exchange(other._size, 0)),
+        _pairs(std::exchange(other._pairs, nullptr))
+    {}
 
     inline Object & Object::operator=(Object && other) noexcept {
-        _type_capacity = other._type_capacity;
-        _size = other._size;
-        _pairs = other._pairs;
-        other._type_capacity = uint32_t(Type::object) << 29;
-        other._size = 0;
-        other._pairs = nullptr;
+        _type_capacity = std::exchange(other._type_capacity, uint32_t(Type::object) << 29);
+        _size = std::exchange(other._size, 0);
+        _pairs = std::exchange(other._pairs, nullptr);
         return *this;
     }
 
@@ -958,22 +946,15 @@ namespace qc::json {
     }
 
     inline Array::Array(Array && other) noexcept :
-        _type_capacity(other._type_capacity),
-        _size(other._size),
-        _values(other._values)
-    {
-        other._type_capacity = uint32_t(Type::array) << 29;
-        other._size = 0;
-        other._values = nullptr;
-    }
+        _type_capacity(std::exchange(other._type_capacity, uint32_t(Type::array) << 29)),
+        _size(std::exchange(other._size, 0)),
+        _values(std::exchange(other._values, nullptr))
+    {}
 
     inline Array & Array::operator=(Array && other) noexcept {
-        _type_capacity = other._type_capacity;
-        _size = other._size;
-        _values = other._values;
-        other._type_capacity = uint32_t(Type::array) << 29;
-        other._size = 0;
-        other._values = nullptr;
+        _type_capacity = std::exchange(other._type_capacity, uint32_t(Type::array) << 29);
+        _size = std::exchange(other._size, 0);
+        _values = std::exchange(other._values, nullptr);
         return *this;
     }
 
@@ -1102,22 +1083,15 @@ namespace qc::json {
     }
 
     inline String::String(String && other) noexcept :
-        _type_size(other._type_size),
-        _inlineChars0(other._inlineChars0),
-        _inlineChars1(other._inlineChars1)
-    {
-        other._type_size = uint32_t(Type::string) << 29;
-        other._inlineChars0 = 0;
-        other._inlineChars1 = 0;
-    }
+        _type_size(std::exchange(other._type_size, uint32_t(Type::string) << 29)),
+        _inlineChars0(std::exchange(other._inlineChars0, 0)),
+        _inlineChars1(std::exchange(other._inlineChars1, 0))
+    {}
 
     inline String & String::operator=(String && other) noexcept {
-        _type_size = other._type_size;
-        _inlineChars0 = other._inlineChars0;
-        _inlineChars1 = other._inlineChars1;
-        other._type_size = uint32_t(Type::string) << 29;
-        other._inlineChars0 = 0;
-        other._inlineChars1 = 0;
+        _type_size = std::exchange(other._type_size, uint32_t(Type::string) << 29);
+        _inlineChars0 = std::exchange(other._inlineChars0, 0);
+        _inlineChars1 = std::exchange(other._inlineChars1, 0);
         return *this;
     }
 
