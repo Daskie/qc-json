@@ -160,7 +160,7 @@ namespace qc::json {
         return *this;
     }
 
-    inline Encoder & Encoder::key(string_view key) {
+    inline Encoder & Encoder::key(const string_view key) {
         if (_isKey) {
             throw EncodeError("A key has already been given");
         }
@@ -179,7 +179,7 @@ namespace qc::json {
         return *this;
     }
 
-    inline Encoder & Encoder::val(string_view v) {
+    inline Encoder & Encoder::val(const string_view v) {
         _val(v);
 
         return *this;
@@ -189,71 +189,71 @@ namespace qc::json {
         return val(string_view(v));
     }
 
-    inline Encoder & Encoder::val(const char * v) {
+    inline Encoder & Encoder::val(const char * const v) {
         return val(string_view(v));
     }
 
-    inline Encoder & Encoder::val(char * v) {
+    inline Encoder & Encoder::val(char * const v) {
         return val(string_view(v));
     }
 
-    inline Encoder & Encoder::val(char v) {
+    inline Encoder & Encoder::val(const char v) {
         return val(string_view(&v, 1));
     }
 
-    inline Encoder & Encoder::val(int64_t v) {
+    inline Encoder & Encoder::val(const int64_t v) {
         _val(v);
 
         return *this;
     }
 
-    inline Encoder & Encoder::val(int32_t v) {
+    inline Encoder & Encoder::val(const int32_t v) {
         return val(int64_t(v));
     }
 
-    inline Encoder & Encoder::val(int16_t v) {
+    inline Encoder & Encoder::val(const int16_t v) {
         return val(int64_t(v));
     }
 
-    inline Encoder & Encoder::val(int8_t v) {
+    inline Encoder & Encoder::val(const int8_t v) {
         return val(int64_t(v));
     }
 
-    inline Encoder & Encoder::val(uint64_t v) {
+    inline Encoder & Encoder::val(const uint64_t v) {
         _val(v);
 
         return *this;
     }
 
-    inline Encoder & Encoder::val(uint32_t v) {
+    inline Encoder & Encoder::val(const uint32_t v) {
         return val(uint64_t(v));
     }
 
-    inline Encoder & Encoder::val(uint16_t v) {
+    inline Encoder & Encoder::val(const uint16_t v) {
         return val(uint64_t(v));
     }
 
-    inline Encoder & Encoder::val(uint8_t v) {
+    inline Encoder & Encoder::val(const uint8_t v) {
         return val(uint64_t(v));
     }
 
-    inline Encoder & Encoder::val(double v) {
+    inline Encoder & Encoder::val(const double v) {
         _val(v);
 
         return *this;
     }
 
-    inline Encoder & Encoder::val(float v) {
+    inline Encoder & Encoder::val(const float v) {
         return val(double(v));
     }
 
-    inline Encoder & Encoder::val(bool v) {
+    inline Encoder & Encoder::val(const bool v) {
         _val(v);
 
         return *this;
     }
 
-    inline Encoder & Encoder::val(nullptr_t) {
+    inline Encoder & Encoder::val(const nullptr_t) {
         _val(nullptr);
 
         return *this;
@@ -311,7 +311,7 @@ namespace qc::json {
     }
 
     template <typename T>
-    inline void Encoder::_val(T t) {
+    inline void Encoder::_val(const T t) {
         _checkPre();
         _prefix();
         _encode(t);
@@ -357,12 +357,12 @@ namespace qc::json {
         }
     }
 
-    inline void Encoder::_encode(string_view v) {
+    inline void Encoder::_encode(const string_view v) {
         static constexpr char hexChars[16]{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
 
         _oss << '"';
 
-        for (unsigned char c : v) {
+        for (const unsigned char c : v) {
             if (std::isprint(c)) {
                 if (c == '"' || c == '\\') _oss << '\\';
                 _oss << c;
@@ -388,7 +388,7 @@ namespace qc::json {
         _oss << '"';
     }
 
-    inline void Encoder::_encode(int64_t v) {
+    inline void Encoder::_encode(const int64_t v) {
         char buffer[24];
 
         std::to_chars_result res(std::to_chars(buffer, buffer + sizeof(buffer), v));
@@ -396,7 +396,7 @@ namespace qc::json {
         _oss << string_view(buffer, res.ptr - buffer);
     }
 
-    inline void Encoder::_encode(uint64_t v) {
+    inline void Encoder::_encode(const uint64_t v) {
         char buffer[24];
 
         std::to_chars_result res(std::to_chars(buffer, buffer + sizeof(buffer), v));
@@ -404,7 +404,7 @@ namespace qc::json {
         _oss << string_view(buffer, res.ptr - buffer);
     }
 
-    inline void Encoder::_encode(double v) {
+    inline void Encoder::_encode(const double v) {
         char buffer[32];
 
         std::to_chars_result res(std::to_chars(buffer, buffer + sizeof(buffer), v));
@@ -412,7 +412,7 @@ namespace qc::json {
         _oss << string_view(buffer, res.ptr - buffer);
     }
 
-    inline void Encoder::_encode(bool v) {
+    inline void Encoder::_encode(const bool v) {
         _oss << (v ? "true"sv : "false"sv);
     }
 

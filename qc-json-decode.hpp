@@ -66,7 +66,7 @@ namespace qc::json {
 
         public:
 
-        _Decoder(string_view str, Composer & composer) :
+        _Decoder(const string_view str, Composer & composer) :
             _start(str.data()),
             _end(_start + str.length()),
             _pos(_start),
@@ -98,7 +98,7 @@ namespace qc::json {
             while (_pos < _end && std::isspace(*_pos)) ++_pos;
         }
 
-        bool _tryConsumeChar(char c) {
+        bool _tryConsumeChar(const char c) {
             if (_pos < _end && *_pos == c) {
                 ++_pos;
                 return true;
@@ -108,13 +108,13 @@ namespace qc::json {
             }
         }
 
-        void _consumeChar(char c) {
+        void _consumeChar(const char c) {
             if (!_tryConsumeChar(c)) {
                 throw DecodeError(("Expected `"s + c + "`"s).c_str(), _pos - _start);
             }
         }
 
-        bool _tryConsumeChars(string_view str) {
+        bool _tryConsumeChars(const string_view str) {
             if (size_t(_end - _pos) >= str.length()) {
                 for (size_t i(0); i < str.length(); ++i) {
                     if (_pos[i] != str[i]) {
@@ -259,7 +259,7 @@ namespace qc::json {
                     throw DecodeError("Expected end quote", _pos - _start);
                 }
 
-                char c(*_pos);
+                const char c(*_pos);
                 if (c == '"') {
                     ++_pos;
                     return _stringBuffer;
@@ -371,7 +371,7 @@ namespace qc::json {
         template <bool isSigned>
         void _ingestInteger(State & state) {
             std::conditional_t<isSigned, int64_t, uint64_t> val;
-            std::from_chars_result res(std::from_chars(_pos, _end, val));
+            const std::from_chars_result res(std::from_chars(_pos, _end, val));
 
             // There was an issue parsing
             if (res.ec != std::errc()) {
@@ -429,7 +429,7 @@ namespace qc::json {
 
     };
 
-    inline DecodeError::DecodeError(const string & msg, size_t position) noexcept :
+    inline DecodeError::DecodeError(const string & msg, const size_t position) noexcept :
         std::runtime_error(msg),
         position(position)
     {}

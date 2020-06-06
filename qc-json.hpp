@@ -407,7 +407,7 @@ namespace qc::json {
         void end(State && innerState, State & outerState) {}
 
         template <typename T>
-        void val(T v, State & state) {
+        void val(const T v, State & state) {
             if (state.isObject) {
                 state.node->asObject<true>().add(std::move(_key), v);
             }
@@ -425,7 +425,7 @@ namespace qc::json {
 
     };
 
-    inline void _encodeRecursive(Encoder & encoder, const Value & val, bool compact) {
+    inline void _encodeRecursive(Encoder & encoder, const Value & val, const bool compact) {
         switch (val.type()) {
             case Type::null: {
                 encoder.val(nullptr);
@@ -483,71 +483,71 @@ namespace qc::json {
         Value(string_view(val))
     {}
 
-    inline Value::Value(const char * val) :
+    inline Value::Value(const char * const val) :
         Value(string_view(val))
     {}
 
-    inline Value::Value(char * val) :
+    inline Value::Value(char * const val) :
         Value(string_view(val))
     {}
 
-    inline Value::Value(char val) noexcept :
+    inline Value::Value(const char val) noexcept :
         Value(string_view(&val, 1))
     {}
 
-    inline Value::Value(int64_t val) noexcept :
+    inline Value::Value(const int64_t val) noexcept :
         _type_data0(uint32_t(Type::number) << 29),
         _numberType(NumberType::signedInteger),
         _signedInteger(val)
     {}
 
-    inline Value::Value(int32_t val) noexcept :
+    inline Value::Value(const int32_t val) noexcept :
         Value(int64_t(val))
     {}
 
-    inline Value::Value(int16_t val) noexcept :
+    inline Value::Value(const int16_t val) noexcept :
         Value(int64_t(val))
     {}
 
-    inline Value::Value(int8_t val) noexcept :
+    inline Value::Value(const int8_t val) noexcept :
         Value(int64_t(val))
     {}
 
-    inline Value::Value(uint64_t val) noexcept :
+    inline Value::Value(const uint64_t val) noexcept :
         _type_data0(uint32_t(Type::number) << 29),
         _numberType(NumberType::unsignedInteger),
         _unsignedInteger(val)
     {}
 
-    inline Value::Value(uint32_t val) noexcept :
+    inline Value::Value(const uint32_t val) noexcept :
         Value(uint64_t(val))
     {}
 
-    inline Value::Value(uint16_t val) noexcept :
+    inline Value::Value(const uint16_t val) noexcept :
         Value(uint64_t(val))
     {}
 
-    inline Value::Value(uint8_t val) noexcept :
+    inline Value::Value(const uint8_t val) noexcept :
         Value(uint64_t(val))
     {}
 
-    inline Value::Value(double val) noexcept :
+    inline Value::Value(const double val) noexcept :
         _type_data0(uint32_t(Type::number) << 29),
         _numberType(NumberType::floater),
         _floater(val)
     {}
 
-    inline Value::Value(float val) noexcept :
+    inline Value::Value(const float val) noexcept :
         Value(double(val))
     {}
 
-    inline Value::Value(bool val) noexcept :
+    inline Value::Value(const bool val) noexcept :
         _type_data0(uint32_t(Type::boolean) << 29),
         _data1(),
         _boolean(val)
     {}
 
-    inline Value::Value(nullptr_t) noexcept :
+    inline Value::Value(const nullptr_t) noexcept :
         Value()
     {}
 
@@ -808,10 +808,10 @@ namespace qc::json {
         }
 
         // If we're at capacity, expand
-        if (uint32_t capacity(capacity()); _size >= capacity) {
-            uint32_t newCapacity(capacity << 1);
-            Pair * newPairs(static_cast<Pair *>(::operator new(newCapacity * sizeof(Pair))));
-            Pair * newPos(newPairs + (pos - _pairs));
+        if (const uint32_t capacity(capacity()); _size >= capacity) {
+            const uint32_t newCapacity(capacity << 1);
+            Pair * const newPairs(static_cast<Pair *>(::operator new(newCapacity * sizeof(Pair))));
+            Pair * const newPos(newPairs + (pos - _pairs));
             // Copy the pairs before the one we're inserting
             std::copy(reinterpret_cast<const uint64_t *>(_pairs), reinterpret_cast<const uint64_t *>(pos), reinterpret_cast<uint64_t *>(newPairs));
             // Copy the pairs after the one we're inserting, leaving a gap
@@ -825,7 +825,7 @@ namespace qc::json {
         // Otherwise, we've still got space
         else {
             // Shift back the pairs after the one we're inserting, leaving a gap
-            Pair * endPos(end());
+            Pair * const endPos(end());
             std::copy_backward(reinterpret_cast<uint64_t *>(pos), reinterpret_cast<uint64_t *>(endPos), reinterpret_cast<uint64_t *>(endPos + 1));
         }
 
@@ -837,32 +837,32 @@ namespace qc::json {
         return *pos;
     }
 
-    inline bool Object::contains(string_view key) const {
+    inline bool Object::contains(const string_view key) const {
         return _search(key).second;
     }
 
-    inline const Value & Object::at(string_view key) const {
-        auto [pos, found](_search(key));
+    inline const Value & Object::at(const string_view key) const {
+        const auto [pos, found](_search(key));
         if (!found) {
             throw std::out_of_range("Key not found");
         }
         return pos->second;
     }
 
-    inline Value & Object::at(string_view key) {
+    inline Value & Object::at(const string_view key) {
         return const_cast<Value &>(const_cast<const Object &>(*this).at(key));
     }
 
-    inline Object::const_iterator Object::find(string_view key) const {
-        auto [pos, found](_search(key));
+    inline Object::const_iterator Object::find(const string_view key) const {
+        const auto [pos, found](_search(key));
         return found ? pos : cend();
     }
 
-    inline Object::iterator Object::find(string_view key) {
+    inline Object::iterator Object::find(const string_view key) {
         return const_cast<iterator>(const_cast<const Object &>(*this).find(key));
     }
 
-    inline Object::Pair Object::remove(iterator it) noexcept {
+    inline Object::Pair Object::remove(const iterator it) noexcept {
         // Save off pair and destruct
         Pair pair(std::move(*it));
         it->~pair();
@@ -905,12 +905,12 @@ namespace qc::json {
         return end();
     }
 
-    inline std::pair<const Object::Pair *, bool> Object::_search(string_view key) const {
-        const Pair * endPos(cend());
+    inline std::pair<const Object::Pair *, bool> Object::_search(const string_view key) const {
+        const Pair * const endPos(cend());
         const Pair * low(_pairs), * high(endPos);
         while (low < high) {
-            const Pair * mid(low + ((high - low) >> 1));
-            int delta(std::strcmp(key.data(), mid->first.c_str()));
+            const Pair * const mid(low + ((high - low) >> 1));
+            const int delta(std::strcmp(key.data(), mid->first.c_str()));
             if (delta < 0) {
                 high = mid;
             }
@@ -924,8 +924,8 @@ namespace qc::json {
         return {low, low != endPos && low->first == key};
     }
 
-    inline std::pair<Object::Pair *, bool> Object::_search(string_view key) {
-        auto [pos, found](const_cast<const Object *>(this)->_search(key));
+    inline std::pair<Object::Pair *, bool> Object::_search(const string_view key) {
+        const auto [pos, found](const_cast<const Object *>(this)->_search(key));
         return {const_cast<Pair *>(pos), found};
     }
 
@@ -984,9 +984,9 @@ namespace qc::json {
             _type_capacity = (uint32_t(Type::array) << 29) | 1u;
         }
         // If we're at capacity, expand
-        else if (uint32_t capacity(capacity());  _size >= capacity) {
-            uint32_t newCapacity(capacity << 1);
-            Value * newValues(static_cast<Value *>(::operator new(newCapacity * sizeof(Value))));
+        else if (const uint32_t capacity(capacity());  _size >= capacity) {
+            const uint32_t newCapacity(capacity << 1);
+            Value * const newValues(static_cast<Value *>(::operator new(newCapacity * sizeof(Value))));
             std::copy(reinterpret_cast<const uint64_t *>(_values), reinterpret_cast<const uint64_t *>(cend()), reinterpret_cast<uint64_t *>(newValues));
             // Update our current state
             ::operator delete(_values);
@@ -997,7 +997,7 @@ namespace qc::json {
         return *(new (_values + _size++) Value(std::move(val)));
     }
 
-    inline const Value & Array::at(uint32_t i) const {
+    inline const Value & Array::at(const uint32_t i) const {
         if (i >= _size) {
             throw std::out_of_range("Index out of bounds");
         }
@@ -1005,11 +1005,11 @@ namespace qc::json {
         return _values[i];
     }
 
-    inline Value & Array::at(uint32_t i) {
+    inline Value & Array::at(const uint32_t i) {
         return const_cast<Value &>(const_cast<const Array &>(*this).at(i));
     }
 
-    inline Value Array::remove(uint32_t i) {
+    inline Value Array::remove(const uint32_t i) {
         if (i >= _size) {
             throw std::out_of_range("Index out of bounds");
         }
@@ -1017,7 +1017,7 @@ namespace qc::json {
         return remove(begin() + i);
     }
 
-    inline Value Array::remove(iterator it) noexcept {
+    inline Value Array::remove(const iterator it) noexcept {
         // Save off value and destruct
         Value val(std::move(*it));
         it->~Value();
@@ -1030,7 +1030,7 @@ namespace qc::json {
         return val;
     }
 
-    inline void Array::remove(iterator it1, iterator it2) noexcept {
+    inline void Array::remove(const iterator it1, const iterator it2) noexcept {
         // Destruct the values
         for (iterator it(it1); it != it2; ++it) it->~Value();
 
@@ -1068,7 +1068,7 @@ namespace qc::json {
         return end();
     }
 
-    inline String::String(string_view str) noexcept :
+    inline String::String(const string_view str) noexcept :
         _type_size((uint32_t(Type::string) << 29) | uint32_t(str.size())),
         _inlineChars0(),
         _inlineChars1()
@@ -1108,14 +1108,14 @@ namespace qc::json {
         return {size > 12 ? _dynamicChars : reinterpret_cast<const char *>(&_inlineChars0), size};
     }
 
-    inline Value decode(string_view json) {
+    inline Value decode(const string_view json) {
         Value root;
         _Composer composer;
         decode(json, composer, _Composer::State{&root, false, false});
         return root;
     }
 
-    inline string encode(const Value & val, bool compact) {
+    inline string encode(const Value & val, const bool compact) {
         Encoder encoder;
         _encodeRecursive(encoder, val, compact);
         return encoder.finish();
