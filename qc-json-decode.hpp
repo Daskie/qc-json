@@ -70,8 +70,7 @@ namespace qc::json {
             _start(str.data()),
             _end(_start + str.length()),
             _pos(_start),
-            _composer(composer),
-            _stringBuffer()
+            _composer(composer)
         {}
 
         void operator()(State & initialState) {
@@ -86,11 +85,11 @@ namespace qc::json {
 
         private:
 
-        const char * const _start;
-        const char * const _end;
-        const char * _pos;
-        size_t _line;
-        size_t _column;
+        const char * const _start{nullptr};
+        const char * const _end{nullptr};
+        const char * _pos{nullptr};
+        size_t _line{0u};
+        size_t _column{0u};
         Composer & _composer;
         string _stringBuffer;
 
@@ -116,7 +115,7 @@ namespace qc::json {
 
         bool _tryConsumeChars(const string_view str) {
             if (size_t(_end - _pos) >= str.length()) {
-                for (size_t i(0); i < str.length(); ++i) {
+                for (size_t i{0u}; i < str.length(); ++i) {
                     if (_pos[i] != str[i]) {
                         return false;
                     }

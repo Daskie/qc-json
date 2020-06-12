@@ -198,7 +198,7 @@ namespace qc::json {
     }
 
     inline Encoder & Encoder::val(const char v) {
-        return val(string_view(&v, 1));
+        return val(string_view(&v, 1u));
     }
 
     inline Encoder & Encoder::val(const int64_t v) {
@@ -343,7 +343,7 @@ namespace qc::json {
     }
 
     inline void Encoder::_indent() {
-        for (int i(0); i < _indentation; ++i) {
+        for (int i{0}; i < _indentation; ++i) {
             _oss << "    "sv;
         }
     }

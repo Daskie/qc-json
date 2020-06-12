@@ -158,13 +158,13 @@ namespace qc::json {
 
         private:
 
-        uint32_t _type_data0{0};
+        uint32_t _type_data0{0u};
         union {
-            uint32_t _data1{0};
+            uint32_t _data1{0u};
             NumberType _numberType;
         };
         union {
-            uint64_t _data2{0};
+            uint64_t _data2{0u};
             int64_t _signedInteger;
             uint64_t _unsignedInteger;
             double _floater;
@@ -225,7 +225,7 @@ namespace qc::json {
         private:
 
         uint32_t _type_capacity{uint32_t(Type::object) << 29};
-        uint32_t _size{0};
+        uint32_t _size{0u};
         alignas(8) Pair * _pairs{nullptr};
 
         std::pair<const Pair *, bool> _search(string_view key) const;
@@ -281,7 +281,7 @@ namespace qc::json {
         private:
 
         uint32_t _type_capacity{uint32_t(Type::array) << 29};
-        uint32_t _size{0};
+        uint32_t _size{0u};
         alignas(8) Value * _values{nullptr};
 
     };
@@ -306,10 +306,10 @@ namespace qc::json {
 
         private:
 
-        uint32_t _type_size;
-        uint32_t _inlineChars0;
+        uint32_t _type_size{uint32_t(Type::string) << 29};
+        uint32_t _inlineChars0{0u};
         union {
-            uint64_t _inlineChars1;
+            uint64_t _inlineChars1{0u};
             char * _dynamicChars;
         };
 
@@ -328,7 +328,7 @@ namespace qc::json {
 //      struct qc_json_valueTo<std::pair<int, int>, safe> {
 //          std::pair<int, int> operator()(const qc::json::Value & v) {
 //              const Array & arr(v.asArray<safe>());
-//              return {arr.at(0)->asInteger<safe>(), arr.at(1)->asInteger<safe>()};
+//              return {arr.at(0u)->asInteger<safe>(), arr.at(1u)->asInteger<safe>()};
 //          }
 //      };
 //
@@ -492,7 +492,7 @@ namespace qc::json {
     {}
 
     inline Value::Value(const char val) noexcept :
-        Value(string_view(&val, 1))
+        Value(string_view(&val, 1u))
     {}
 
     inline Value::Value(const int64_t val) noexcept :
@@ -543,7 +543,6 @@ namespace qc::json {
 
     inline Value::Value(const bool val) noexcept :
         _type_data0(uint32_t(Type::boolean) << 29),
-        _data1(),
         _boolean(val)
     {}
 
@@ -557,15 +556,15 @@ namespace qc::json {
     {}
 
     inline Value::Value(Value && other) noexcept :
-        _type_data0(std::exchange(other._type_data0, 0)),
-        _data1(std::exchange(other._data1, 0)),
-        _data2(std::exchange(other._data2, 0))
+        _type_data0(std::exchange(other._type_data0, 0u)),
+        _data1(std::exchange(other._data1, 0u)),
+        _data2(std::exchange(other._data2, 0u))
     {}
 
     inline Value & Value::operator=(Value && other) noexcept {
-        _type_data0 = std::exchange(other._type_data0, 0);
-        _data1 = std::exchange(other._data1, 0);
-        _data2 = std::exchange(other._data2, 0);
+        _type_data0 = std::exchange(other._type_data0, 0u);
+        _data1 = std::exchange(other._data1, 0u);
+        _data2 = std::exchange(other._data2, 0u);
         return *this;
     }
 
@@ -759,19 +758,19 @@ namespace qc::json {
 
     inline Object::Object(Object && other) noexcept :
         _type_capacity(std::exchange(other._type_capacity, uint32_t(Type::object) << 29)),
-        _size(std::exchange(other._size, 0)),
+        _size(std::exchange(other._size, 0u)),
         _pairs(std::exchange(other._pairs, nullptr))
     {}
 
     inline Object & Object::operator=(Object && other) noexcept {
         _type_capacity = std::exchange(other._type_capacity, uint32_t(Type::object) << 29);
-        _size = std::exchange(other._size, 0);
+        _size = std::exchange(other._size, 0u);
         _pairs = std::exchange(other._pairs, nullptr);
         return *this;
     }
 
     inline Object::~Object() noexcept {
-        if (_size > 0) {
+        if (_size) {
             clear();
             ::operator delete(_pairs);
         }
@@ -786,13 +785,13 @@ namespace qc::json {
     }
 
     inline bool Object::empty() const noexcept {
-        return _size == 0;
+        return !_size;
     }
 
     inline Object::Pair & Object::add(string && key, Value && val) {
         // If this is the first pair, allocate backing array
         if (!_pairs) {
-            _pairs = static_cast<Pair *>(::operator new(8 * sizeof(Pair)));
+            _pairs = static_cast<Pair *>(::operator new(8u * sizeof(Pair)));
             _type_capacity = (uint32_t(Type::object) << 29) | 1u;
         }
 
@@ -808,8 +807,8 @@ namespace qc::json {
         }
 
         // If we're at capacity, expand
-        if (const uint32_t capacity(capacity()); _size >= capacity) {
-            const uint32_t newCapacity(capacity << 1);
+        if (const uint32_t capacity{Object::capacity()}; _size >= capacity) {
+            const uint32_t newCapacity{capacity << 1};
             Pair * const newPairs(static_cast<Pair *>(::operator new(newCapacity * sizeof(Pair))));
             Pair * const newPos(newPairs + (pos - _pairs));
             // Copy the pairs before the one we're inserting
@@ -878,7 +877,7 @@ namespace qc::json {
     inline void Object::clear() noexcept {
         // Destruct the pairs
         for (Pair & pair : *this) pair.~pair();
-        _size = 0;
+        _size = 0u;
     }
 
     inline Object::iterator Object::begin() noexcept {
@@ -910,7 +909,7 @@ namespace qc::json {
         const Pair * low(_pairs), * high(endPos);
         while (low < high) {
             const Pair * const mid(low + ((high - low) >> 1));
-            const int delta(std::strcmp(key.data(), mid->first.c_str()));
+            const int delta{std::strcmp(key.data(), mid->first.c_str())};
             if (delta < 0) {
                 high = mid;
             }
@@ -931,12 +930,12 @@ namespace qc::json {
 
     template <typename T, typename... Ts>
     inline Array::Array(T && val, Ts &&... vals) :
-        _type_capacity((uint32_t(Type::array) << 29) | (std::max(_ceil2(1 + sizeof...(Ts)), uint32_t(8)) >> 3)),
-        _size(1 + sizeof...(Ts)),
+        _type_capacity((uint32_t(Type::array) << 29) | (std::max(_ceil2(1u + sizeof...(Ts)), uint32_t(8u)) >> 3)),
+        _size(1u + sizeof...(Ts)),
         _values(static_cast<Value *>(::operator new(_size * sizeof(Value))))
     {
         // Populate `_values` using fold expression
-        int index(0);
+        int index{0};
         auto f([this, &index](auto && val) {
             new (_values + index) Value(std::forward<decltype(val)>(val));
             ++index;
@@ -947,19 +946,19 @@ namespace qc::json {
 
     inline Array::Array(Array && other) noexcept :
         _type_capacity(std::exchange(other._type_capacity, uint32_t(Type::array) << 29)),
-        _size(std::exchange(other._size, 0)),
+        _size(std::exchange(other._size, 0u)),
         _values(std::exchange(other._values, nullptr))
     {}
 
     inline Array & Array::operator=(Array && other) noexcept {
         _type_capacity = std::exchange(other._type_capacity, uint32_t(Type::array) << 29);
-        _size = std::exchange(other._size, 0);
+        _size = std::exchange(other._size, 0u);
         _values = std::exchange(other._values, nullptr);
         return *this;
     }
 
     inline Array::~Array() noexcept {
-        if (_size > 0) {
+        if (_size) {
             clear();
             ::operator delete(_values);
         }
@@ -974,18 +973,18 @@ namespace qc::json {
     }
 
     inline bool Array::empty() const noexcept {
-        return _size == 0;
+        return !_size;
     }
 
     inline Value & Array::add(Value && val) noexcept {
         // If this is the first value, allocate initial storage
         if (!_values) {
-            _values = static_cast<Value *>(::operator new(8 * sizeof(Value)));
+            _values = static_cast<Value *>(::operator new(8u * sizeof(Value)));
             _type_capacity = (uint32_t(Type::array) << 29) | 1u;
         }
         // If we're at capacity, expand
-        else if (const uint32_t capacity(capacity());  _size >= capacity) {
-            const uint32_t newCapacity(capacity << 1);
+        else if (const uint32_t capacity{Array::capacity()};  _size >= capacity) {
+            const uint32_t newCapacity{capacity << 1};
             Value * const newValues(static_cast<Value *>(::operator new(newCapacity * sizeof(Value))));
             std::copy(reinterpret_cast<const uint64_t *>(_values), reinterpret_cast<const uint64_t *>(cend()), reinterpret_cast<uint64_t *>(newValues));
             // Update our current state
@@ -1069,11 +1068,9 @@ namespace qc::json {
     }
 
     inline String::String(const string_view str) noexcept :
-        _type_size((uint32_t(Type::string) << 29) | uint32_t(str.size())),
-        _inlineChars0(),
-        _inlineChars1()
+        _type_size((uint32_t(Type::string) << 29) | uint32_t(str.size()))
     {
-        if (str.size() <= 12) {
+        if (str.size() <= 12u) {
             std::copy(str.cbegin(), str.cend(), reinterpret_cast<char *>(&_inlineChars0));
         }
         else {
@@ -1084,19 +1081,19 @@ namespace qc::json {
 
     inline String::String(String && other) noexcept :
         _type_size(std::exchange(other._type_size, uint32_t(Type::string) << 29)),
-        _inlineChars0(std::exchange(other._inlineChars0, 0)),
-        _inlineChars1(std::exchange(other._inlineChars1, 0))
+        _inlineChars0(std::exchange(other._inlineChars0, 0u)),
+        _inlineChars1(std::exchange(other._inlineChars1, 0u))
     {}
 
     inline String & String::operator=(String && other) noexcept {
         _type_size = std::exchange(other._type_size, uint32_t(Type::string) << 29);
-        _inlineChars0 = std::exchange(other._inlineChars0, 0);
-        _inlineChars1 = std::exchange(other._inlineChars1, 0);
+        _inlineChars0 = std::exchange(other._inlineChars0, 0u);
+        _inlineChars1 = std::exchange(other._inlineChars1, 0u);
         return *this;
     }
 
     inline String::~String() noexcept {
-        if (size() > 12) ::operator delete(_dynamicChars);
+        if (size() > 12u) ::operator delete(_dynamicChars);
     }
 
     inline uint32_t String::size() const noexcept {
@@ -1104,8 +1101,8 @@ namespace qc::json {
     }
 
     inline string_view String::view() const noexcept {
-        uint32_t size(size());
-        return {size > 12 ? _dynamicChars : reinterpret_cast<const char *>(&_inlineChars0), size};
+        uint32_t size{String::size()};
+        return {size > 12u ? _dynamicChars : reinterpret_cast<const char *>(&_inlineChars0), size};
     }
 
     inline Value decode(const string_view json) {

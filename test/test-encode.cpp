@@ -276,49 +276,49 @@ TEST_CLASS(Encode) {
         }
         { // Max integer 64
             qc::json::Encoder encoder;
-            uint64_t val(0b0'10000110011'1111111111111111111111111111111111111111111111111111u);
+            uint64_t val{0b0'10000110011'1111111111111111111111111111111111111111111111111111u};
             encoder.val(reinterpret_cast<const double &>(val));
             Assert::AreEqual(R"(9007199254740991)"s, encoder.finish());
         }
         { // Max integer 32
             qc::json::Encoder encoder;
-            uint32_t val(0b0'10010110'11111111111111111111111u);
+            uint32_t val{0b0'10010110'11111111111111111111111u};
             encoder.val(reinterpret_cast<const float &>(val));
             Assert::AreEqual(R"(16777215)"s, encoder.finish());
         }
         { // Max 64
             qc::json::Encoder encoder;
-            uint64_t val(0b0'11111111110'1111111111111111111111111111111111111111111111111111u);
+            uint64_t val{0b0'11111111110'1111111111111111111111111111111111111111111111111111u};
             encoder.val(reinterpret_cast<const double &>(val));
             Assert::AreEqual(R"(1.7976931348623157e+308)"s, encoder.finish());
         }
         { // Max 32
             qc::json::Encoder encoder;
-            uint32_t val(0b0'11111110'11111111111111111111111u);
+            uint32_t val{0b0'11111110'11111111111111111111111u};
             encoder.val(reinterpret_cast<const float &>(val));
             Assert::AreEqual(R"(3.4028234663852886e+38)"s, encoder.finish());
         }
         { // Min normal 64
             qc::json::Encoder encoder;
-            uint64_t val(0b0'00000000001'0000000000000000000000000000000000000000000000000000u);
+            uint64_t val{0b0'00000000001'0000000000000000000000000000000000000000000000000000u};
             encoder.val(reinterpret_cast<const double &>(val));
             Assert::AreEqual(R"(2.2250738585072014e-308)"s, encoder.finish());
         }
         { // Min normal 32
             qc::json::Encoder encoder;
-            uint32_t val(0b0'00000001'00000000000000000000000u);
+            uint32_t val{0b0'00000001'00000000000000000000000u};
             encoder.val(reinterpret_cast<const float &>(val));
             Assert::AreEqual(R"(1.1754943508222875e-38)"s, encoder.finish());
         }
         { // Min subnormal 64
             qc::json::Encoder encoder;
-            uint64_t val(0b0'00000000000'0000000000000000000000000000000000000000000000000001u);
+            uint64_t val{0b0'00000000000'0000000000000000000000000000000000000000000000000001u};
             encoder.val(reinterpret_cast<const double &>(val));
             Assert::AreEqual(R"(5e-324)"s, encoder.finish());
         }
         { // Min subnormal 32
             qc::json::Encoder encoder;
-            uint64_t val(0b0'00000000'00000000000000000000001u);
+            uint64_t val{0b0'00000000'00000000000000000000001u};
             encoder.val(reinterpret_cast<const float &>(val));
             Assert::AreEqual(R"(1.401298464324817e-45)"s, encoder.finish());
         }
