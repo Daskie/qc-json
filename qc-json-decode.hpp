@@ -1,9 +1,9 @@
 #pragma once
 
 //
-// QC Json 1.2.3
+// QC Json 1.2.4
 // Austin Quick
-// July 2019 - May 2020
+// July 2019 - July 2020
 // https://github.com/Daskie/qc-json
 //
 // Decodes data from a JSON string and sends it to the provided `Composer`.
@@ -20,6 +20,26 @@
 #include <system_error>
 #include <utility>
 
+#ifndef QC_JSON_COMMON
+#define QC_JSON_COMMON
+
+namespace qc::json {
+
+    //
+    // Common exception type used for all qc::json exceptions.
+    //
+    struct Error : std::runtime_error {
+
+        Error(const std::string & msg = {}) noexcept :
+            std::runtime_error(msg)
+        {}
+
+    };
+
+} // namespace qc::json
+
+#endif // QC_JSON_COMMON
+
 namespace qc::json {
 
     using std::string;
@@ -31,7 +51,7 @@ namespace qc::json {
     // This will be thrown if anything goes wrong during the decoding process.
     // `position` is the index into the string where the error occured.
     //
-    struct DecodeError : public std::runtime_error {
+    struct DecodeError : Error {
 
         size_t position;
 
@@ -429,8 +449,8 @@ namespace qc::json {
     };
 
     inline DecodeError::DecodeError(const string & msg, const size_t position) noexcept :
-        std::runtime_error(msg),
-        position(position)
+        Error(msg),
+        position{position}
     {}
 
     template <typename Composer, typename State>

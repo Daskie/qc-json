@@ -1,9 +1,9 @@
 #pragma once
 
 //
-// QC Json 1.2.3
+// QC Json 1.2.4
 // Austin Quick
-// July 2019 - May 2020
+// July 2019 - July 2020
 // https://github.com/Daskie/qc-json
 //
 // Provides an interface for decoding a JSON strings to JSON objects, creating/manipulating JSON objects, and encoding
@@ -31,11 +31,7 @@ namespace qc::json {
     //
     // This will be thrown when attempting to access a value as the wrong type.
     //
-    struct TypeError : public std::runtime_error {
-
-        TypeError() noexcept;
-
-    };
+    struct TypeError : Error {};
 
     //
     // The type of the JSON value.
@@ -462,10 +458,6 @@ namespace qc::json {
             }
         }
     }
-
-    inline TypeError::TypeError() noexcept :
-        std::runtime_error(nullptr)
-    {}
 
     inline Value::Value(Object && val) noexcept :
         Value(reinterpret_cast<Value &&>(val))

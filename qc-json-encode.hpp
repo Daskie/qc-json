@@ -1,9 +1,9 @@
 #pragma once
 
 //
-// QC Json 1.2.3
+// QC Json 1.2.4
 // Austin Quick
-// July 2019 - May 2020
+// July 2019 - July 2020
 // https://github.com/Daskie/qc-json
 //
 // Encodes data into a JSON string.
@@ -18,6 +18,26 @@
 #include <string>
 #include <utility>
 #include <vector>
+
+#ifndef QC_JSON_COMMON
+#define QC_JSON_COMMON
+
+namespace qc::json {
+
+    //
+    // Common exception type used for all qc::json exceptions.
+    //
+    struct Error : std::runtime_error {
+
+        Error(const std::string & msg = {}) noexcept :
+            std::runtime_error(msg)
+        {}
+
+    };
+
+} // namespace qc::json
+
+#endif // QC_JSON_COMMON
 
 namespace qc::json {
 
@@ -35,7 +55,7 @@ namespace qc::json {
     //
     // This will be thrown if anything goes wrong during the encoding process.
     //
-    struct EncodeError : public std::runtime_error {
+    struct EncodeError : Error {
 
         EncodeError(const string & msg) noexcept;
 
@@ -121,7 +141,7 @@ namespace qc::json {
 namespace qc::json {
 
     inline EncodeError::EncodeError(const string & msg) noexcept :
-        std::runtime_error(msg)
+        Error(msg)
     {}
 
     inline Encoder::Encoder(Encoder && other) :
