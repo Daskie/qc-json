@@ -1,5 +1,5 @@
 # QC Json
-###### Clean, quick, and simple JSON library for C++17
+###### Clean, quick, and simple JSON library for C++20
 
 ### Some JSON
 
