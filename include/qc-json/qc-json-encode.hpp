@@ -1,9 +1,9 @@
 #pragma once
 
 //
-// QC Json 1.2.4
+// QC Json 1.3.0
 // Austin Quick
-// July 2019 - July 2020
+// 2019 - 2020
 // https://github.com/Daskie/qc-json
 //
 // Encodes data into a JSON string.
@@ -12,6 +12,8 @@
 //
 
 #include <cctype>
+#include <cstddef>
+
 #include <charconv>
 #include <sstream>
 #include <stdexcept>
@@ -29,7 +31,7 @@ namespace qc::json {
     //
     struct Error : std::runtime_error {
 
-        Error(const std::string & msg = {}) noexcept :
+        explicit Error(const std::string & msg = {}) noexcept :
             std::runtime_error(msg)
         {}
 
@@ -57,7 +59,7 @@ namespace qc::json {
     //
     struct EncodeError : Error {
 
-        EncodeError(const string & msg) noexcept;
+        explicit EncodeError(const string & msg) noexcept;
 
     };
 
@@ -71,7 +73,7 @@ namespace qc::json {
         Encoder() = default;
 
         Encoder(const Encoder & other) = delete;
-        Encoder(Encoder && other);
+        Encoder(Encoder && other) noexcept;
 
         Encoder & operator=(const Encoder & other) = delete;
         Encoder & operator=(Encoder && other) = delete;
@@ -100,7 +102,7 @@ namespace qc::json {
         Encoder & val(double v);
         Encoder & val(float v);
         Encoder & val(bool v);
-        Encoder & val(nullptr_t);
+        Encoder & val(std::nullptr_t);
         template <typename T> Encoder & val(const T & v);
 
         Encoder & end();
@@ -130,11 +132,23 @@ namespace qc::json {
         void _encode(uint64_t val);
         void _encode(double val);
         void _encode(bool val);
-        void _encode(nullptr_t);
+        void _encode(std::nullptr_t);
 
     };
 
 }
+
+//
+// Specialize `qc_json_encode` to enable encoding of custom types
+// Example:
+//      template <>
+//      struct qc_json_encode<std::pair<int, int>> {
+//          void operator()(qc::json::Encoder & encoder, const std::pair<int, int> & v) {
+//              encoder.array(true).val(v.first).val(v.second).end();
+//          }
+//      };
+//
+template <typename T> struct qc_json_encode;
 
 // IMPLEMENTATION //////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -144,7 +158,7 @@ namespace qc::json {
         Error(msg)
     {}
 
-    inline Encoder::Encoder(Encoder && other) :
+    inline Encoder::Encoder(Encoder && other) noexcept :
         _oss(std::move(other._oss)),
         _state(std::move(other._state)),
         _indentation(std::exchange(other._indentation, 0)),
@@ -273,7 +287,7 @@ namespace qc::json {
         return *this;
     }
 
-    inline Encoder & Encoder::val(const nullptr_t) {
+    inline Encoder & Encoder::val(const std::nullptr_t) {
         _val(nullptr);
 
         return *this;
@@ -281,7 +295,7 @@ namespace qc::json {
 
     template <typename T>
     inline Encoder & Encoder::val(const T & v) {
-        ::qc_json_encode(*this, v);
+        qc_json_encode<T>()(*this, v);
 
         return *this;
     }
@@ -331,10 +345,10 @@ namespace qc::json {
     }
 
     template <typename T>
-    inline void Encoder::_val(const T t) {
+    inline void Encoder::_val(const T v) {
         _checkPre();
         _prefix();
-        _encode(t);
+        _encode(v);
 
         if (_state.empty()) {
             _isComplete = true;
@@ -425,18 +439,25 @@ namespace qc::json {
     }
 
     inline void Encoder::_encode(const double v) {
+#if 0 // TODO: Switch to std::to_chars form once GCC supports it :(
         char buffer[32];
 
         std::to_chars_result res(std::to_chars(buffer, buffer + sizeof(buffer), v));
 
         _oss << string_view(buffer, res.ptr - buffer);
     }
+#else
+        char buffer[32];
+        int len{sprintf(buffer, "%g", v)};
+        _oss << string_view(buffer, len);
+#endif
+    }
 
     inline void Encoder::_encode(const bool v) {
         _oss << (v ? "true"sv : "false"sv);
     }
 
-    inline void Encoder::_encode(nullptr_t) {
+    inline void Encoder::_encode(std::nullptr_t) {
         _oss << "null"sv;
     }
 

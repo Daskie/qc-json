@@ -1,9 +1,9 @@
 #pragma once
 
 //
-// QC Json 1.2.4
+// QC Json 1.3.0
 // Austin Quick
-// July 2019 - July 2020
+// 2019 - 2020
 // https://github.com/Daskie/qc-json
 //
 // Provides an interface for decoding a JSON strings to JSON objects, creating/manipulating JSON objects, and encoding
@@ -14,8 +14,9 @@
 // See the GitHub link above for more info and examples.
 //
 
-#include <algorithm>
 #include <cstring>
+
+#include <algorithm>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -57,8 +58,13 @@ namespace qc::json {
 
     class Object;
     class Array;
+    class String;
 
     class Value {
+
+        friend Object;
+        friend Array;
+        friend String;
 
         public:
 
@@ -81,7 +87,7 @@ namespace qc::json {
         Value(double val) noexcept;
         Value(float val) noexcept;
         Value(bool val) noexcept;
-        Value(nullptr_t) noexcept;
+        Value(std::nullptr_t) noexcept;
         template <typename T> Value(const T & val);
 
         Value(const Value &) = delete;
@@ -154,18 +160,16 @@ namespace qc::json {
 
         private:
 
-        uint32_t _type_data0{0u};
+        struct {
+            uint32_t type_and_data;
+            NumberType numberType;
+        } _data0{};
         union {
-            uint32_t _data1{0u};
-            NumberType _numberType;
-        };
-        union {
-            uint64_t _data2{0u};
-            int64_t _signedInteger;
-            uint64_t _unsignedInteger;
-            double _floater;
-            bool _boolean;
-        };
+            int64_t signedInteger;
+            uint64_t unsignedInteger;
+            double floater;
+            bool boolean;
+        } _data1{};
 
     };
 
@@ -220,7 +224,7 @@ namespace qc::json {
 
         private:
 
-        uint32_t _type_capacity{uint32_t(Type::object) << 29};
+        uint32_t _type_and_capacity{uint32_t(Type::object) << 29};
         uint32_t _size{0u};
         alignas(8) Pair * _pairs{nullptr};
 
@@ -237,7 +241,7 @@ namespace qc::json {
         using const_iterator = const Value *;
 
         Array() noexcept = default;
-        template <typename T, typename... Ts> Array(T && val, Ts &&... vals);
+        template <typename T, typename... Ts> explicit Array(T && val, Ts &&... vals);
 
         Array(const Array & other) = delete;
         Array(Array && other) noexcept;
@@ -276,7 +280,7 @@ namespace qc::json {
 
         private:
 
-        uint32_t _type_capacity{uint32_t(Type::array) << 29};
+        uint32_t _type_and_capacity{uint32_t(Type::array) << 29};
         uint32_t _size{0u};
         alignas(8) Value * _values{nullptr};
 
@@ -286,7 +290,7 @@ namespace qc::json {
 
         public:
 
-        String(string_view str) noexcept;
+        explicit String(string_view str) noexcept;
 
         String(const String &) = delete;
         String(String && other) noexcept;
@@ -302,7 +306,7 @@ namespace qc::json {
 
         private:
 
-        uint32_t _type_size{uint32_t(Type::string) << 29};
+        uint32_t _type_and_size{uint32_t(Type::string) << 29};
         uint32_t _inlineChars0{0u};
         union {
             uint64_t _inlineChars1{0u};
@@ -345,16 +349,6 @@ template <typename T> struct qc_json_valueFrom;
 // IMPLEMENTATION //////////////////////////////////////////////////////////////////////////////////////////////////////
 
 namespace qc::json {
-
-    constexpr uint32_t _ceil2(uint32_t v) noexcept {
-        --v;
-        v |= v >> 1;
-        v |= v >> 2;
-        v |= v >> 4;
-        v |= v >> 8;
-        v |= v >> 16;
-        return ++v;
-    }
 
     class _Composer {
 
@@ -460,103 +454,109 @@ namespace qc::json {
     }
 
     inline Value::Value(Object && val) noexcept :
-        Value(reinterpret_cast<Value &&>(val))
+        Value{std::move(reinterpret_cast<Value &>(val))}
     {}
 
     inline Value::Value(Array && val) noexcept :
-        Value(reinterpret_cast<Value &&>(val))
+        Value{std::move(reinterpret_cast<Value &>(val))}
     {}
 
-    inline Value::Value(string_view val) noexcept :
-        Value(reinterpret_cast<Value &&>(String(val)))
+    inline Value::Value(const string_view val) noexcept :
+        Value{reinterpret_cast<Value &&>(String{val})}
     {}
 
     inline Value::Value(const string & val) noexcept :
-        Value(string_view(val))
+        Value{string_view{val}}
     {}
 
     inline Value::Value(const char * const val) :
-        Value(string_view(val))
+        Value{string_view{val}}
     {}
 
     inline Value::Value(char * const val) :
-        Value(string_view(val))
+        Value{string_view{val}}
     {}
 
     inline Value::Value(const char val) noexcept :
-        Value(string_view(&val, 1u))
+        Value{string_view{&val, 1u}}
     {}
 
     inline Value::Value(const int64_t val) noexcept :
-        _type_data0(uint32_t(Type::number) << 29),
-        _numberType(NumberType::signedInteger),
-        _signedInteger(val)
+        _data0{uint32_t(Type::number) << 29, NumberType::signedInteger},
+        _data1{.signedInteger = val}
     {}
 
     inline Value::Value(const int32_t val) noexcept :
-        Value(int64_t(val))
+        Value{int64_t{val}}
     {}
 
     inline Value::Value(const int16_t val) noexcept :
-        Value(int64_t(val))
+        Value{int64_t{val}}
     {}
 
     inline Value::Value(const int8_t val) noexcept :
-        Value(int64_t(val))
+        Value{int64_t{val}}
     {}
 
     inline Value::Value(const uint64_t val) noexcept :
-        _type_data0(uint32_t(Type::number) << 29),
-        _numberType(NumberType::unsignedInteger),
-        _unsignedInteger(val)
+        _data0{uint32_t(Type::number) << 29, NumberType::unsignedInteger},
+        _data1{.unsignedInteger = val}
     {}
 
     inline Value::Value(const uint32_t val) noexcept :
-        Value(uint64_t(val))
+        Value{uint64_t{val}}
     {}
 
     inline Value::Value(const uint16_t val) noexcept :
-        Value(uint64_t(val))
+        Value{uint64_t{val}}
     {}
 
     inline Value::Value(const uint8_t val) noexcept :
-        Value(uint64_t(val))
+        Value{uint64_t{val}}
     {}
 
     inline Value::Value(const double val) noexcept :
-        _type_data0(uint32_t(Type::number) << 29),
-        _numberType(NumberType::floater),
-        _floater(val)
+        _data0{uint32_t(Type::number) << 29, NumberType::floater},
+        _data1{.floater = val}
     {}
 
     inline Value::Value(const float val) noexcept :
-        Value(double(val))
+        Value{double{val}}
     {}
 
     inline Value::Value(const bool val) noexcept :
-        _type_data0(uint32_t(Type::boolean) << 29),
-        _boolean(val)
+        _data0{uint32_t(Type::boolean) << 29},
+        _data1{.boolean = val}
     {}
 
-    inline Value::Value(const nullptr_t) noexcept :
-        Value()
-    {}
+    inline Value::Value(const std::nullptr_t) noexcept {}
 
     template <typename T>
     inline Value::Value(const T & val) :
-        Value(qc_json_valueFrom<T>()(val))
+        Value{qc_json_valueFrom<T>()(val)}
     {}
 
     inline Value::Value(Value && other) noexcept :
-        _type_data0(std::exchange(other._type_data0, 0u)),
-        _data1(std::exchange(other._data1, 0u)),
-        _data2(std::exchange(other._data2, 0u))
+        _data0{std::exchange(other._data0, {})},
+        _data1{std::exchange(other._data1, {})}
     {}
 
     inline Value & Value::operator=(Value && other) noexcept {
-        _type_data0 = std::exchange(other._type_data0, 0u);
-        _data1 = std::exchange(other._data1, 0u);
-        _data2 = std::exchange(other._data2, 0u);
+        switch (type()) {
+            case Type::object:
+                reinterpret_cast<Object &>(*this) = std::move(reinterpret_cast<Object &>(other));
+                break;
+            case Type::array:
+                reinterpret_cast<Array &>(*this) = std::move(reinterpret_cast<Array &>(other));
+                break;
+            case Type::string:
+                reinterpret_cast<String &>(*this) = std::move(reinterpret_cast<String &>(other));
+                break;
+            default:
+                _data0 = std::exchange(other._data0, {});
+                _data1 = std::exchange(other._data1, {});
+        }
+
         return *this;
     }
 
@@ -571,11 +571,12 @@ namespace qc::json {
             case Type::string:
                 reinterpret_cast<String &>(*this).~String();
                 break;
+            default:;
         }
     }
 
     inline Type Value::type() const noexcept {
-        return Type(_type_data0 >> 29);
+        return Type{_data0.type_and_data >> 29};
     }
 
     inline bool Value::isObject() const noexcept {
@@ -635,17 +636,17 @@ namespace qc::json {
         // Signed integer
         else if constexpr (std::is_integral_v<U> && std::is_signed_v<U>) {
             return isNumber() && (
-                _numberType == NumberType::signedInteger && _signedInteger <= std::numeric_limits<U>::max() && _signedInteger >= std::numeric_limits<U>::min() ||
-                _numberType == NumberType::unsignedInteger && _unsignedInteger <= uint64_t(std::numeric_limits<U>::max()) ||
-                _numberType == NumberType::floater && U(_floater) == _floater
+                ((_data0.numberType == NumberType::signedInteger) && (_data1.signedInteger <= std::numeric_limits<U>::max()) && (_data1.signedInteger >= std::numeric_limits<U>::min())) ||
+                ((_data0.numberType == NumberType::unsignedInteger) && (_data1.unsignedInteger <= uint64_t{std::numeric_limits<U>::max()})) ||
+                ((_data0.numberType == NumberType::floater) && (U(_data1.floater) == _data1.floater))
             );
         }
         // Unsigned integer
         else if constexpr (std::is_integral_v<U> && std::is_unsigned_v<U>) {
             return isNumber() && (
-                _numberType == NumberType::unsignedInteger && _unsignedInteger <= std::numeric_limits<U>::max() ||
-                _numberType == NumberType::signedInteger && _signedInteger >= 0 && uint64_t(_signedInteger) <= std::numeric_limits<U>::max() ||
-                _numberType == NumberType::floater && U(_floater) == _floater
+                ((_data0.numberType == NumberType::unsignedInteger) && (_data1.unsignedInteger <= std::numeric_limits<U>::max())) ||
+                ((_data0.numberType == NumberType::signedInteger) && (_data1.signedInteger >= 0) && (uint64_t(_data1.signedInteger) <= std::numeric_limits<U>::max())) ||
+                ((_data0.numberType == NumberType::floater) && (U(_data1.floater) == _data1.floater))
             );
         }
         // Floater
@@ -660,7 +661,7 @@ namespace qc::json {
 
     template <bool safe>
     inline const Object & Value::asObject() const noexcept(!safe) {
-        if constexpr (safe) if (!isObject()) throw TypeError();
+        if constexpr (safe) if (!isObject()) throw TypeError{};
         return reinterpret_cast<const Object &>(*this);
     }
 
@@ -671,7 +672,7 @@ namespace qc::json {
 
     template <bool safe>
     inline const Array & Value::asArray() const noexcept(!safe) {
-        if constexpr (safe) if (!isArray()) throw TypeError();
+        if constexpr (safe) if (!isArray()) throw TypeError{};
         return reinterpret_cast<const Array &>(*this);
     }
 
@@ -682,25 +683,25 @@ namespace qc::json {
 
     template <bool safe>
     inline string_view Value::asString() const noexcept(!safe) {
-        if constexpr (safe) if (!isString()) throw TypeError();
+        if constexpr (safe) if (!isString()) throw TypeError{};
         return reinterpret_cast<const String &>(*this).view();
     }
 
     template <bool safe>
     inline std::variant<int64_t, uint64_t, double> Value::asNumber() const noexcept(!safe) {
-        if constexpr (safe) if (!isNumber()) throw TypeError();
-        switch (_numberType) {
-            case NumberType::signedInteger: return _signedInteger;
-            case NumberType::unsignedInteger: return _unsignedInteger;
-            case NumberType::floater: return _floater;
-            default: if constexpr (safe) throw TypeError(); else return _signedInteger;
+        if constexpr (safe) if (!isNumber()) throw TypeError{};
+        switch (_data0.numberType) {
+            case NumberType::signedInteger: return _data1.signedInteger;
+            case NumberType::unsignedInteger: return _data1.unsignedInteger;
+            case NumberType::floater: return _data1.floater;
+            default: if constexpr (safe) throw TypeError{}; else return _data1.signedInteger;
         }
     }
 
     template <bool safe>
     inline bool Value::asBoolean() const noexcept(!safe) {
-        if constexpr (safe) if (!isBoolean()) throw TypeError();
-        return _boolean;
+        if constexpr (safe) if (!isBoolean()) throw TypeError{};
+        return _data1.boolean;
     }
 
     template <typename T, bool safe>
@@ -725,7 +726,7 @@ namespace qc::json {
         }
         // Character
         else if constexpr (std::is_same_v<U, char>) {
-            if constexpr (safe) if (!is<char>()) throw TypeError();
+            if constexpr (safe) if (!is<char>()) throw TypeError{};
             return asString<true>().front();
         }
         // Boolean
@@ -734,12 +735,12 @@ namespace qc::json {
         }
         // Number
         else if constexpr (std::is_arithmetic_v<U>) {
-            if constexpr (safe) if (!is<U>()) throw TypeError();
-            switch (_numberType) {
-                case NumberType::signedInteger: return U(_signedInteger);
-                case NumberType::unsignedInteger: return U(_unsignedInteger);
-                case NumberType::floater: return U(_floater);
-                default: if constexpr (safe) throw TypeError(); else return U(_signedInteger);
+            if constexpr (safe) if (!is<U>()) throw TypeError{};
+            switch (_data0.numberType) {
+                case NumberType::signedInteger: return U(_data1.signedInteger);
+                case NumberType::unsignedInteger: return U(_data1.unsignedInteger);
+                case NumberType::floater: return U(_data1.floater);
+                default: if constexpr (safe) throw TypeError{}; else return U(_data1.signedInteger);
             }
         }
         // Other
@@ -749,15 +750,18 @@ namespace qc::json {
     }
 
     inline Object::Object(Object && other) noexcept :
-        _type_capacity(std::exchange(other._type_capacity, uint32_t(Type::object) << 29)),
-        _size(std::exchange(other._size, 0u)),
-        _pairs(std::exchange(other._pairs, nullptr))
+        _type_and_capacity{std::exchange(other._type_and_capacity, uint32_t(Type::object) << 29)},
+        _size{std::exchange(other._size, 0u)},
+        _pairs{std::exchange(other._pairs, nullptr)}
     {}
 
     inline Object & Object::operator=(Object && other) noexcept {
-        _type_capacity = std::exchange(other._type_capacity, uint32_t(Type::object) << 29);
+        this->~Object();
+
+        _type_and_capacity = std::exchange(other._type_and_capacity, uint32_t(Type::object) << 29);
         _size = std::exchange(other._size, 0u);
         _pairs = std::exchange(other._pairs, nullptr);
+
         return *this;
     }
 
@@ -773,7 +777,7 @@ namespace qc::json {
     }
 
     inline uint32_t Object::capacity() const noexcept {
-        return _type_capacity << 3;
+        return _type_and_capacity << 3;
     }
 
     inline bool Object::empty() const noexcept {
@@ -784,45 +788,65 @@ namespace qc::json {
         // If this is the first pair, allocate backing array
         if (!_pairs) {
             _pairs = static_cast<Pair *>(::operator new(8u * sizeof(Pair)));
-            _type_capacity = (uint32_t(Type::object) << 29) | 1u;
+            _type_and_capacity = (uint32_t(Type::object) << 29) | 1u;
         }
 
         // Find the position in the backing array where this pair should go
-        auto [pos, found](_search(key));
+        auto [pos, found]{_search(key)};
 
         // If key already exists, replace it
         if (found) {
-            pos->second.~Value();
-            pos->first = std::move(key);
-            new (&pos->second) Value(std::move(val));
+            pos->second = std::move(val);
             return *pos;
         }
 
         // If we're at capacity, expand
         if (const uint32_t capacity{Object::capacity()}; _size >= capacity) {
             const uint32_t newCapacity{capacity << 1};
-            Pair * const newPairs(static_cast<Pair *>(::operator new(newCapacity * sizeof(Pair))));
-            Pair * const newPos(newPairs + (pos - _pairs));
-            // Copy the pairs before the one we're inserting
-            std::copy(reinterpret_cast<const uint64_t *>(_pairs), reinterpret_cast<const uint64_t *>(pos), reinterpret_cast<uint64_t *>(newPairs));
-            // Copy the pairs after the one we're inserting, leaving a gap
-            std::copy(reinterpret_cast<const uint64_t *>(pos), reinterpret_cast<const uint64_t *>(cend()), reinterpret_cast<uint64_t *>(newPos + 1));
-            // Update our current state
+            Pair * const newPairs{static_cast<Pair *>(::operator new(newCapacity * sizeof(Pair)))};
+            Pair * const newPos{newPairs + (pos - _pairs)};
+
+            // Move over the pairs before the one we're inserting
+            for (Pair * src{_pairs}, * dst{newPairs}; src < pos; ++src, ++dst) {
+                new (&dst->first) string{std::move(src->first)};
+                src->first.~string();
+
+                dst->second._data0 = src->second._data0;
+                dst->second._data1 = src->second._data1;
+            }
+
+            // Move over the pairs after the one we're inserting, leaving a gap
+            for (Pair * src{pos}, * dst{newPos + 1}, * end{this->end()}; src < end; ++src, ++dst) {
+                new (&dst->first) string{std::move(src->first)};
+                src->first.~string();
+
+                dst->second._data0 = src->second._data0;
+                dst->second._data1 = src->second._data1;
+            }
+
+            // Update our state
             ::operator delete(_pairs);
             _pairs = newPairs;
-            _type_capacity = (uint32_t(Type::object) << 29) | (newCapacity >> 3);
+            _type_and_capacity = (uint32_t(Type::object) << 29) | (newCapacity >> 3);
             pos = newPos;
         }
         // Otherwise, we've still got space
         else {
             // Shift back the pairs after the one we're inserting, leaving a gap
-            Pair * const endPos(end());
-            std::copy_backward(reinterpret_cast<uint64_t *>(pos), reinterpret_cast<uint64_t *>(endPos), reinterpret_cast<uint64_t *>(endPos + 1));
+            Pair * const end{this->end()};
+            new (&end->first) string{};
+            for (Pair * src{end - 1}, * dst{end}; src >= pos; --src, --dst) {
+                dst->first = std::move(src->first);
+
+                dst->second._data0 = src->second._data0;
+                dst->second._data1 = src->second._data1;
+            }
+            pos->first.~string();
         }
 
-        // Construct the new pair
-        new (&pos->first) string(std::move(key));
-        new (&pos->second) Value(std::move(val));
+        // Add new entry
+        new (&pos->first) string{std::move(key)};
+        new (&pos->second) Value{std::move(val)};
         ++_size;
 
         return *pos;
@@ -833,7 +857,7 @@ namespace qc::json {
     }
 
     inline const Value & Object::at(const string_view key) const {
-        const auto [pos, found](_search(key));
+        const auto [pos, found]{_search(key)};
         if (!found) {
             throw std::out_of_range("Key not found");
         }
@@ -845,7 +869,7 @@ namespace qc::json {
     }
 
     inline Object::const_iterator Object::find(const string_view key) const {
-        const auto [pos, found](_search(key));
+        const auto [pos, found]{_search(key)};
         return found ? pos : cend();
     }
 
@@ -854,12 +878,18 @@ namespace qc::json {
     }
 
     inline Object::Pair Object::remove(const iterator it) noexcept {
-        // Save off pair and destruct
-        Pair pair(std::move(*it));
-        it->~pair();
+        // Save off pair
+        Pair pair{std::move(*it)};
 
         // Shift forward posterior pairs
-        std::copy(reinterpret_cast<const uint64_t *>(it + 1), reinterpret_cast<const uint64_t *>(cend()), reinterpret_cast<uint64_t *>(it));
+        Pair * const end{this->end()};
+        for (Pair * src{it + 1}, * dst{it}; src < end; ++src, ++dst) {
+            dst->first = std::move(src->first);
+
+            dst->second._data0 = src->second._data0;
+            dst->second._data1 = src->second._data1;
+        }
+        (end - 1)->first.~string();
 
         --_size;
 
@@ -897,10 +927,10 @@ namespace qc::json {
     }
 
     inline std::pair<const Object::Pair *, bool> Object::_search(const string_view key) const {
-        const Pair * const endPos(cend());
-        const Pair * low(_pairs), * high(endPos);
+        const Pair * const endPos{cend()};
+        const Pair * low{_pairs}, * high{endPos};
         while (low < high) {
-            const Pair * const mid(low + ((high - low) >> 1));
+            const Pair * const mid{low + ((high - low) >> 1)};
             const int delta{std::strcmp(key.data(), mid->first.c_str())};
             if (delta < 0) {
                 high = mid;
@@ -916,36 +946,39 @@ namespace qc::json {
     }
 
     inline std::pair<Object::Pair *, bool> Object::_search(const string_view key) {
-        const auto [pos, found](const_cast<const Object *>(this)->_search(key));
+        const auto [pos, found]{const_cast<const Object *>(this)->_search(key)};
         return {const_cast<Pair *>(pos), found};
     }
 
     template <typename T, typename... Ts>
     inline Array::Array(T && val, Ts &&... vals) :
-        _type_capacity((uint32_t(Type::array) << 29) | (std::max(_ceil2(1u + sizeof...(Ts)), uint32_t(8u)) >> 3)),
-        _size(1u + sizeof...(Ts)),
-        _values(static_cast<Value *>(::operator new(_size * sizeof(Value))))
+        _type_and_capacity{(uint32_t(Type::array) << 29) | (std::max(uint32_t(std::bit_ceil(1u + sizeof...(Ts))), 8u) >> 3)},
+        _size{1u + sizeof...(Ts)},
+        _values{static_cast<Value *>(::operator new(_size * sizeof(Value)))}
     {
         // Populate `_values` using fold expression
         int index{0};
-        auto f([this, &index](auto && val) {
-            new (_values + index) Value(std::forward<decltype(val)>(val));
+        auto f{[this, &index](auto && val) {
+            new (_values + index) Value{std::forward<decltype(val)>(val)};
             ++index;
-        });
+        }};
         f(std::forward<T>(val));
         (f(std::forward<Ts>(vals)), ...);
     }
 
     inline Array::Array(Array && other) noexcept :
-        _type_capacity(std::exchange(other._type_capacity, uint32_t(Type::array) << 29)),
-        _size(std::exchange(other._size, 0u)),
-        _values(std::exchange(other._values, nullptr))
+        _type_and_capacity{std::exchange(other._type_and_capacity, uint32_t(Type::array) << 29)},
+        _size{std::exchange(other._size, 0u)},
+        _values{std::exchange(other._values, nullptr)}
     {}
 
     inline Array & Array::operator=(Array && other) noexcept {
-        _type_capacity = std::exchange(other._type_capacity, uint32_t(Type::array) << 29);
+        this->~Array();
+
+        _type_and_capacity = std::exchange(other._type_and_capacity, uint32_t(Type::array) << 29);
         _size = std::exchange(other._size, 0u);
         _values = std::exchange(other._values, nullptr);
+
         return *this;
     }
 
@@ -961,7 +994,7 @@ namespace qc::json {
     }
 
     inline uint32_t Array::capacity() const noexcept {
-        return _type_capacity << 3;
+        return _type_and_capacity << 3;
     }
 
     inline bool Array::empty() const noexcept {
@@ -972,25 +1005,28 @@ namespace qc::json {
         // If this is the first value, allocate initial storage
         if (!_values) {
             _values = static_cast<Value *>(::operator new(8u * sizeof(Value)));
-            _type_capacity = (uint32_t(Type::array) << 29) | 1u;
+            _type_and_capacity = (uint32_t(Type::array) << 29) | 1u;
         }
         // If we're at capacity, expand
-        else if (const uint32_t capacity{Array::capacity()};  _size >= capacity) {
+        else if (const uint32_t capacity{this->capacity()}; _size >= capacity) {
             const uint32_t newCapacity{capacity << 1};
             Value * const newValues(static_cast<Value *>(::operator new(newCapacity * sizeof(Value))));
+
+            // Copy over values
             std::copy(reinterpret_cast<const uint64_t *>(_values), reinterpret_cast<const uint64_t *>(cend()), reinterpret_cast<uint64_t *>(newValues));
+
             // Update our current state
             ::operator delete(_values);
             _values = newValues;
-            _type_capacity = (uint32_t(Type::array) << 29) | (newCapacity >> 3);
+            _type_and_capacity = (uint32_t(Type::array) << 29) | (newCapacity >> 3);
         }
 
-        return *(new (_values + _size++) Value(std::move(val)));
+        return *new (_values + _size++) Value{std::move(val)};
     }
 
     inline const Value & Array::at(const uint32_t i) const {
         if (i >= _size) {
-            throw std::out_of_range("Index out of bounds");
+            throw std::out_of_range{"Index out of bounds"};
         }
 
         return _values[i];
@@ -1002,19 +1038,18 @@ namespace qc::json {
 
     inline Value Array::remove(const uint32_t i) {
         if (i >= _size) {
-            throw std::out_of_range("Index out of bounds");
+            throw std::out_of_range{"Index out of bounds"};
         }
 
         return remove(begin() + i);
     }
 
-    inline Value Array::remove(const iterator it) noexcept {
+    inline Value Array::remove(iterator it) noexcept {
         // Save off value and destruct
-        Value val(std::move(*it));
-        it->~Value();
+        Value val{std::move(*it)};
 
         // Shift posterior elements forward
-        std::copy(reinterpret_cast<const uint64_t *>(it + 1), reinterpret_cast<const uint64_t *>(end()), reinterpret_cast<uint64_t *>(it));
+        std::copy(reinterpret_cast<const uint64_t *>(it + 1), reinterpret_cast<const uint64_t *>(cend()), reinterpret_cast<uint64_t *>(it));
 
         --_size;
 
@@ -1023,7 +1058,7 @@ namespace qc::json {
 
     inline void Array::remove(const iterator it1, const iterator it2) noexcept {
         // Destruct the values
-        for (iterator it(it1); it != it2; ++it) it->~Value();
+        for (iterator it{it1}; it != it2; ++it) it->~Value();
 
         // Shift the posterior elements forward
         std::copy(reinterpret_cast<const uint64_t *>(it2), reinterpret_cast<const uint64_t *>(cend()), reinterpret_cast<uint64_t *>(it1));
@@ -1032,7 +1067,9 @@ namespace qc::json {
     }
 
     inline void Array::clear() noexcept {
-        remove(begin(), end());
+        // Destruct the values
+        for (Value & val : *this) val.~Value();
+        _size = 0u;
     }
 
     inline Array::iterator Array::begin() noexcept {
@@ -1060,7 +1097,7 @@ namespace qc::json {
     }
 
     inline String::String(const string_view str) noexcept :
-        _type_size((uint32_t(Type::string) << 29) | uint32_t(str.size()))
+        _type_and_size{(uint32_t(Type::string) << 29) | uint32_t(str.size())}
     {
         if (str.size() <= 12u) {
             std::copy(str.cbegin(), str.cend(), reinterpret_cast<char *>(&_inlineChars0));
@@ -1072,15 +1109,18 @@ namespace qc::json {
     }
 
     inline String::String(String && other) noexcept :
-        _type_size(std::exchange(other._type_size, uint32_t(Type::string) << 29)),
-        _inlineChars0(std::exchange(other._inlineChars0, 0u)),
-        _inlineChars1(std::exchange(other._inlineChars1, 0u))
+        _type_and_size{std::exchange(other._type_and_size, uint32_t(Type::string) << 29)},
+        _inlineChars0{std::exchange(other._inlineChars0, 0u)},
+        _inlineChars1{std::exchange(other._inlineChars1, 0u)}
     {}
 
     inline String & String::operator=(String && other) noexcept {
-        _type_size = std::exchange(other._type_size, uint32_t(Type::string) << 29);
+        this->~String();
+
+        _type_and_size = std::exchange(other._type_and_size, uint32_t(Type::string) << 29);
         _inlineChars0 = std::exchange(other._inlineChars0, 0u);
         _inlineChars1 = std::exchange(other._inlineChars1, 0u);
+
         return *this;
     }
 
@@ -1089,11 +1129,11 @@ namespace qc::json {
     }
 
     inline uint32_t String::size() const noexcept {
-        return _type_size & 0b000'11111'11111111'11111111'11111111u;
+        return _type_and_size & 0b000'11111'11111111'11111111'11111111u;
     }
 
     inline string_view String::view() const noexcept {
-        uint32_t size{String::size()};
+        const uint32_t size{this->size()};
         return {size > 12u ? _dynamicChars : reinterpret_cast<const char *>(&_inlineChars0), size};
     }
 

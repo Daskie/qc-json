@@ -1,9 +1,9 @@
 #pragma once
 
 //
-// QC Json 1.2.4
+// QC Json 1.3.0
 // Austin Quick
-// July 2019 - July 2020
+// 2019 - 2020
 // https://github.com/Daskie/qc-json
 //
 // Decodes data from a JSON string and sends it to the provided `Composer`.
@@ -12,6 +12,8 @@
 //
 
 #include <cctype>
+#include <cerrno> // TODO: Remove once gcc supports floating-point from_chars
+
 #include <charconv>
 #include <limits>
 #include <stdexcept>
@@ -30,7 +32,7 @@ namespace qc::json {
     //
     struct Error : std::runtime_error {
 
-        Error(const std::string & msg = {}) noexcept :
+        explicit Error(const std::string & msg = {}) noexcept :
             std::runtime_error(msg)
         {}
 
@@ -49,7 +51,7 @@ namespace qc::json {
 
     //
     // This will be thrown if anything goes wrong during the decoding process.
-    // `position` is the index into the string where the error occured.
+    // `position` is the index into the string where the error occurred.
     //
     struct DecodeError : Error {
 
@@ -434,6 +436,7 @@ namespace qc::json {
         }
 
         void _ingestFloater(State & state) {
+#if 0 // TODO: Use std::from_chars version once GCC supports it :(
             double val;
             std::from_chars_result res(std::from_chars(_pos, _end, val));
 
@@ -444,6 +447,17 @@ namespace qc::json {
 
             _pos = res.ptr;
             _composer.val(val, state);
+#else
+            errno = 0;
+            char * endPos{};
+            const double val{std::strtod(_pos, &endPos)};
+            if (endPos == _pos || errno == ERANGE) {
+                throw DecodeError("Invalid floater", _pos - _start);
+            }
+
+            _pos = endPos;
+            _composer.val(val, state);
+#endif
         }
 
     };

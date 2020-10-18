@@ -1,10 +1,2 @@
-*.vcxproj
-*.vcxproj.filters
-*.vcxproj.user
-*.sln
-
-.vs/
-Debug/
-Release/
-x64/Debug/
-x64/Release/
+.idea/
+cmake*/
