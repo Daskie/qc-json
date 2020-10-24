@@ -227,8 +227,10 @@ TEST(decode, string) {
         EXPECT_TRUE(composer.isDone());
     }
     { // Missing escape sequence
-        EXPECT_THROW(qc::json::decode(R"("\")", dummyComposer, nullptr), qc::json::DecodeError);
-        EXPECT_THROW(qc::json::decode(R"([ "\" ])", dummyComposer, nullptr), qc::json::DecodeError);
+        const std::string_view brokenSeq{R"("\\\")"};
+        EXPECT_THROW(qc::json::decode(brokenSeq, dummyComposer, nullptr), qc::json::DecodeError);
+        const std::string_view brokenSeqInArray{R"([ "\\\" ])"};
+        EXPECT_THROW(qc::json::decode(brokenSeqInArray, dummyComposer, nullptr), qc::json::DecodeError);
     }
     { // Unknown escape sequence
         EXPECT_THROW(qc::json::decode(R"("\v")", dummyComposer, nullptr), qc::json::DecodeError);
@@ -240,9 +242,14 @@ TEST(decode, string) {
         EXPECT_TRUE(composer.isDone());
     }
     { // Non-ascii unicode
-        EXPECT_THROW(qc::json::decode(R"("\u0080")", dummyComposer, nullptr), qc::json::DecodeError);
-        EXPECT_THROW(qc::json::decode(R"("\u0F00")", dummyComposer, nullptr), qc::json::DecodeError);
-        EXPECT_THROW(qc::json::decode(R"("\uF000")", dummyComposer, nullptr), qc::json::DecodeError);
+        const std::string_view str1{R"("\u0080")"};
+        EXPECT_THROW(qc::json::decode(str1, dummyComposer, nullptr), qc::json::DecodeError);
+
+        const std::string_view str2{R"("\u0F00")"};
+        EXPECT_THROW(qc::json::decode(str2, dummyComposer, nullptr), qc::json::DecodeError);
+
+        const std::string_view str3{R"("\uF000")"};
+        EXPECT_THROW(qc::json::decode(str3, dummyComposer, nullptr), qc::json::DecodeError);
     }
     { // Missing all unicode digits
         EXPECT_THROW(qc::json::decode(R"("\u")", dummyComposer, nullptr), qc::json::DecodeError);

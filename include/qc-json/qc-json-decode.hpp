@@ -1,7 +1,7 @@
 #pragma once
 
 //
-// QC Json 1.3.0
+// QC Json 1.3.1
 // Austin Quick
 // 2019 - 2020
 // https://github.com/Daskie/qc-json
@@ -181,7 +181,7 @@ namespace qc::json {
                         _composer.val(-std::numeric_limits<double>::infinity(), state);
                         break;
                     }
-                    // Intentional fallthrough
+                    [[fallthrough]];
                 }
                 default:
                     if (_tryConsumeChars("true"sv)) {
@@ -436,7 +436,7 @@ namespace qc::json {
         }
 
         void _ingestFloater(State & state) {
-#if 0 // TODO: Use std::from_chars version once GCC supports it :(
+#ifndef __GNUC__ // TODO: Update once GCC supports std::from_chars
             double val;
             std::from_chars_result res(std::from_chars(_pos, _end, val));
 
@@ -448,6 +448,7 @@ namespace qc::json {
             _pos = res.ptr;
             _composer.val(val, state);
 #else
+#pragma message("`std::charconv` not supported by compiler - floating point deserialization quality may suffer")
             errno = 0;
             char * endPos{};
             const double val{std::strtod(_pos, &endPos)};

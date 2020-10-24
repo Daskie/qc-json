@@ -1,7 +1,7 @@
 #pragma once
 
 //
-// QC Json 1.3.0
+// QC Json 1.3.1
 // Austin Quick
 // 2019 - 2020
 // https://github.com/Daskie/qc-json
@@ -27,6 +27,25 @@
 #include "qc-json-decode.hpp"
 #include "qc-json-encode.hpp"
 
+// TODO: Remove once MSVC has this
+#ifdef _MSC_VER
+namespace std {
+
+    template <typename T> requires (::std::is_unsigned_v<T>)
+    inline constexpr T bit_ceil(T v) {
+        --v;
+                                       v |= v >>  1;
+                                       v |= v >>  2;
+                                       v |= v >>  4;
+        if constexpr (sizeof(T) >= 2u) v |= v >>  8;
+        if constexpr (sizeof(T) >= 4u) v |= v >> 16;
+        if constexpr (sizeof(T) >= 8u) v |= v >> 32;
+        return ++v;
+    }
+
+}
+#endif
+
 namespace qc::json {
 
     //
@@ -51,6 +70,7 @@ namespace qc::json {
     // Ignore this.
     //
     enum class NumberType : uint32_t {
+        nan,
         signedInteger,
         unsignedInteger,
         floater
@@ -525,7 +545,7 @@ namespace qc::json {
     {}
 
     inline Value::Value(const bool val) noexcept :
-        _data0{uint32_t(Type::boolean) << 29},
+        _data0{uint32_t(Type::boolean) << 29, NumberType::nan},
         _data1{.boolean = val}
     {}
 

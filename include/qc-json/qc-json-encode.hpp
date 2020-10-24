@@ -1,7 +1,7 @@
 #pragma once
 
 //
-// QC Json 1.3.0
+// QC Json 1.3.1
 // Austin Quick
 // 2019 - 2020
 // https://github.com/Daskie/qc-json
@@ -439,14 +439,14 @@ namespace qc::json {
     }
 
     inline void Encoder::_encode(const double v) {
-#if 0 // TODO: Switch to std::to_chars form once GCC supports it :(
+#ifndef __GNUC__ // TODO: Update once GCC supports std::to_chars
         char buffer[32];
 
         std::to_chars_result res(std::to_chars(buffer, buffer + sizeof(buffer), v));
 
         _oss << string_view(buffer, res.ptr - buffer);
-    }
 #else
+#pragma message("`std::charconv` not supported by compiler - floating point serialization quality may suffer")
         char buffer[32];
         int len{sprintf(buffer, "%g", v)};
         _oss << string_view(buffer, len);

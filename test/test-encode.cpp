@@ -7,7 +7,12 @@ using std::string_view;
 using namespace std::string_literals;
 using namespace std::string_view_literals;
 
-static constexpr bool gccSupportsFloatingCharconv{false};
+// TODO: Remove once GCC gets this sorted
+#ifdef _MSC_VER
+static constexpr bool charconvSupported{true};
+#else
+static constexpr bool charconvSupported{false};
+#endif
 
 struct CustomVal { int x, y; };
 
@@ -150,8 +155,10 @@ TEST(encode, string) {
     }
     { // Printable characters
         qc::json::Encoder encoder;
-        encoder.val(R"( !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~)");
-        EXPECT_EQ(R"(" !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~")"s, encoder.finish());
+        const std::string actual{R"( !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~)"s};
+        const std::string expected{R"(" !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~")"s};
+        encoder.val(actual);
+        EXPECT_EQ(expected, encoder.finish());
     }
     { // Escape characters
         qc::json::Encoder encoder;
@@ -277,49 +284,49 @@ TEST(encode, floater) {
         qc::json::Encoder encoder;
         uint64_t val{0b0'10000110011'1111111111111111111111111111111111111111111111111111u};
         encoder.val(reinterpret_cast<const double &>(val));
-        EXPECT_EQ(gccSupportsFloatingCharconv ? R"(9007199254740991)"s : R"(9.0072e+15)"s, encoder.finish());
+        EXPECT_EQ(charconvSupported ? R"(9007199254740991)"s : R"(9.0072e+15)"s, encoder.finish());
     }
     { // Max integer 32
         qc::json::Encoder encoder;
         uint32_t val{0b0'10010110'11111111111111111111111u};
         encoder.val(reinterpret_cast<const float &>(val));
-        EXPECT_EQ(gccSupportsFloatingCharconv ? R"(16777215)"s : R"(1.67772e+07)", encoder.finish());
+        EXPECT_EQ(charconvSupported ? R"(16777215)"s : R"(1.67772e+07)", encoder.finish());
     }
     { // Max 64
         qc::json::Encoder encoder;
         uint64_t val{0b0'11111111110'1111111111111111111111111111111111111111111111111111u};
         encoder.val(reinterpret_cast<const double &>(val));
-        EXPECT_EQ(gccSupportsFloatingCharconv ? R"(1.7976931348623157e+308)"s : R"(1.79769e+308)", encoder.finish());
+        EXPECT_EQ(charconvSupported ? R"(1.7976931348623157e+308)"s : R"(1.79769e+308)", encoder.finish());
     }
     { // Max 32
         qc::json::Encoder encoder;
         uint32_t val{0b0'11111110'11111111111111111111111u};
         encoder.val(reinterpret_cast<const float &>(val));
-        EXPECT_EQ(gccSupportsFloatingCharconv ? R"(3.4028234663852886e+38)"s : R"(3.40282e+38)", encoder.finish());
+        EXPECT_EQ(charconvSupported ? R"(3.4028234663852886e+38)"s : R"(3.40282e+38)", encoder.finish());
     }
     { // Min normal 64
         qc::json::Encoder encoder;
         uint64_t val{0b0'00000000001'0000000000000000000000000000000000000000000000000000u};
         encoder.val(reinterpret_cast<const double &>(val));
-        EXPECT_EQ(gccSupportsFloatingCharconv ? R"(2.2250738585072014e-308)"s : R"(2.22507e-308)", encoder.finish());
+        EXPECT_EQ(charconvSupported ? R"(2.2250738585072014e-308)"s : R"(2.22507e-308)", encoder.finish());
     }
     { // Min normal 32
         qc::json::Encoder encoder;
         uint32_t val{0b0'00000001'00000000000000000000000u};
         encoder.val(reinterpret_cast<const float &>(val));
-        EXPECT_EQ(gccSupportsFloatingCharconv ? "(1.1754943508222875e-38)"s : R"(1.17549e-38)", encoder.finish());
+        EXPECT_EQ(charconvSupported ? R"(1.1754943508222875e-38)"s : R"(1.17549e-38)", encoder.finish());
     }
     { // Min subnormal 64
         qc::json::Encoder encoder;
         uint64_t val{0b0'00000000000'0000000000000000000000000000000000000000000000000001u};
         encoder.val(reinterpret_cast<const double &>(val));
-        EXPECT_EQ(gccSupportsFloatingCharconv ? R"(5e-324)"s : R"(4.94066e-324)", encoder.finish());
+        EXPECT_EQ(charconvSupported ? R"(5e-324)"s : R"(4.94066e-324)", encoder.finish());
     }
     { // Min subnormal 32
         qc::json::Encoder encoder;
         uint64_t val{0b0'00000000'00000000000000000000001u};
         encoder.val(reinterpret_cast<const float &>(val));
-        EXPECT_EQ(gccSupportsFloatingCharconv ? R"(1.401298464324817e-45)"s : R"(1.4013e-45)", encoder.finish());
+        EXPECT_EQ(charconvSupported ? R"(1.401298464324817e-45)"s : R"(1.4013e-45)", encoder.finish());
     }
     { // Positive infinity
         qc::json::Encoder encoder;
