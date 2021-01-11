@@ -1,9 +1,9 @@
 #pragma once
 
 //
-// QC Json 1.3.1
+// QC Json 1.3.2
 // Austin Quick
-// 2019 - 2020
+// 2019 - 2021
 // https://github.com/Daskie/qc-json
 //
 // Provides an interface for decoding a JSON strings to JSON objects, creating/manipulating JSON objects, and encoding
@@ -46,7 +46,7 @@ namespace std {
 }
 #endif
 
-namespace qc::json {
+namespace qc_json {
 
     //
     // This will be thrown when attempting to access a value as the wrong type.
@@ -346,8 +346,8 @@ namespace qc::json {
 // Example:
 //      template <bool safe>
 //      struct qc_json_valueTo<std::pair<int, int>, safe> {
-//          std::pair<int, int> operator()(const qc::json::Value & v) {
-//              const qc::json::Array & arr(v.asArray<safe>());
+//          std::pair<int, int> operator()(const qc_json::Value & v) {
+//              const qc_json::Array & arr(v.asArray<safe>());
 //              return {arr.at(0u)->asInteger<safe>(), arr.at(1u)->asInteger<safe>()};
 //          }
 //      };
@@ -359,8 +359,8 @@ template <typename T, bool safe> struct qc_json_valueTo;
 // Example:
 //      template <>
 //      struct qc_json_valueFrom<std::pair<int, int>> {
-//          qc::json::Value operator()(const std::pair<int, int> & v) {
-//              return qc::json::Array(v.first, f.second);
+//          qc_json::Value operator()(const std::pair<int, int> & v) {
+//              return qc_json::Array(v.first, f.second);
 //          }
 //      };
 //
@@ -368,7 +368,7 @@ template <typename T> struct qc_json_valueFrom;
 
 // IMPLEMENTATION //////////////////////////////////////////////////////////////////////////////////////////////////////
 
-namespace qc::json {
+namespace qc_json {
 
     class _Composer {
 
@@ -630,7 +630,7 @@ namespace qc::json {
         // Type should not be `std::string`, `const char *`, or `char *`
         static_assert(
             !(std::is_same_v<U, string> || std::is_same_v<U, const char *> || std::is_same_v<U, char *>),
-            "Use `qc::json::Value::isString` or `qc::json::Value::is<std::string_view>` instead"
+            "Use `qc_json::Value::isString` or `qc_json::Value::is<std::string_view>` instead"
         );
 
         // Object
@@ -728,16 +728,16 @@ namespace qc::json {
     inline T Value::as() const {
         using U = std::decay_t<T>;
 
-        // Type should not be `qc::json::Object`
-        static_assert(!std::is_same_v<U, Object>, "Use `qc::json::Value::asObject` instead, as this function must return by value");
+        // Type should not be `qc_json::Object`
+        static_assert(!std::is_same_v<U, Object>, "Use `qc_json::Value::asObject` instead, as this function must return by value");
 
-        // Type should not be `qc::json::Array`
-        static_assert(!std::is_same_v<U, Object>, "Use `qc::json::Value::asArray` instead, as this function must return by value");
+        // Type should not be `qc_json::Array`
+        static_assert(!std::is_same_v<U, Object>, "Use `qc_json::Value::asArray` instead, as this function must return by value");
 
-        // Type should not be `std::string`, `const char *`, `char *`, or `qc::json::String`
+        // Type should not be `std::string`, `const char *`, `char *`, or `qc_json::String`
         static_assert(
             !(std::is_same_v<U, string> || std::is_same_v<U, const char *> || std::is_same_v<U, char *> || std::is_same_v<U, String>),
-            "Use `qc::json::Value::asString` or `qc::json::Value::as<std::string_view>` instead"
+            "Use `qc_json::Value::asString` or `qc_json::Value::as<std::string_view>` instead"
         );
 
         // String

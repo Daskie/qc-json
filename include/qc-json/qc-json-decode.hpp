@@ -1,9 +1,9 @@
 #pragma once
 
 //
-// QC Json 1.3.1
+// QC Json 1.3.2
 // Austin Quick
-// 2019 - 2020
+// 2019 - 2021
 // https://github.com/Daskie/qc-json
 //
 // Decodes data from a JSON string and sends it to the provided `Composer`.
@@ -25,10 +25,10 @@
 #ifndef QC_JSON_COMMON
 #define QC_JSON_COMMON
 
-namespace qc::json {
+namespace qc_json {
 
     //
-    // Common exception type used for all qc::json exceptions.
+    // Common exception type used for all qc_json exceptions.
     //
     struct Error : std::runtime_error {
 
@@ -38,11 +38,11 @@ namespace qc::json {
 
     };
 
-} // namespace qc::json
+} // namespace qc_json
 
 #endif // QC_JSON_COMMON
 
-namespace qc::json {
+namespace qc_json {
 
     using std::string;
     using std::string_view;
@@ -80,7 +80,7 @@ namespace qc::json {
 
 // IMPLEMENTATION //////////////////////////////////////////////////////////////////////////////////////////////////////
 
-namespace qc::json {
+namespace qc_json {
 
     // This functionality is wrapped in a class as a convenient way to keep track of state
     template <typename Composer, typename State>
