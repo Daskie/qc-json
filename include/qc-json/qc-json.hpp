@@ -347,7 +347,7 @@ namespace qc::json {
 //      template <bool safe>
 //      struct qc_json_valueTo<std::pair<int, int>, safe> {
 //          std::pair<int, int> operator()(const qc::json::Value & v) {
-//              const Array & arr(v.asArray<safe>());
+//              const qc::json::Array & arr(v.asArray<safe>());
 //              return {arr.at(0u)->asInteger<safe>(), arr.at(1u)->asInteger<safe>()};
 //          }
 //      };
