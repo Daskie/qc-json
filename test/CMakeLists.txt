@@ -1,18 +1,18 @@
-# qc-json-test
-
 include(FetchContent)
 
-FetchContent_Declare(
-        googletest
-        SOURCE_DIR $ENV{DEV_DIR}/googletest)
+### DEPENDENCIES ###
 
+# googletest
+FetchContent_Declare(googletest GIT_REPOSITORY https://github.com/google/googletest.git)
 FetchContent_MakeAvailable(googletest)
 
-add_executable(qc-json-test test-decode.cpp test-encode.cpp test-json.cpp)
+### qc-json-test ###
 
-target_link_libraries(qc-json-test PRIVATE gtest gtest_main qc-json)
+file(GLOB qc-json-test_SRC *.cpp)
 
-target_include_directories(qc-json-test PRIVATE ${gtest_SOURCE_DIR}/include)
+add_executable(qc-json-test ${qc-json-test_SRC})
+
+target_link_libraries(qc-json-test PRIVATE qc-json gtest_main)
 
 if (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
     target_compile_options(qc-json-test PRIVATE -Wno-unused-parameter)
