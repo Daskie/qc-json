@@ -4,15 +4,15 @@ project(qc-json)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_DEBUG_POSTFIX d)
 
-### qc-json ###
+### QC-JSON ###
 
 add_library(qc-json INTERFACE)
 
 target_include_directories(
-    ${PROJECT_NAME}
+    qc-json
     INTERFACE
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<INSTALL_INTERFACE:include>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>
 )
 
 if (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
@@ -21,8 +21,9 @@ elseif (${CMAKE_CXX_COMPILER_ID} STREQUAL "MSVC")
     target_compile_options(qc-json INTERFACE /W4 /WX)
 endif()
 
-### qc-json-test ###
+### SUBDIRECTORIES ###
 
+# qc-json-test
 add_subdirectory(test EXCLUDE_FROM_ALL)
 
 ### INSTALL ###
