@@ -19,12 +19,12 @@ class DummyComposer {
     std::nullptr_t object(std::nullptr_t) { return nullptr; }
     std::nullptr_t array(std::nullptr_t) { return nullptr; }
     void end(std::nullptr_t, std::nullptr_t) {}
-    void key(string && k, std::nullptr_t) {}
-    void val(string_view v, std::nullptr_t) {}
-    void val(int64_t v, std::nullptr_t) {}
-    void val(uint64_t v, std::nullptr_t) {}
-    void val(double v, std::nullptr_t) {}
-    void val(bool v, std::nullptr_t) {}
+    void key(string &&, std::nullptr_t) {}
+    void val(string_view, std::nullptr_t) {}
+    void val(int64_t, std::nullptr_t) {}
+    void val(uint64_t, std::nullptr_t) {}
+    void val(double, std::nullptr_t) {}
+    void val(bool, std::nullptr_t) {}
     void val(std::nullptr_t, std::nullptr_t) {}
 
 } dummyComposer;
@@ -252,6 +252,8 @@ TEST(decode, string) {
         EXPECT_THROW(qc_json::decode(str3, dummyComposer, nullptr), qc_json::DecodeError);
     }
     { // Missing all unicode digits
+#pragma warning(push)
+#pragma warning(disable:4429) // Disable "improperly formed universal-characer-name" warning
         EXPECT_THROW(qc_json::decode(R"("\u")", dummyComposer, nullptr), qc_json::DecodeError);
         EXPECT_THROW(qc_json::decode(R"([ "\u" ])", dummyComposer, nullptr), qc_json::DecodeError);
         EXPECT_THROW(qc_json::decode(R"("\u0")", dummyComposer, nullptr), qc_json::DecodeError);
@@ -260,6 +262,7 @@ TEST(decode, string) {
         EXPECT_THROW(qc_json::decode(R"([ "\u00" ])", dummyComposer, nullptr), qc_json::DecodeError);
         EXPECT_THROW(qc_json::decode(R"("\u000")", dummyComposer, nullptr), qc_json::DecodeError);
         EXPECT_THROW(qc_json::decode(R"([ "\u000" ])", dummyComposer, nullptr), qc_json::DecodeError);
+#pragma warning(pop)
     }
     { // Missing end quote
         EXPECT_THROW(qc_json::decode(R"("abc)", dummyComposer, nullptr), qc_json::DecodeError);

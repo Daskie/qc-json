@@ -1,7 +1,7 @@
 #pragma once
 
 //
-// QC Json 1.3.2
+// QC Json 1.3.3
 // Austin Quick
 // 2019 - 2021
 // https://github.com/Daskie/qc-json
@@ -91,6 +91,7 @@ namespace qc_json {
         Value() noexcept = default;
         Value(Object && val) noexcept;
         Value(Array && val) noexcept;
+        Value(String && val) noexcept;
         Value(string_view val) noexcept;
         Value(const string & val) noexcept;
         Value(const char * val);
@@ -410,11 +411,11 @@ namespace qc_json {
             return {innerNode, false, true};
         }
 
-        void key(string && k, State & state) {
+        void key(string && k, State &) {
             _key = std::move(k);
         }
 
-        void end(State && innerState, State & outerState) {}
+        void end(State &&, State &) {}
 
         template <typename T>
         void val(const T v, State & state) {
@@ -481,8 +482,12 @@ namespace qc_json {
         Value{std::move(reinterpret_cast<Value &>(val))}
     {}
 
+    inline Value::Value(String && val) noexcept :
+        Value{std::move(reinterpret_cast<Value &>(val))}
+    {}
+
     inline Value::Value(const string_view val) noexcept :
-        Value{reinterpret_cast<Value &&>(String{val})}
+        Value{String{val}}
     {}
 
     inline Value::Value(const string & val) noexcept :

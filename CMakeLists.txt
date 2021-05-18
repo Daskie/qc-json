@@ -15,10 +15,10 @@ target_include_directories(
         $<INSTALL_INTERFACE:include>
 )
 
-if (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
-    target_compile_options(qc-json INTERFACE -Wall -Werror -Wextra -Wpedantic -Wno-strict-aliasing)
-elseif (${CMAKE_CXX_COMPILER_ID} STREQUAL "MSVC")
+if(MSVC)
     target_compile_options(qc-json INTERFACE /W4 /WX)
+else()
+    target_compile_options(qc-json INTERFACE -Wall -Wextra -Wpedantic -Werror)
 endif()
 
 ### SUBDIRECTORIES ###

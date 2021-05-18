@@ -1,7 +1,7 @@
 #pragma once
 
 //
-// QC Json 1.3.2
+// QC Json 1.3.3
 // Austin Quick
 // 2019 - 2021
 // https://github.com/Daskie/qc-json
@@ -337,7 +337,7 @@ namespace qc_json {
 
             _pos += 4;
 
-            return val;
+            return char(val);
         }
 
         bool _isInteger() const {
