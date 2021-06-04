@@ -1,7 +1,7 @@
 #pragma once
 
 //
-// QC Json 1.3.3
+// QC Json 1.3.4
 // Austin Quick
 // 2019 - 2021
 // https://github.com/Daskie/qc-json
@@ -25,10 +25,10 @@
 #ifndef QC_JSON_COMMON
 #define QC_JSON_COMMON
 
-namespace qc_json {
+namespace qc::json {
 
     //
-    // Common exception type used for all qc_json exceptions.
+    // Common exception type used for all qc::json exceptions.
     //
     struct Error : std::runtime_error {
 
@@ -38,11 +38,11 @@ namespace qc_json {
 
     };
 
-} // namespace qc_json
+} // namespace qc::json
 
 #endif // QC_JSON_COMMON
 
-namespace qc_json {
+namespace qc::json {
 
     using std::string;
     using std::string_view;
@@ -80,7 +80,7 @@ namespace qc_json {
 
 // IMPLEMENTATION //////////////////////////////////////////////////////////////////////////////////////////////////////
 
-namespace qc_json {
+namespace qc::json {
 
     // This functionality is wrapped in a class as a convenient way to keep track of state
     template <typename Composer, typename State>
