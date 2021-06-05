@@ -15,12 +15,6 @@ target_include_directories(
         $<INSTALL_INTERFACE:include>
 )
 
-if(MSVC)
-    target_compile_options(qc-json INTERFACE /W4 /WX)
-else()
-    target_compile_options(qc-json INTERFACE -Wall -Wextra -Wpedantic -Werror)
-endif()
-
 ### SUBDIRECTORIES ###
 
 # qc-json-test
