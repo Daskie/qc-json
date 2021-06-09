@@ -1,10 +1,11 @@
 cmake_minimum_required(VERSION 3.17)
+
 project(qc-json)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_DEBUG_POSTFIX d)
 
-### QC-JSON ###
+### QC-JSON ####################################################################
 
 add_library(qc-json INTERFACE)
 
@@ -15,12 +16,11 @@ target_include_directories(
         $<INSTALL_INTERFACE:include>
 )
 
-### SUBDIRECTORIES ###
+### SUBDIRECTORIES #############################################################
 
-# qc-json-test
 add_subdirectory(test EXCLUDE_FROM_ALL)
 
-### INSTALL ###
+### INSTALL ####################################################################
 
 # General install and target setup
 install(
