@@ -15,7 +15,7 @@ using qc::json::DecodeError;
 
 class DummyComposer {
 
-  public:
+  public: //--------------------------------------------------------------------
 
     std::nullptr_t object(std::nullptr_t) { return nullptr; }
     std::nullptr_t array(std::nullptr_t) { return nullptr; }
@@ -32,7 +32,7 @@ class DummyComposer {
 
 class ExpectantComposer {
 
-  public:
+  public: //--------------------------------------------------------------------
 
     struct Object {};
     struct Array {};
@@ -82,7 +82,7 @@ class ExpectantComposer {
 
     bool isDone() const { return m_sequence.empty(); }
 
-  private:
+  private: //-------------------------------------------------------------------
 
     std::deque<Element> m_sequence;
 

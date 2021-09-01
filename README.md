@@ -171,9 +171,9 @@ It's the new best-on-the-block solution for converting strings to numbers and vi
 
 ### Unsafe `Value` accessors
 
-The `Value::as` set of methods take a boolean template type `safe` that determines whether the type is checked before the underlying data is returned. If the type does not match, a `TypeError` is thrown.
+The `Value::as` set of methods take a `qc::json::Safety` enum template value `isSafe`. If this is `qc::json::safe`, then the type is checked before the underlying data is returned, and if the type does not match, a `TypeError` is thrown. If this is instead `qc::json::unsafe` then no check is performed.
 
-This is good in the general case, but there are situations in which that type check is an uneccessary resource drain. Take for example:
+Checking the type is the default behavior, and generally a good idea, but there are situations in which it is only an uneccessary slowdown. Take for example:
 
 ```c++
 // Here, `val` is a `qc::json::Value`
@@ -188,13 +188,16 @@ else if (val.is<int>()) {
 In this example, the type is already checked, rendering the internal type check in the `as` methods redundant. This code can be safely changed to the following to be just a bit more performant:
 
 ```c++
+// Not necessary, but may help cut down on verbosity in JSON-heavy code
+using qc::json::unsafe;
+
 // Here, `val` is a `qc::json::Value`
 if (val.isString()) {
-    name = val.asString<false>();
+    name = val.asString<unsafe>();
 }
 else if (val.is<int>()) {
-    name = "#" + std::to_string(val.as<int, false>());
+    name = "#" + std::to_string(val.as<int, unsafe>());
 }
 ```
 
-Beware, when using unsafe accessors, **NO** checks are done. So you can totally access a `Boolean` as an `Array`, or a `String` as an `int`. So be certain your assumptions are correct, lest you arrive at segfault city.
+Beware, when using unsafe accessors, **NO** checks are done. There is nothing stopping you from reading a `Boolean` as an `Array`, or a `String` as an `int`. So be certain your assumptions are correct, lest you arrive at segfault city.

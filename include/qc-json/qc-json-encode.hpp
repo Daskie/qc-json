@@ -6,9 +6,9 @@
 /// 2019 - 2021
 /// https://github.com/Daskie/qc-json
 ///
-/// Encodes data into a JSON string.
+/// Encodes data into a JSON string
 ///
-/// See the GitHub link above for more info and examples.
+/// See the GitHub link above for more info and examples
 ///
 
 #include <cctype>
@@ -32,7 +32,7 @@ namespace qc::json
     using namespace std::string_view_literals;
 
     ///
-    /// Common exception type used for all `qc::json` exceptions.
+    /// Common exception type used for all `qc::json` exceptions
     ///
     struct Error : std::runtime_error
     {
@@ -47,7 +47,7 @@ namespace qc::json
 namespace qc::json
 {
     ///
-    /// This will be thrown if anything goes wrong during the encoding process.
+    /// This will be thrown if anything goes wrong during the encoding process
     ///
     struct EncodeError : Error
     {
@@ -56,40 +56,95 @@ namespace qc::json
 
     ///
     /// Namespace provided to allow the user to `using namespace qc::json::tokens` to avoid the verbosity of fully
-    /// qualifying the tokens' namespace.
+    /// qualifying the tokens' namespace
     ///
     inline namespace tokens
     {
+        ///
+        /// Stream this to start a new object
+        ///
         enum ObjectToken { object };
 
+        ///
+        /// Stream this to start a new array
+        ///
         enum ArrayToken { array };
 
+        ///
+        /// Stream this to end the current object or array
+        ///
         enum EndToken { end };
 
-        enum Density { multiline, uniline, compact };
+        ///
+        /// Stream this to specify the density of the current object or array
+        ///
+        enum Density
+        {
+            multiline, /// Elements are put on new lines
+            uniline,   /// Elements are put on one line separated by spaces
+            compact    /// No whitespace is used whatsoever
+        };
     }
 
     ///
-    /// Instantiate this class to do the encoding.
+    /// Instantiate this class to do the encoding
     ///
     class Encoder
     {
-        public:
+        public: //--------------------------------------------------------------
 
+        ///
+        /// Construct a new `Encoder`
+        ///
+        /// @param density the starting density for the JSON
+        ///
         Encoder(Density density = multiline);
 
         Encoder(const Encoder & other) = delete;
         Encoder(Encoder && other) noexcept;
 
         Encoder & operator=(const Encoder & other) = delete;
-        Encoder & operator=(Encoder && other) = delete;
+        Encoder & operator=(Encoder && other) noexcept;
 
-        ~Encoder() = default;
+        ~Encoder() noexcept = default;
 
+        ///
+        /// Start a new object
+        ///
+        /// @return this
+        ///
         Encoder & operator<<(ObjectToken);
+
+        ///
+        /// Start a new array
+        ///
+        /// @return this
+        ///
         Encoder & operator<<(ArrayToken);
+
+        ///
+        /// End the current object or array
+        ///
+        /// @return this
+        ///
         Encoder & operator<<(EndToken);
-        Encoder & operator<<(Density);
+
+        ///
+        /// Set the density of the current object or array. Must be passed before any keys or elements
+        ///
+        /// Density can only go up, therefore specifying a lower density than is currently present will have no effect
+        ///
+        /// @param density the density to set the current object or array to
+        /// @return this
+        ///
+        Encoder & operator<<(Density density);
+
+        ///
+        /// Encode a value into the JSON
+        ///
+        /// @param v the value to encode
+        /// @return this
+        ///
         Encoder & operator<<(string_view v);
         Encoder & operator<<(const string & v);
         Encoder & operator<<(const char * v);
@@ -108,9 +163,15 @@ namespace qc::json
         Encoder & operator<<(bool v);
         Encoder & operator<<(std::nullptr_t);
 
+        ///
+        /// Collapses the internal string stream into the encoded JSON string. This function resets the internal state
+        /// of the encoder to a "clean slate" such that it can be safely reused
+        ///
+        /// @return the encoded JSON string
+        ///
         string finish();
 
-        private:
+        private: //-------------------------------------------------------------
 
         struct _State
         {
@@ -151,7 +212,7 @@ namespace qc::json
 /// Example:
 ///     qc::json::Encoder & operator<<(qc::json::Encoder & encoder, const std::pair<int, int> & v)
 ///     {
-///         return encoder.array(true).val(v.first).val(v.second).end();
+///         return encoder << array << v.first << v.second << end;
 ///     }
 ///
 
@@ -175,6 +236,18 @@ namespace qc::json
         _isKey{std::exchange(other._isKey, false)},
         _isComplete{std::exchange(other._isComplete, false)}
     {}
+
+    inline Encoder & Encoder::operator=(Encoder && other) noexcept
+    {
+        _oss = std::move(other._oss);
+        _state = std::move(other._state);
+        _baseDensity = std::exchange(other._baseDensity, multiline);
+        _indentation = std::exchange(other._indentation, 0);
+        _isKey = std::exchange(other._isKey, false);
+        _isComplete = std::exchange(other._isComplete, false);
+
+        return *this;
+    }
 
     inline Encoder & Encoder::operator<<(const ObjectToken)
     {

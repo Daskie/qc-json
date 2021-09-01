@@ -7,11 +7,11 @@
 /// https://github.com/Daskie/qc-json
 ///
 /// Provides an interface for decoding a JSON strings to JSON objects, creating/manipulating JSON objects, and encoding
-/// JSON objects to a JSON string.
+/// JSON objects to a JSON string
 ///
-/// Uses `qc-json-encode.hpp` to do the encoding and `qc-json-decode.hpp` to do the decoding.
+/// Uses `qc-json-encode.hpp` to do the encoding and `qc-json-decode.hpp` to do the decoding
 ///
-/// See the GitHub link above for more info and examples.
+/// See the GitHub link above for more info and examples
 ///
 
 #include <cstring>
@@ -24,18 +24,25 @@
 #include <utility>
 #include <variant>
 
-#include "qc-json-decode.hpp"
-#include "qc-json-encode.hpp"
+#include <qc-json/qc-json-decode.hpp>
+#include <qc-json/qc-json-encode.hpp>
 
 namespace qc::json
 {
     ///
-    /// This will be thrown when attempting to access a value as the wrong type.
+    /// This will be thrown when attempting to access a value as the wrong type
     ///
     struct TypeError : Error {};
 
     ///
-    /// The type of the JSON value.
+    /// An essentially cosmetic means of making certain unsafe methods more clearly so
+    ///
+    /// The user may choose to `using enum qc::json::Safety` to reduce code verbosity
+    ///
+    enum Safety { safe, unsafe };
+
+    ///
+    /// The type of the JSON value
     ///
     enum class Type : uint32_t
     {
@@ -47,11 +54,7 @@ namespace qc::json
         boolean
     };
 
-    ///
-    /// Indicates how a number is stored internally, not necessarily what type it may be accessed as.
-    /// Ignore this.
-    ///
-    enum class NumberType : uint32_t
+    enum class _NumberType : uint32_t
     {
         nan,
         signedInteger,
@@ -63,15 +66,25 @@ namespace qc::json
     class Array;
     class String;
 
+    ///
+    /// Represents one JSON value, which can be an object, array, string, number, boolean, or null
+    ///
     class Value
     {
         friend Object;
         friend Array;
         friend String;
 
-        public:
+        public: //--------------------------------------------------------------
 
-        Value() noexcept = default;
+        ///
+        /// Constructs a null value
+        ///
+        Value(std::nullptr_t = nullptr) noexcept;
+
+        ///
+        /// @param val the value whith which to be constructed
+        ///
         Value(Object && val) noexcept;
         Value(Array && val) noexcept;
         Value(String && val) noexcept;
@@ -91,7 +104,14 @@ namespace qc::json
         Value(double val) noexcept;
         Value(float val) noexcept;
         Value(bool val) noexcept;
-        Value(std::nullptr_t) noexcept;
+
+        ///
+        /// Attempts to construct a value from a custom type `T` using a specialized `qc::json::valueFrom` function,
+        /// details of which can be found below
+        ///
+        /// @tparam T the custom type
+        /// @param val the custom type value
+        ///
         template <typename T> Value(const T & val);
 
         Value(const Value &) = delete;
@@ -102,51 +122,100 @@ namespace qc::json
 
         ~Value() noexcept;
 
+        ///
+        /// @return the type of the value
+        ///
         Type type() const noexcept;
 
+        ///
+        /// @return whether the value is an object
+        ///
         bool isObject() const noexcept;
 
+        ///
+        /// @return whether the value is an array
+        ///
         bool isArray() const noexcept;
 
+        ///
+        /// @return whether the value is a string
+        ///
         bool isString() const noexcept;
 
+        ///
+        /// @return whether the value is a number
+        ///
         bool isNumber() const noexcept;
 
+        ///
+        /// @return whether the value is a boolean
+        ///
         bool isBoolean() const noexcept;
 
+        ///
+        /// @return whether the value is null
+        ///
         bool isNull() const noexcept;
 
+        ///
+        /// Determines if the value type is compatible with `T`, which is to say calling `as<T>()` would be valid. See
+        /// the `as` method docs below for more details
+        ///
+        /// @tparam T the type in question, e.g. `int` or `std::string_view`
+        /// @return whether the value type is compatible with type `T`
+        ///
         template <typename T> bool is() const noexcept;
 
         ///
-        /// In the following methods, `safe` indicates whether the type is checked.
-        /// If `safe` is true, and the value's type does not match the type requested, a `TypeError` is thrown.
-        /// If `safe` is false, no checks are done, and if there is a type mismatch then enjoy your segfault.
+        /// @tparam isSafe whether to check if this value is actually an object
+        /// @return this value as an object
+        /// @throw `TypeError` if this value is not an object and `isSafe` is true
         ///
-
-        template <bool safe = true> const Object & asObject() const noexcept(!safe);
-        template <bool safe = true>       Object & asObject() noexcept(!safe);
-
-        template <bool safe = true> const Array & asArray() const noexcept(!safe);
-        template <bool safe = true>       Array & asArray() noexcept(!safe);
-
-        template <bool safe = true> string_view asString() const noexcept(!safe);
-
-        template <bool safe = true> std::variant<int64_t, uint64_t, double> asNumber() const noexcept(!safe);
-
-        template <bool safe = true> bool asBoolean() const noexcept(!safe);
+        template <Safety isSafe = safe> Object & asObject() noexcept(isSafe == unsafe);
+        template <Safety isSafe = safe> const Object & asObject() const noexcept(isSafe == unsafe);
 
         ///
-        /// Retrieves the value as the given type.
-        /// If the actual type does not match the requested type and `safe` is true, a `TypeError` is thrown.
+        /// @tparam isSafe whether to check if this value is actually an array
+        /// @return this value as an array
+        /// @throw `TypeError` if this value is not an array and `isSafe` is true
         ///
-        /// If `T` is `std::string_view`, this call is equivalent to `asString`.
+        template <Safety isSafe = safe> Array & asArray() noexcept(isSafe == unsafe);
+        template <Safety isSafe = safe> const Array & asArray() const noexcept(isSafe == unsafe);
+
         ///
-        /// If `T` is `bool`, this call is equivalent to `asBoolean`.
+        /// @tparam isSafe whether to check if this value is actually a string
+        /// @return this value as a string
+        /// @throw `TypeError` if this value is not a string and `isSafe` is true
+        ///
+        template <Safety isSafe = safe> string_view asString() const noexcept(isSafe == unsafe);
+
+        ///
+        /// @tparam isSafe whether to check if this value is actually a number
+        /// @return this value as a number
+        /// @throw `TypeError` if this value is not a number and `isSafe` is true
+        ///
+        template <Safety isSafe = safe> std::variant<int64_t, uint64_t, double> asNumber() const noexcept(isSafe == unsafe);
+
+        ///
+        /// @tparam isSafe whether to check if this value is actually a boolean
+        /// @return this value as a boolean
+        /// @throw `TypeError` if this value is not a boolean and `isSafe` is true
+        ///
+        template <Safety isSafe = safe> bool asBoolean() const noexcept(isSafe == unsafe);
+
+        ///
+        /// Retrieves the value as the given type
+        ///
+        /// If the actual type does not match the requested type and `isSafe` is true, a `TypeError` is thrown
+        ///
+        /// If `T` is `std::string_view`, this call is equivalent to `asString`. `std::string` and `char *` are
+        /// incompatible and may not be used
+        ///
+        /// If `T` is `bool`, this call is equivalent to `asBoolean`
         ///
         /// If `T` is `char`, a single character string will try to be fetched. Note that in c++ `char`,
         /// `signed char`, and `unsigned char` are distinct types. Asking for a `signed char` or `unsigned char` will
-        /// instead try to fetch a number as type `int8_t` or `uint8_t` respectively.
+        /// instead try to fetch a number as type `int8_t` or `uint8_t` respectively
         ///
         /// If `T` is a numeric type...
         /// ...and the value is a positive integer, it may be accessed as:
@@ -158,16 +227,17 @@ namespace qc::json
         ///   - any signed integer type (`int64_t`, `int32_t`, `int16_t`, `int8_t`), but only if it can fit
         /// ...and the value is not an integer, it may only be accessed as a floater (`double`, `float`)
         ///
-        /// If `T` is an unrecognized type, then we attempt to use the specialized `qc::json::valueTo` struct.
+        /// If `T` is an unrecognized type, then we attempt to use the specialized `qc::json::valueTo` struct, details
+        /// of which can be found below
         ///
-        template <typename T, bool safe = true> T as() const;
+        template <typename T, Safety isSafe = safe> T as() const;
 
-        private:
+        private: //-------------------------------------------------------------
 
         struct
         {
             uint32_t type_and_data;
-            NumberType numberType;
+            _NumberType numberType;
         } _data0{};
         union
         {
@@ -179,15 +249,21 @@ namespace qc::json
 
     };
 
-    class Object {
-
-        public:
+    ///
+    /// Represents a JSON object
+    ///
+    class Object
+    {
+        public: //--------------------------------------------------------------
 
         using Pair = std::pair<string, Value>;
 
         using iterator = Pair *;
         using const_iterator = const Pair *;
 
+        ///
+        /// Construct an empty object. No memory is allocated until the first element is added
+        ///
         Object() noexcept = default;
 
         Object(const Object &) = delete;
@@ -198,37 +274,77 @@ namespace qc::json
 
         ~Object() noexcept;
 
+        ///
+        /// @return the current number of elements in the object
+        ///
         uint32_t size() const noexcept;
 
-        uint32_t capacity() const noexcept;
-
+        ///
+        /// @return whether the object has no elements
+        ///
         bool empty() const noexcept;
 
+        ///
+        /// @return the size of the backing array. Always a power of two
+        ///
+        uint32_t capacity() const noexcept;
+
+        ///
+        /// Add a new key/value element to the object, growing to the next power of two if at full capacity
+        ///
+        /// @param key the key to add or replace
+        /// @param val the value to add or replace
+        /// @return the new pair entry in the object
+        ///
         Pair & add(string && key, Value && val);
 
+        ///
+        /// @param key the key in question
+        /// @return whether the object has an element with `key`
+        ///
         bool contains(string_view key) const;
 
-        const Value & at(string_view key) const;
+        ///
+        /// @param key the key of the element to fetch
+        /// @return the pair entry matching `key` if it exists
+        /// @throw `std::out_of_range` if the key does not exist in the object
+        ///
         Value & at(string_view key);
+        const Value & at(string_view key) const;
 
-        const_iterator find(string_view key) const;
+        ///
+        /// @param key the key of the element to find
+        /// @return an iterator to the pair entry matching `key`, or the end iterator if the key does not exist
+        ///
         iterator find(string_view key);
+        const_iterator find(string_view key) const;
 
+        ///
+        /// @param it a valid iterator to an element present in the object
+        /// @return the removed element
+        ///
         Pair remove(iterator it) noexcept;
 
+        ///
+        /// Deletes all elements
+        ///
         void clear() noexcept;
 
-        const_iterator begin() const noexcept;
+        ///
+        /// @return an iterator to the first element, or the end iterator if the object is empty
+        ///
         iterator begin() noexcept;
-
+        const_iterator begin() const noexcept;
         const_iterator cbegin() const noexcept;
 
-        const_iterator end() const noexcept;
+        ///
+        /// @return the end iterator, which is one-past the last element
+        ///
         iterator end() noexcept;
-
+        const_iterator end() const noexcept;
         const_iterator cend() const noexcept;
 
-        private:
+        private: //-------------------------------------------------------------
 
         uint32_t _type_and_capacity{uint32_t(Type::object) << 29};
         uint32_t _size{0u};
@@ -236,17 +352,32 @@ namespace qc::json
 
         std::pair<const Pair *, bool> _search(string_view key) const;
         std::pair<Pair *, bool> _search(string_view key);
-
     };
 
+    ///
+    /// Represents a JSON array
+    ///
     class Array
     {
-        public:
+        public: //--------------------------------------------------------------
 
         using iterator = Value *;
         using const_iterator = const Value *;
 
+        ///
+        /// Constructs an empty array. No memory is allocated until the first element is added
+        ///
         Array() noexcept = default;
+
+        ///
+        /// Constructs an array from the given arguments, which may be differnt types. Memory is allocated to match the
+        /// number of elements.
+        ///
+        /// @tparam T the type of the first value
+        /// @tparam Ts the remaining value types, if any
+        /// @param val the first value
+        /// @param vals the remaining values, if any
+        ///
         template <typename T, typename... Ts> explicit Array(T && val, Ts &&... vals);
 
         Array(const Array & other) = delete;
@@ -257,44 +388,99 @@ namespace qc::json
 
         ~Array() noexcept;
 
+        ///
+        /// @return the current number of elements in the array
+        ///
         uint32_t size() const noexcept;
 
-        uint32_t capacity() const noexcept;
-
+        ///
+        /// @return whether the array has no elements
+        ///
         bool empty() const noexcept;
 
+        ///
+        /// @return the backing capacity of the array
+        ///
+        uint32_t capacity() const noexcept;
+
+        ///
+        /// Adds the value to the end of the array, growing to the next power of two if at full capacity
+        ///
+        /// @param val the value to add
+        /// @return the new element in the array
+        ///
         Value & add(Value && val) noexcept;
 
-        const Value & at(uint32_t i) const;
+        ///
+        /// @param i the index of the element to fetch
+        /// @return the element at index `i`
+        /// @throw `std::out_of_range` if `i` >= the current size of the array
         Value & at(uint32_t i);
+        const Value & at(uint32_t i) const;
 
+        ///
+        /// Removes the element at the given index and shifts all posterior elements forward
+        ///
+        /// @param i the index of the element to remove
+        /// @return the removed element
+        /// @throw `std::out_of_range` if `i` >= the current size of the array
+        ///
         Value remove(uint32_t i);
+
+        ///
+        /// Removes the element at the given iterator and shifts all posterior elements forward
+        ///
+        /// @param it a valid iterator to an element to remove
+        /// @return the removed element
+        ///
         Value remove(iterator it) noexcept;
+
+        ///
+        /// Removes the elements in the given iterator range and shifts all posterior elements forward
+        ///
+        /// @param it1 a valid iterator to the first element to remove
+        /// @param it2 an iterator to one-past the last element to remove
+        ///
         void remove(iterator it1, iterator it2) noexcept;
 
+        ///
+        /// Deletes all elements in the array
+        ///
         void clear() noexcept;
 
-        const_iterator begin() const noexcept;
+        ///
+        /// @return an iterator to the first element or the end iterator if the array is empty
+        ///
         iterator begin() noexcept;
-
+        const_iterator begin() const noexcept;
         const_iterator cbegin() const noexcept;
 
-        const_iterator end() const noexcept;
+        ///
+        /// @return the end iterator, which is one-past the last element in the array
+        ///
         iterator end() noexcept;
-
+        const_iterator end() const noexcept;
         const_iterator cend() const noexcept;
 
-        private:
+        private: //-------------------------------------------------------------
 
         uint32_t _type_and_capacity{uint32_t(Type::array) << 29};
         uint32_t _size{0u};
         alignas(8) Value * _values{nullptr};
     };
 
+    ///
+    /// Represents a JSON string
+    ///
     class String
     {
-        public:
+        public: //--------------------------------------------------------------
 
+        ///
+        /// Constructs a string copied from the given string view
+        ///
+        /// @param str the string to copy
+        ///
         explicit String(string_view str) noexcept;
 
         String(const String &) = delete;
@@ -305,11 +491,17 @@ namespace qc::json
 
         ~String() noexcept;
 
+        ///
+        /// @return the number of characters in the string
+        ///
         uint32_t size() const noexcept;
 
+        ///
+        /// @return a string view of the string
+        ///
         string_view view() const noexcept;
 
-        private:
+        private: //-------------------------------------------------------------
 
         uint32_t _type_and_size{uint32_t(Type::string) << 29};
         uint32_t _inlineChars0{0u};
@@ -320,25 +512,43 @@ namespace qc::json
         };
     };
 
+    ///
+    /// @param json the JSON string to decode
+    /// @return the decoded value of the JSON
+    /// @throw `DecodeError` if the JSON string is invalid or could otherwise not be parsed
+    ///
     Value decode(string_view json);
 
+    ///
+    /// @param val the JSON value to encode
+    /// @param density the base density of the encoded JSON string
+    /// @return an encoded JSON string of the given JSON value
+    /// @throw `EncodeError` if there was an issue encoding the JSON
+    ///
     string encode(const Value & val, Density density = multiline);
 
+    ///
+    /// Specialization of the encoder's `operator<<` for `Value`
+    /// @param encoder the encoder
+    /// @param val the JSON value to encode
+    /// @return `encoder`
+    /// @throw `EncodeError` if there was an issue encoding the JSON value
+    ///
     Encoder & operator<<(Encoder & encoder, const Value & val);
 
     ///
-    /// Specialize `qc::json::valueTo` to enable `Value::as` for custom types.
+    /// Specialize `qc::json::valueTo` to enable `Value::as` for custom types
     ///
     /// Example:
-    ///     template <bool safe>
-    ///     struct qc::json::valueTo<std::pair<int, int>, safe> {
+    ///     template <qc::json::Safety isSafe>
+    ///     struct qc::json::valueTo<std::pair<int, int>, isSafe> {
     ///         std::pair<int, int> operator()(const qc::json::Value & v) {
-    ///             const qc::json::Array & arr{v.asArray<safe>()};
-    ///             return {arr.at(0u)->asInteger<safe>(), arr.at(1u)->asInteger<safe>()};
+    ///             const qc::json::Array & arr{v.asArray<isSafe>()};
+    ///             return {arr.at(0u)->asInteger<isSafe>(), arr.at(1u)->asInteger<isSafe>()};
     ///         }
     ///     };
     ///
-    template <typename T, bool safe> struct valueTo;
+    template <typename T, Safety isSafe> struct valueTo;
 
     ///
     /// Specialize `qc::json::valueFrom` to enable `Value` construction from custom types
@@ -360,7 +570,7 @@ namespace qc::json
 {
     class _Composer
     {
-        public:
+        public: //--------------------------------------------------------------
 
         struct State
         {
@@ -373,10 +583,10 @@ namespace qc::json
         {
             Value * innerNode;
             if (outerState.isObject) {
-                innerNode = &outerState.node->asObject<true>().add(std::move(_key), Object{}).second;
+                innerNode = &outerState.node->asObject<unsafe>().add(std::move(_key), Object{}).second;
             }
             else if (outerState.isArray) {
-                innerNode = &outerState.node->asArray<true>().add(Object{});
+                innerNode = &outerState.node->asArray<unsafe>().add(Object{});
             }
             else {
                 *outerState.node = Object{};
@@ -389,10 +599,10 @@ namespace qc::json
         {
             Value * innerNode;
             if (outerState.isObject) {
-                innerNode = &outerState.node->asObject<true>().add(std::move(_key), Array{}).second;
+                innerNode = &outerState.node->asObject<unsafe>().add(std::move(_key), Array{}).second;
             }
             else if (outerState.isArray) {
-                innerNode = &outerState.node->asArray<true>().add(Array{});
+                innerNode = &outerState.node->asArray<unsafe>().add(Array{});
             }
             else {
                 *outerState.node = Array{};
@@ -412,20 +622,22 @@ namespace qc::json
         void val(const T v, State & state)
         {
             if (state.isObject) {
-                state.node->asObject<true>().add(std::move(_key), v);
+                state.node->asObject<unsafe>().add(std::move(_key), v);
             }
             else if (state.isArray) {
-                state.node->asArray<true>().add(v);
+                state.node->asArray<unsafe>().add(v);
             }
             else {
                 *state.node = v;
             }
         }
 
-        private:
+        private: //-------------------------------------------------------------
 
         string _key;
     };
+
+    inline Value::Value(const std::nullptr_t) noexcept {}
 
     inline Value::Value(Object && val) noexcept :
         Value{std::move(reinterpret_cast<Value &>(val))}
@@ -460,7 +672,7 @@ namespace qc::json
     {}
 
     inline Value::Value(const int64_t val) noexcept :
-        _data0{uint32_t(Type::number) << 29, NumberType::signedInteger},
+        _data0{uint32_t(Type::number) << 29, _NumberType::signedInteger},
         _data1{.signedInteger = val}
     {}
 
@@ -477,7 +689,7 @@ namespace qc::json
     {}
 
     inline Value::Value(const uint64_t val) noexcept :
-        _data0{uint32_t(Type::number) << 29, NumberType::unsignedInteger},
+        _data0{uint32_t(Type::number) << 29, _NumberType::unsignedInteger},
         _data1{.unsignedInteger = val}
     {}
 
@@ -494,7 +706,7 @@ namespace qc::json
     {}
 
     inline Value::Value(const double val) noexcept :
-        _data0{uint32_t(Type::number) << 29, NumberType::floater},
+        _data0{uint32_t(Type::number) << 29, _NumberType::floater},
         _data1{.floater = val}
     {}
 
@@ -503,11 +715,9 @@ namespace qc::json
     {}
 
     inline Value::Value(const bool val) noexcept :
-        _data0{uint32_t(Type::boolean) << 29, NumberType::nan},
+        _data0{uint32_t(Type::boolean) << 29, _NumberType::nan},
         _data1{.boolean = val}
     {}
-
-    inline Value::Value(const std::nullptr_t) noexcept {}
 
     template <typename T>
     inline Value::Value(const T & val) :
@@ -624,17 +834,17 @@ namespace qc::json
         // Signed integer
         else if constexpr (std::is_integral_v<U> && std::is_signed_v<U>) {
             return isNumber() && (
-                ((_data0.numberType == NumberType::signedInteger) && (_data1.signedInteger <= std::numeric_limits<U>::max()) && (_data1.signedInteger >= std::numeric_limits<U>::min())) ||
-                ((_data0.numberType == NumberType::unsignedInteger) && (_data1.unsignedInteger <= uint64_t{std::numeric_limits<U>::max()})) ||
-                ((_data0.numberType == NumberType::floater) && (U(_data1.floater) == _data1.floater))
+                                     ((_data0.numberType == _NumberType::signedInteger) && (_data1.signedInteger <= std::numeric_limits<U>::max()) && (_data1.signedInteger >= std::numeric_limits<U>::min())) ||
+                                     ((_data0.numberType == _NumberType::unsignedInteger) && (_data1.unsignedInteger <= uint64_t{std::numeric_limits<U>::max()})) ||
+                                     ((_data0.numberType == _NumberType::floater) && (U(_data1.floater) == _data1.floater))
             );
         }
         // Unsigned integer
         else if constexpr (std::is_integral_v<U> && std::is_unsigned_v<U>) {
             return isNumber() && (
-                ((_data0.numberType == NumberType::unsignedInteger) && (_data1.unsignedInteger <= std::numeric_limits<U>::max())) ||
-                ((_data0.numberType == NumberType::signedInteger) && (_data1.signedInteger >= 0) && (uint64_t(_data1.signedInteger) <= std::numeric_limits<U>::max())) ||
-                ((_data0.numberType == NumberType::floater) && (U(_data1.floater) == _data1.floater))
+                                     ((_data0.numberType == _NumberType::unsignedInteger) && (_data1.unsignedInteger <= std::numeric_limits<U>::max())) ||
+                                     ((_data0.numberType == _NumberType::signedInteger) && (_data1.signedInteger >= 0) && (uint64_t(_data1.signedInteger) <= std::numeric_limits<U>::max())) ||
+                                     ((_data0.numberType == _NumberType::floater) && (U(_data1.floater) == _data1.floater))
             );
         }
         // Floater
@@ -647,59 +857,59 @@ namespace qc::json
         }
     }
 
-    template <bool safe>
-    inline const Object & Value::asObject() const noexcept(!safe)
+    template <Safety isSafe>
+    inline Object & Value::asObject() noexcept(isSafe == unsafe)
     {
-        if constexpr (safe) if (!isObject()) throw TypeError{};
+        return const_cast<Object &>(static_cast<const Value &>(*this).asObject<isSafe>());
+    }
+
+    template <Safety isSafe>
+    inline const Object & Value::asObject() const noexcept(isSafe == unsafe)
+    {
+        if constexpr (isSafe == safe) if (!isObject()) throw TypeError{};
         return reinterpret_cast<const Object &>(*this);
     }
 
-    template <bool safe>
-    inline Object & Value::asObject() noexcept(!safe)
+    template <Safety isSafe>
+    inline Array & Value::asArray() noexcept(isSafe == unsafe)
     {
-        return const_cast<Object &>(const_cast<const Value &>(*this).asObject<safe>());
+        return const_cast<Array &>(static_cast<const Value &>(*this).asArray<isSafe>());
     }
 
-    template <bool safe>
-    inline const Array & Value::asArray() const noexcept(!safe)
+    template <Safety isSafe>
+    inline const Array & Value::asArray() const noexcept(isSafe == unsafe)
     {
-        if constexpr (safe) if (!isArray()) throw TypeError{};
+        if constexpr (isSafe == safe) if (!isArray()) throw TypeError{};
         return reinterpret_cast<const Array &>(*this);
     }
 
-    template <bool safe>
-    inline Array & Value::asArray() noexcept(!safe)
+    template <Safety isSafe>
+    inline string_view Value::asString() const noexcept(isSafe == unsafe)
     {
-        return const_cast<Array &>(const_cast<const Value &>(*this).asArray<safe>());
-    }
-
-    template <bool safe>
-    inline string_view Value::asString() const noexcept(!safe)
-    {
-        if constexpr (safe) if (!isString()) throw TypeError{};
+        if constexpr (isSafe == safe) if (!isString()) throw TypeError{};
         return reinterpret_cast<const String &>(*this).view();
     }
 
-    template <bool safe>
-    inline std::variant<int64_t, uint64_t, double> Value::asNumber() const noexcept(!safe)
+    template <Safety isSafe>
+    inline std::variant<int64_t, uint64_t, double> Value::asNumber() const noexcept(isSafe == unsafe)
     {
-        if constexpr (safe) if (!isNumber()) throw TypeError{};
+        if constexpr (isSafe == safe) if (!isNumber()) throw TypeError{};
         switch (_data0.numberType) {
-            case NumberType::signedInteger: return _data1.signedInteger;
-            case NumberType::unsignedInteger: return _data1.unsignedInteger;
-            case NumberType::floater: return _data1.floater;
-            default: if constexpr (safe) throw TypeError{}; else return _data1.signedInteger;
+            case _NumberType::signedInteger: return _data1.signedInteger;
+            case _NumberType::unsignedInteger: return _data1.unsignedInteger;
+            case _NumberType::floater: return _data1.floater;
+            default: if constexpr (isSafe == safe) throw TypeError{}; else return _data1.signedInteger;
         }
     }
 
-    template <bool safe>
-    inline bool Value::asBoolean() const noexcept(!safe)
+    template <Safety isSafe>
+    inline bool Value::asBoolean() const noexcept(isSafe == unsafe)
     {
-        if constexpr (safe) if (!isBoolean()) throw TypeError{};
+        if constexpr (isSafe == safe) if (!isBoolean()) throw TypeError{};
         return _data1.boolean;
     }
 
-    template <typename T, bool safe>
+    template <typename T, Safety isSafe>
     inline T Value::as() const
     {
         using U = std::decay_t<T>;
@@ -718,30 +928,30 @@ namespace qc::json
 
         // String
         if constexpr (std::is_same_v<U, string_view>) {
-            return asString<safe>();
+            return asString<isSafe>();
         }
         // Character
         else if constexpr (std::is_same_v<U, char>) {
-            if constexpr (safe) if (!is<char>()) throw TypeError{};
-            return asString<true>().front();
+            if constexpr (isSafe == safe) if (!is<char>()) throw TypeError{};
+            return asString<unsafe>().front();
         }
         // Boolean
         else if constexpr (std::is_same_v<U, bool>) {
-            return asBoolean<safe>();
+            return asBoolean<isSafe>();
         }
         // Number
         else if constexpr (std::is_arithmetic_v<U>) {
-            if constexpr (safe) if (!is<U>()) throw TypeError{};
+            if constexpr (isSafe == safe) if (!is<U>()) throw TypeError{};
             switch (_data0.numberType) {
-                case NumberType::signedInteger: return U(_data1.signedInteger);
-                case NumberType::unsignedInteger: return U(_data1.unsignedInteger);
-                case NumberType::floater: return U(_data1.floater);
-                default: if constexpr (safe) throw TypeError{}; else return U(_data1.signedInteger);
+                case _NumberType::signedInteger: return U(_data1.signedInteger);
+                case _NumberType::unsignedInteger: return U(_data1.unsignedInteger);
+                case _NumberType::floater: return U(_data1.floater);
+                default: if constexpr (isSafe == safe) throw TypeError{}; else return U(_data1.signedInteger);
             }
         }
         // Other
         else {
-            return ::qc::json::valueTo<U, safe>()(*this);
+            return ::qc::json::valueTo<U, isSafe>()(*this);
         }
     }
 
@@ -775,14 +985,14 @@ namespace qc::json
         return _size;
     }
 
-    inline uint32_t Object::capacity() const noexcept
-    {
-        return _type_and_capacity << 3;
-    }
-
     inline bool Object::empty() const noexcept
     {
         return !_size;
+    }
+
+    inline uint32_t Object::capacity() const noexcept
+    {
+        return _type_and_capacity << 3;
     }
 
     inline Object::Pair & Object::add(string && key, Value && val)
@@ -859,6 +1069,11 @@ namespace qc::json
         return _search(key).second;
     }
 
+    inline Value & Object::at(const string_view key)
+    {
+        return const_cast<Value &>(static_cast<const Object &>(*this).at(key));
+    }
+
     inline const Value & Object::at(const string_view key) const
     {
         const auto [pos, found]{_search(key)};
@@ -868,20 +1083,15 @@ namespace qc::json
         return pos->second;
     }
 
-    inline Value & Object::at(const string_view key)
+    inline Object::iterator Object::find(const string_view key)
     {
-        return const_cast<Value &>(const_cast<const Object &>(*this).at(key));
+        return const_cast<iterator>(static_cast<const Object &>(*this).find(key));
     }
 
     inline Object::const_iterator Object::find(const string_view key) const
     {
         const auto [pos, found]{_search(key)};
         return found ? pos : cend();
-    }
-
-    inline Object::iterator Object::find(const string_view key)
-    {
-        return const_cast<iterator>(const_cast<const Object &>(*this).find(key));
     }
 
     inline Object::Pair Object::remove(const iterator it) noexcept
@@ -963,7 +1173,7 @@ namespace qc::json
 
     inline std::pair<Object::Pair *, bool> Object::_search(const string_view key)
     {
-        const auto [pos, found]{const_cast<const Object *>(this)->_search(key)};
+        const auto [pos, found]{static_cast<const Object *>(this)->_search(key)};
         return {const_cast<Pair *>(pos), found};
     }
 
@@ -975,12 +1185,12 @@ namespace qc::json
     {
         // Populate `_values` using fold expression
         int index{0};
-        auto f{[this, &index](auto && val) {
+        const auto populate{[this, &index](auto && val) {
             new (_values + index) Value{std::forward<decltype(val)>(val)};
             ++index;
         }};
-        f(std::forward<T>(val));
-        (f(std::forward<Ts>(vals)), ...);
+        populate(std::forward<T>(val));
+        (populate(std::forward<Ts>(vals)), ...);
     }
 
     inline Array::Array(Array && other) noexcept :
@@ -1013,14 +1223,14 @@ namespace qc::json
         return _size;
     }
 
-    inline uint32_t Array::capacity() const noexcept
-    {
-        return _type_and_capacity << 3;
-    }
-
     inline bool Array::empty() const noexcept
     {
         return !_size;
+    }
+
+    inline uint32_t Array::capacity() const noexcept
+    {
+        return _type_and_capacity << 3;
     }
 
     inline Value & Array::add(Value && val) noexcept
@@ -1047,6 +1257,11 @@ namespace qc::json
         return *new (_values + _size++) Value{std::move(val)};
     }
 
+    inline Value & Array::at(const uint32_t i)
+    {
+        return const_cast<Value &>(static_cast<const Array &>(*this).at(i));
+    }
+
     inline const Value & Array::at(const uint32_t i) const
     {
         if (i >= _size) {
@@ -1054,11 +1269,6 @@ namespace qc::json
         }
 
         return _values[i];
-    }
-
-    inline Value & Array::at(const uint32_t i)
-    {
-        return const_cast<Value &>(const_cast<const Array &>(*this).at(i));
     }
 
     inline Value Array::remove(const uint32_t i)
@@ -1200,7 +1410,7 @@ namespace qc::json
             }
             case Type::object: {
                 encoder << object;
-                for (const auto & [key, v] : val.asObject<true>()) {
+                for (const auto & [key, v] : val.asObject<unsafe>()) {
                     encoder << key << v;
                 }
                 encoder << end;
@@ -1208,22 +1418,22 @@ namespace qc::json
             }
             case Type::array: {
                 encoder << array;
-                for (const auto & v : val.asArray<true>()) {
+                for (const auto & v : val.asArray<unsafe>()) {
                     encoder << v;
                 }
                 encoder << end;
                 break;
             }
             case Type::string: {
-                encoder << val.asString<true>();
+                encoder << val.asString<unsafe>();
                 break;
             }
             case Type::number: {
-                std::visit([&encoder](auto v) { encoder << v; }, val.asNumber<true>());
+                std::visit([&encoder](auto v) { encoder << v; }, val.asNumber<unsafe>());
                 break;
             }
             case Type::boolean: {
-                encoder << val.asBoolean<true>();
+                encoder << val.asBoolean<unsafe>();
                 break;
             }
         }

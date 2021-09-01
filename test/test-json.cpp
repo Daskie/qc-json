@@ -16,6 +16,8 @@ using qc::json::encode;
 using qc::json::Type;
 using qc::json::TypeError;
 using namespace qc::json::tokens;
+using qc::json::Safety::safe;
+using qc::json::Safety::unsafe;
 
 struct CustomVal { int x, y; };
 
@@ -23,11 +25,11 @@ bool operator==(const CustomVal & cv1, const CustomVal & cv2) {
     return cv1.x == cv2.x && cv1.y == cv2.y;
 }
 
-template <bool safe>
-struct qc::json::valueTo<CustomVal, safe> {
+template <qc::json::Safety isSafe>
+struct qc::json::valueTo<CustomVal, isSafe> {
     CustomVal operator()(const Value & val) const {
-        const Array & arr(val.asArray<safe>());
-        return {arr.at(0).as<int, safe>(), arr.at(1).as<int, safe>()};
+        const Array & arr(val.asArray<isSafe>());
+        return {arr.at(0).as<int, isSafe>(), arr.at(1).as<int, isSafe>()};
     }
 };
 
@@ -256,26 +258,26 @@ TEST(json, valueTypes) {
         EXPECT_EQ(Type::object, v.type());
         EXPECT_TRUE(v.isObject());
         EXPECT_TRUE(v.is<Object>());
-        v.asObject<false>();
-        v.asObject<true>();
+        v.asObject<safe>();
+        v.asObject<unsafe>();
     }
     { // Array
         Value v(Array{});
         EXPECT_EQ(Type::array, v.type());
         EXPECT_TRUE(v.isArray());
         EXPECT_TRUE(v.is<Array>());
-        v.asArray<false>();
-        v.asArray<true>();
+        v.asArray<safe>();
+        v.asArray<unsafe>();
     }
     { // String
         Value v("abc"sv);
         EXPECT_EQ(Type::string, v.type());
         EXPECT_TRUE(v.isString());
         EXPECT_TRUE(v.is<std::string_view>());
-        v.asString<false>();
-        v.asString<true>();
-        v.as<std::string_view, true>();
-        v.as<std::string_view, false>();
+        v.asString<safe>();
+        v.asString<unsafe>();
+        v.as<std::string_view, safe>();
+        v.as<std::string_view, unsafe>();
     }
     { // Character
         Value v('a');
@@ -283,32 +285,32 @@ TEST(json, valueTypes) {
         EXPECT_TRUE(v.isString());
         EXPECT_TRUE(v.is<std::string_view>());
         EXPECT_TRUE(v.is<char>());
-        v.asString<false>();
-        v.asString<true>();
-        v.as<std::string_view, true>();
-        v.as<std::string_view, false>();
-        v.as<char, true>();
-        v.as<char, false>();
+        v.asString<safe>();
+        v.asString<unsafe>();
+        v.as<std::string_view, safe>();
+        v.as<std::string_view, unsafe>();
+        v.as<char, safe>();
+        v.as<char, unsafe>();
     }
     { // Number
         Value v(123);
         EXPECT_EQ(Type::number, v.type());
         EXPECT_TRUE(v.isNumber());
         EXPECT_TRUE(v.is<int>());
-        v.asNumber<true>();
-        v.asNumber<false>();
-        v.as<int, true>();
-        v.as<int, false>();
+        v.asNumber<safe>();
+        v.asNumber<unsafe>();
+        v.as<int, safe>();
+        v.as<int, unsafe>();
     }
     { // Boolean
         Value v(false);
         EXPECT_EQ(Type::boolean, v.type());
         EXPECT_TRUE(v.isBoolean());
         EXPECT_TRUE(v.is<bool>());
-        v.asBoolean<true>();
-        v.asBoolean<false>();
-        v.as<bool, true>();
-        v.as<bool, false>();
+        v.asBoolean<safe>();
+        v.asBoolean<unsafe>();
+        v.as<bool, safe>();
+        v.as<bool, unsafe>();
     }
     { // Null
         Value v(nullptr);
@@ -422,42 +424,42 @@ TEST(json, valueNumbers) {
 
 TEST(json, valueAs) {
     // Safe
-    EXPECT_THROW((Value().asObject<true>()), TypeError);
-    EXPECT_THROW((Value().asArray<true>()), TypeError);
-    EXPECT_THROW((Value().asString<true>()), TypeError);
-    EXPECT_THROW((Value().as<std::string_view, true>()), TypeError);
-    EXPECT_THROW((Value().asNumber<true>()), TypeError);
-    EXPECT_THROW((Value().as<int64_t, true>()), TypeError);
-    EXPECT_THROW((Value().as<int32_t, true>()), TypeError);
-    EXPECT_THROW((Value().as<int16_t, true>()), TypeError);
-    EXPECT_THROW((Value().as<int8_t, true>()), TypeError);
-    EXPECT_THROW((Value().as<uint64_t, true>()), TypeError);
-    EXPECT_THROW((Value().as<uint32_t, true>()), TypeError);
-    EXPECT_THROW((Value().as<uint16_t, true>()), TypeError);
-    EXPECT_THROW((Value().as<uint8_t, true>()), TypeError);
-    EXPECT_THROW((Value().as<double, true>()), TypeError);
-    EXPECT_THROW((Value().as<float, true>()), TypeError);
-    EXPECT_THROW((Value().asBoolean<true>()), TypeError);
-    EXPECT_THROW((Value().as<bool, true>()), TypeError);
+    EXPECT_THROW((Value().asObject<safe>()), TypeError);
+    EXPECT_THROW((Value().asArray<safe>()), TypeError);
+    EXPECT_THROW((Value().asString<safe>()), TypeError);
+    EXPECT_THROW((Value().as<std::string_view, safe>()), TypeError);
+    EXPECT_THROW((Value().asNumber<safe>()), TypeError);
+    EXPECT_THROW((Value().as<int64_t, safe>()), TypeError);
+    EXPECT_THROW((Value().as<int32_t, safe>()), TypeError);
+    EXPECT_THROW((Value().as<int16_t, safe>()), TypeError);
+    EXPECT_THROW((Value().as<int8_t, safe>()), TypeError);
+    EXPECT_THROW((Value().as<uint64_t, safe>()), TypeError);
+    EXPECT_THROW((Value().as<uint32_t, safe>()), TypeError);
+    EXPECT_THROW((Value().as<uint16_t, safe>()), TypeError);
+    EXPECT_THROW((Value().as<uint8_t, safe>()), TypeError);
+    EXPECT_THROW((Value().as<double, safe>()), TypeError);
+    EXPECT_THROW((Value().as<float, safe>()), TypeError);
+    EXPECT_THROW((Value().asBoolean<safe>()), TypeError);
+    EXPECT_THROW((Value().as<bool, safe>()), TypeError);
 
     // Unsafe
-    Value().asObject<false>();
-    Value().asArray<false>();
-    Value().asString<false>();
-    Value().as<std::string_view, false>();
-    Value().asNumber<false>();
-    Value().as<int64_t, false>();
-    Value().as<int32_t, false>();
-    Value().as<int16_t, false>();
-    Value().as<int8_t, false>();
-    Value().as<uint64_t, false>();
-    Value().as<uint32_t, false>();
-    Value().as<uint16_t, false>();
-    Value().as<uint8_t, false>();
-    Value().as<double, false>();
-    Value().as<float, false>();
-    Value().asBoolean<false>();
-    Value().as<bool, false>();
+    Value().asObject<unsafe>();
+    Value().asArray<unsafe>();
+    Value().asString<unsafe>();
+    Value().as<std::string_view, unsafe>();
+    Value().asNumber<unsafe>();
+    Value().as<int64_t, unsafe>();
+    Value().as<int32_t, unsafe>();
+    Value().as<int16_t, unsafe>();
+    Value().as<int8_t, unsafe>();
+    Value().as<uint64_t, unsafe>();
+    Value().as<uint32_t, unsafe>();
+    Value().as<uint16_t, unsafe>();
+    Value().as<uint8_t, unsafe>();
+    Value().as<double, unsafe>();
+    Value().as<float, unsafe>();
+    Value().asBoolean<unsafe>();
+    Value().as<bool, unsafe>();
 }
 
 TEST(json, object) {

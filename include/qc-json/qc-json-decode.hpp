@@ -6,9 +6,9 @@
 /// 2019 - 2021
 /// https://github.com/Daskie/qc-json
 ///
-/// Decodes data from a JSON string and sends it to the provided `Composer`.
+/// Decodes data from a JSON string and sends it to the provided `Composer`
 ///
-/// See the GitHub link above for more info and examples.
+/// See the GitHub link above for more info and examples
 ///
 
 #include <cctype>
@@ -32,7 +32,7 @@ namespace qc::json
     using namespace std::string_view_literals;
 
     ///
-    /// Common exception type used for all qc::json exceptions.
+    /// Common exception type used for all `qc::json` exceptions
     ///
     struct Error : std::runtime_error
     {
@@ -47,21 +47,20 @@ namespace qc::json
 namespace qc::json
 {
     ///
-    /// This will be thrown if anything goes wrong during the decoding process.
-    /// `position` is the index into the string where the error occurred.
+    /// This will be thrown if anything goes wrong during the decoding process
     ///
     struct DecodeError : Error
     {
-        size_t position;
+        size_t position; /// The index into the string where the error occurred
 
         DecodeError(const string & msg, size_t position) noexcept;
     };
 
     ///
-    /// Decodes the JSON string.
+    /// Decodes the JSON string
     ///
     /// A note on numbers:
-    /// A number will be parsed and sent to the composer as either a `int64_t`, a `uint64_t`, or a `double`.
+    /// A number will be parsed and sent to the composer as either a `int64_t`, a `uint64_t`, or a `double`
     /// - `int64_t` if the number is an integer (a fractional component of zero is okay) and can fit in a `int64_t`
     /// - `uint64_t` if the number is a positive integer, can fit in a `uint64_t`, but cannot fit in a `int64_t`
     /// - `double` if the number has a non-zero fractional component, has an exponent, or is an integer that is too large to fit in a `int64_t` or `uint64_t`
@@ -71,18 +70,17 @@ namespace qc::json
     /// @param initialState the initial state object to be passed to the composer
     ///
     template <typename Composer, typename State> void decode(string_view json, Composer & composer, State initialState);
-
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 namespace qc::json
 {
-    // This functionality is wrapped in a class as a convenient way to keep track of state
+    // This functionality is wrapped in a class purely as a convenient way to keep track of state
     template <typename Composer, typename State>
     class _Decoder
     {
-        public:
+        public: //--------------------------------------------------------------
 
         _Decoder(const string_view str, Composer & composer) :
             _start{str.data()},
@@ -102,7 +100,7 @@ namespace qc::json
             }
         }
 
-        private:
+        private: //-------------------------------------------------------------
 
         const char * const _start{nullptr};
         const char * const _end{nullptr};
@@ -471,5 +469,4 @@ namespace qc::json
     {
         return _Decoder<Composer, State>{json, composer}(initialState);
     }
-
 }
