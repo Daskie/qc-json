@@ -1,15 +1,15 @@
 #pragma once
 
-//
-// QC Json 1.3.4
-// Austin Quick
-// 2019 - 2021
-// https://github.com/Daskie/qc-json
-//
-// Encodes data into a JSON string.
-//
-// See the GitHub link above for more info and examples.
-//
+///
+/// QC Json 1.3.4
+/// Austin Quick
+/// 2019 - 2021
+/// https://github.com/Daskie/qc-json
+///
+/// Encodes data into a JSON string.
+///
+/// See the GitHub link above for more info and examples.
+///
 
 #include <cctype>
 #include <cstddef>
@@ -24,50 +24,46 @@
 #ifndef QC_JSON_COMMON
 #define QC_JSON_COMMON
 
-namespace qc::json {
-
-    //
-    // Common exception type used for all qc::json exceptions.
-    //
-    struct Error : std::runtime_error {
-
+namespace qc::json
+{
+    ///
+    /// Common exception type used for all `qc::json` exceptions.
+    ///
+    struct Error : std::runtime_error
+    {
         explicit Error(const std::string & msg = {}) noexcept :
-            std::runtime_error(msg)
+            std::runtime_error{msg}
         {}
-
     };
-
-} // namespace qc::json
+}
 
 #endif // QC_JSON_COMMON
 
-namespace qc::json {
-
+namespace qc::json
+{
     using std::string;
     using std::string_view;
     using namespace std::string_literals;
     using namespace std::string_view_literals;
 
-    namespace config {
-
+    namespace config
+    {
         constexpr bool defaultCompact{false};
-
     }
 
-    //
-    // This will be thrown if anything goes wrong during the encoding process.
-    //
-    struct EncodeError : Error {
-
+    ///
+    /// This will be thrown if anything goes wrong during the encoding process.
+    ///
+    struct EncodeError : Error
+    {
         explicit EncodeError(const string & msg) noexcept;
-
     };
 
-    //
-    // Instantiate this class to do the encoding.
-    //
-    class Encoder {
-
+    ///
+    /// Instantiate this class to do the encoding.
+    ///
+    class Encoder
+    {
         public:
 
         Encoder() = default;
@@ -133,40 +129,41 @@ namespace qc::json {
         void _encode(double val);
         void _encode(bool val);
         void _encode(std::nullptr_t);
-
     };
-
 }
 
-//
-// Specialize `qc_json_encode` to enable encoding of custom types
-// Example:
-//      template <>
-//      struct qc_json_encode<std::pair<int, int>> {
-//          void operator()(qc::json::Encoder & encoder, const std::pair<int, int> & v) {
-//              encoder.array(true).val(v.first).val(v.second).end();
-//          }
-//      };
-//
+///
+/// Specialize `qc_json_encode` to enable encoding of custom types
+/// Example:
+///      template <>
+///      struct qc_json_encode<std::pair<int, int>>
+///      {
+///          void operator()(qc::json::Encoder & encoder, const std::pair<int, int> & v)
+///          {
+///              encoder.array(true).val(v.first).val(v.second).end();
+///          }
+///      };
+///
 template <typename T> struct qc_json_encode;
 
-// IMPLEMENTATION //////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-namespace qc::json {
-
+namespace qc::json
+{
     inline EncodeError::EncodeError(const string & msg) noexcept :
-        Error(msg)
+        Error{msg}
     {}
 
     inline Encoder::Encoder(Encoder && other) noexcept :
-        _oss(std::move(other._oss)),
-        _state(std::move(other._state)),
-        _indentation(std::exchange(other._indentation, 0)),
-        _isKey(std::exchange(other._isKey, false)),
-        _isComplete(std::exchange(other._isComplete, false))
+        _oss{std::move(other._oss)},
+        _state{std::move(other._state)},
+        _indentation{std::exchange(other._indentation, 0)},
+        _isKey{std::exchange(other._isKey, false)},
+        _isComplete{std::exchange(other._isComplete, false)}
     {}
 
-    inline Encoder & Encoder::object(bool compact) {
+    inline Encoder & Encoder::object(bool compact)
+    {
         _checkPre();
         _prefix();
         _oss << '{';
@@ -180,7 +177,8 @@ namespace qc::json {
         return *this;
     }
 
-    inline Encoder & Encoder::array(bool compact) {
+    inline Encoder & Encoder::array(bool compact)
+    {
         _checkPre();
         _prefix();
         _oss << '[';
@@ -194,15 +192,16 @@ namespace qc::json {
         return *this;
     }
 
-    inline Encoder & Encoder::key(const string_view key) {
+    inline Encoder & Encoder::key(const string_view key)
+    {
         if (_isKey) {
-            throw EncodeError("A key has already been given");
+            throw EncodeError{"A key has already been given"s};
         }
         if (_state.empty() || _state.back().array) {
-            throw EncodeError("A key may only be givin within an object");
+            throw EncodeError{"A key may only be givin within an object"s};
         }
         if (key.empty()) {
-            throw EncodeError("Key must not be empty");
+            throw EncodeError{"Key must not be empty"s};
         }
 
         _prefix();
@@ -213,102 +212,114 @@ namespace qc::json {
         return *this;
     }
 
-    inline Encoder & Encoder::val(const string_view v) {
+    inline Encoder & Encoder::val(const string_view v)
+    {
         _val(v);
-
         return *this;
     }
 
-    inline Encoder & Encoder::val(const string & v) {
+    inline Encoder & Encoder::val(const string & v)
+    {
         return val(string_view(v));
     }
 
-    inline Encoder & Encoder::val(const char * const v) {
+    inline Encoder & Encoder::val(const char * const v)
+    {
         return val(string_view(v));
     }
 
-    inline Encoder & Encoder::val(char * const v) {
+    inline Encoder & Encoder::val(char * const v)
+    {
         return val(string_view(v));
     }
 
-    inline Encoder & Encoder::val(const char v) {
+    inline Encoder & Encoder::val(const char v)
+    {
         return val(string_view(&v, 1u));
     }
 
-    inline Encoder & Encoder::val(const int64_t v) {
+    inline Encoder & Encoder::val(const int64_t v)
+    {
         _val(v);
-
         return *this;
     }
 
-    inline Encoder & Encoder::val(const int32_t v) {
+    inline Encoder & Encoder::val(const int32_t v)
+    {
         return val(int64_t(v));
     }
 
-    inline Encoder & Encoder::val(const int16_t v) {
+    inline Encoder & Encoder::val(const int16_t v)
+    {
         return val(int64_t(v));
     }
 
-    inline Encoder & Encoder::val(const int8_t v) {
+    inline Encoder & Encoder::val(const int8_t v)
+    {
         return val(int64_t(v));
     }
 
-    inline Encoder & Encoder::val(const uint64_t v) {
+    inline Encoder & Encoder::val(const uint64_t v)
+    {
         _val(v);
-
         return *this;
     }
 
-    inline Encoder & Encoder::val(const uint32_t v) {
+    inline Encoder & Encoder::val(const uint32_t v)
+    {
         return val(uint64_t(v));
     }
 
-    inline Encoder & Encoder::val(const uint16_t v) {
+    inline Encoder & Encoder::val(const uint16_t v)
+    {
         return val(uint64_t(v));
     }
 
-    inline Encoder & Encoder::val(const uint8_t v) {
+    inline Encoder & Encoder::val(const uint8_t v)
+    {
         return val(uint64_t(v));
     }
 
-    inline Encoder & Encoder::val(const double v) {
+    inline Encoder & Encoder::val(const double v)
+    {
         _val(v);
-
         return *this;
     }
 
-    inline Encoder & Encoder::val(const float v) {
+    inline Encoder & Encoder::val(const float v)
+    {
         return val(double(v));
     }
 
-    inline Encoder & Encoder::val(const bool v) {
+    inline Encoder & Encoder::val(const bool v)
+    {
         _val(v);
-
         return *this;
     }
 
-    inline Encoder & Encoder::val(const std::nullptr_t) {
+    inline Encoder & Encoder::val(const std::nullptr_t)
+    {
         _val(nullptr);
-
         return *this;
     }
 
     template <typename T>
-    inline Encoder & Encoder::val(const T & v) {
+    inline Encoder & Encoder::val(const T & v)
+    {
         qc_json_encode<T>()(*this, v);
-
         return *this;
     }
 
-    inline Encoder & Encoder::end() {
+    inline Encoder & Encoder::end()
+    {
         if (_state.empty()) {
-            throw EncodeError("No object or array to end");
+            throw EncodeError{"No object or array to end"s};
         }
         if (_isKey) {
-            throw EncodeError("Cannot end object with a dangling key");
+            throw EncodeError{"Cannot end object with a dangling key"s};
         }
 
-        const _State & state(_state.back());
+        const _State & state{_state.back()};
         if (state.content) {
             if (state.compact) {
                 _oss << ' ';
@@ -329,12 +340,13 @@ namespace qc::json {
         return *this;
     }
 
-    inline string Encoder::finish() {
+    inline string Encoder::finish()
+    {
         if (!_isComplete) {
-            throw EncodeError("Cannot finish, JSON is not yet complete");
+            throw EncodeError{"Cannot finish, JSON is not yet complete"s};
         }
 
-        string str(_oss.str());
+        const string str{_oss.str()};
 
         // Reset state
         _oss.str(""s);
@@ -345,7 +357,8 @@ namespace qc::json {
     }
 
     template <typename T>
-    inline void Encoder::_val(const T v) {
+    inline void Encoder::_val(const T v)
+    {
         _checkPre();
         _prefix();
         _encode(v);
@@ -359,9 +372,10 @@ namespace qc::json {
         }
     }
 
-    inline void Encoder::_prefix() {
+    inline void Encoder::_prefix()
+    {
         if (!_isKey && !_state.empty()) {
-            const _State & state(_state.back());
+            const _State & state{_state.back()};
             if (state.content) {
                 _oss << ',';
             }
@@ -376,22 +390,25 @@ namespace qc::json {
         }
     }
 
-    inline void Encoder::_indent() {
+    inline void Encoder::_indent()
+    {
         for (int i{0}; i < _indentation; ++i) {
             _oss << "    "sv;
         }
     }
 
-    inline void Encoder::_checkPre() const {
+    inline void Encoder::_checkPre() const
+    {
         if (_isComplete) {
-            throw EncodeError("Cannot add value to complete JSON");
+            throw EncodeError{"Cannot add value to complete JSON"s};
         }
         if (!_isKey && !(_state.empty() || _state.back().array)) {
-            throw EncodeError("Cannot add value to object without first providing a key");
+            throw EncodeError{"Cannot add value to object without first providing a key"s};
         }
     }
 
-    inline void Encoder::_encode(const string_view v) {
+    inline void Encoder::_encode(const string_view v)
+    {
         static constexpr char hexChars[16]{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
 
         _oss << '"';
@@ -413,7 +430,7 @@ namespace qc::json {
                             _oss << R"(\u00)" << hexChars[(c >> 4) & 0xF] << hexChars[c & 0xF];
                         }
                         else {
-                            throw EncodeError("Non-ASCII unicode is not supported");
+                            throw EncodeError{"Non-ASCII unicode is not supported"s};
                         }
                 }
             }
@@ -422,43 +439,41 @@ namespace qc::json {
         _oss << '"';
     }
 
-    inline void Encoder::_encode(const int64_t v) {
+    inline void Encoder::_encode(const int64_t v)
+    {
         char buffer[24];
-
-        std::to_chars_result res(std::to_chars(buffer, buffer + sizeof(buffer), v));
-
-        _oss << string_view(buffer, res.ptr - buffer);
+        const std::to_chars_result res{std::to_chars(buffer, buffer + sizeof(buffer), v)};
+        _oss << string_view{buffer, size_t(res.ptr - buffer)};
     }
 
-    inline void Encoder::_encode(const uint64_t v) {
+    inline void Encoder::_encode(const uint64_t v)
+    {
         char buffer[24];
-
-        std::to_chars_result res(std::to_chars(buffer, buffer + sizeof(buffer), v));
-
-        _oss << string_view(buffer, res.ptr - buffer);
+        const std::to_chars_result res{std::to_chars(buffer, buffer + sizeof(buffer), v)};
+        _oss << string_view{buffer, size_t(res.ptr - buffer)};
     }
 
-    inline void Encoder::_encode(const double v) {
-#ifndef __GNUC__ // TODO: Update once GCC supports std::to_chars
+    inline void Encoder::_encode(const double v)
+    {
+#ifndef __GNUC__ // TODO: Update once GCC supports `std::to_chars`
         char buffer[32];
-
-        std::to_chars_result res(std::to_chars(buffer, buffer + sizeof(buffer), v));
-
-        _oss << string_view(buffer, res.ptr - buffer);
+        const std::to_chars_result res{std::to_chars(buffer, buffer + sizeof(buffer), v)};
+        _oss << string_view{buffer, size_t(res.ptr - buffer)};
 #else
 #pragma message("`std::charconv` not supported by compiler - floating point serialization quality may suffer")
         char buffer[32];
-        int len{sprintf(buffer, "%g", v)};
-        _oss << string_view(buffer, len);
+        const int len{sprintf(buffer, "%g", v)};
+        _oss << string_view{buffer, size_t(len)};
 #endif
     }
 
-    inline void Encoder::_encode(const bool v) {
+    inline void Encoder::_encode(const bool v)
+    {
         _oss << (v ? "true"sv : "false"sv);
     }
 
-    inline void Encoder::_encode(std::nullptr_t) {
+    inline void Encoder::_encode(std::nullptr_t)
+    {
         _oss << "null"sv;
     }
-
 }
