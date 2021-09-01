@@ -2,14 +2,11 @@
 
 #include <qc-json/qc-json-encode.hpp>
 
-using std::string;
-using std::string_view;
 using namespace std::string_literals;
 using namespace std::string_view_literals;
 
 using qc::json::Encoder;
 using qc::json::EncodeError;
-
 using namespace qc::json::tokens;
 
 // TODO: Remove once GCC gets this sorted

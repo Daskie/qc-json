@@ -7,10 +7,11 @@
 
 #include <qc-json/qc-json-decode.hpp>
 
-using std::string;
-using std::string_view;
 using namespace std::string_literals;
 using namespace std::string_view_literals;
+
+using qc::json::decode;
+using qc::json::DecodeError;
 
 class DummyComposer {
 
@@ -19,8 +20,8 @@ class DummyComposer {
     std::nullptr_t object(std::nullptr_t) { return nullptr; }
     std::nullptr_t array(std::nullptr_t) { return nullptr; }
     void end(std::nullptr_t, std::nullptr_t) {}
-    void key(string &&, std::nullptr_t) {}
-    void val(string_view, std::nullptr_t) {}
+    void key(std::string &&, std::nullptr_t) {}
+    void val(std::string_view, std::nullptr_t) {}
     void val(int64_t, std::nullptr_t) {}
     void val(uint64_t, std::nullptr_t) {}
     void val(double, std::nullptr_t) {}
@@ -36,8 +37,8 @@ class ExpectantComposer {
     struct Object {};
     struct Array {};
     struct End {};
-    struct Key { string_view k; };
-    struct String { string_view v; };
+    struct Key { std::string_view k; };
+    struct String { std::string_view v; };
     struct SignedInteger { int64_t v; };
     struct UnsignedInteger { uint64_t v; };
     struct Floater { double v; };
@@ -60,8 +61,8 @@ class ExpectantComposer {
     std::nullptr_t object(std::nullptr_t) { assertNextIs(Object{}); return nullptr; }
     std::nullptr_t array(std::nullptr_t) { assertNextIs(Array{}); return nullptr; }
     void end(std::nullptr_t, std::nullptr_t) { assertNextIs(End{}); }
-    void key(string && k, std::nullptr_t) { assertNextIs(Key{k}); }
-    void val(string_view v, std::nullptr_t) { assertNextIs(String{v}); }
+    void key(std::string && k, std::nullptr_t) { assertNextIs(Key{k}); }
+    void val(std::string_view v, std::nullptr_t) { assertNextIs(String{v}); }
     void val(int64_t v, std::nullptr_t) { assertNextIs(SignedInteger{v}); }
     void val(uint64_t v, std::nullptr_t) { assertNextIs(UnsignedInteger{v}); }
     void val(double v, std::nullptr_t) { assertNextIs(Floater{v}); }
@@ -71,8 +72,8 @@ class ExpectantComposer {
     ExpectantComposer & expectObject() { m_sequence.emplace_back(Object{}); return *this; }
     ExpectantComposer & expectArray() { m_sequence.emplace_back(Array{}); return *this; }
     ExpectantComposer & expectEnd() { m_sequence.emplace_back(End{}); return *this; }
-    ExpectantComposer & expectKey(string_view k) { m_sequence.emplace_back(Key{k}); return *this; }
-    ExpectantComposer & expectString(string_view v) { m_sequence.emplace_back(String{v}); return *this; }
+    ExpectantComposer & expectKey(std::string_view k) { m_sequence.emplace_back(Key{k}); return *this; }
+    ExpectantComposer & expectString(std::string_view v) { m_sequence.emplace_back(String{v}); return *this; }
     ExpectantComposer & expectSignedInteger(int64_t v) { m_sequence.emplace_back(SignedInteger{v}); return *this; }
     ExpectantComposer & expectUnsignedInteger(uint64_t v) { m_sequence.emplace_back(UnsignedInteger{v}); return *this; }
     ExpectantComposer & expectFloater(double v) { m_sequence.emplace_back(Floater{v}); return *this; }
@@ -113,54 +114,54 @@ TEST(decode, object) {
     { // Empty
         ExpectantComposer composer;
         composer.expectObject().expectEnd();
-        qc::json::decode(R"({})"sv, composer, nullptr);
+        decode(R"({})"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Single key
         ExpectantComposer composer;
         composer.expectObject().expectKey("a"sv).expectNull().expectEnd();
-        qc::json::decode(R"({ "a": null })"sv, composer, nullptr);
+        decode(R"({ "a": null })"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Multiple keys
         ExpectantComposer composer;
         composer.expectObject().expectKey("a"sv).expectNull().expectKey("b"sv).expectNull().expectKey("c"sv).expectNull().expectEnd();
-        qc::json::decode(R"({ "a": null, "b": null, "c": null })"sv, composer, nullptr);
+        decode(R"({ "a": null, "b": null, "c": null })"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // No space
         ExpectantComposer composer;
         composer.expectObject().expectKey("a"sv).expectNull().expectKey("b"sv).expectNull().expectEnd();
-        qc::json::decode(R"({"a":null,"b":null})"sv, composer, nullptr);
+        decode(R"({"a":null,"b":null})"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Weird spacing
         ExpectantComposer composer;
         composer.expectObject().expectKey("a"sv).expectNull().expectKey("b"sv).expectNull().expectEnd();
-        qc::json::decode(R"({"a" :null ,"b" :null})"sv, composer, nullptr);
+        decode(R"({"a" :null ,"b" :null})"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Key not within quotes
-        EXPECT_THROW(qc::json::decode(R"({ a: 0 })", dummyComposer, nullptr), qc::json::DecodeError);
+        EXPECT_THROW(decode(R"({ a: 0 })", dummyComposer, nullptr), DecodeError);
     }
     { // No colon after key
-        EXPECT_THROW(qc::json::decode(R"({ "a" 0 })", dummyComposer, nullptr), qc::json::DecodeError);
+        EXPECT_THROW(decode(R"({ "a" 0 })", dummyComposer, nullptr), DecodeError);
     }
     { // Empty key
-        EXPECT_THROW(qc::json::decode(R"({ "": 0 })", dummyComposer, nullptr), qc::json::DecodeError);
+        EXPECT_THROW(decode(R"({ "": 0 })", dummyComposer, nullptr), DecodeError);
     }
     { // Missing value
-        EXPECT_THROW(qc::json::decode(R"({ "a": })", dummyComposer, nullptr), qc::json::DecodeError);
+        EXPECT_THROW(decode(R"({ "a": })", dummyComposer, nullptr), DecodeError);
     }
     { // No comma between elements
-        EXPECT_THROW(qc::json::decode(R"({ "a": 0 "b": 1 })", dummyComposer, nullptr), qc::json::DecodeError);
+        EXPECT_THROW(decode(R"({ "a": 0 "b": 1 })", dummyComposer, nullptr), DecodeError);
     }
     { // Comma after last element
-        EXPECT_THROW(qc::json::decode(R"({ "a": 0, })", dummyComposer, nullptr), qc::json::DecodeError);
-        EXPECT_THROW(qc::json::decode(R"({ "a": 0, "b": 1, })", dummyComposer, nullptr), qc::json::DecodeError);
+        EXPECT_THROW(decode(R"({ "a": 0, })", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"({ "a": 0, "b": 1, })", dummyComposer, nullptr), DecodeError);
     }
     { // Empty entry
-        EXPECT_THROW(qc::json::decode(R"({ "a": 0, , "b": 1 })", dummyComposer, nullptr), qc::json::DecodeError);
+        EXPECT_THROW(decode(R"({ "a": 0, , "b": 1 })", dummyComposer, nullptr), DecodeError);
     }
 }
 
@@ -168,42 +169,42 @@ TEST(decode, array) {
     { // Empty
         ExpectantComposer composer;
         composer.expectArray().expectEnd();
-        qc::json::decode(R"([])"sv, composer, nullptr);
+        decode(R"([])"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Single element
         ExpectantComposer composer;
         composer.expectArray().expectNull().expectEnd();
-        qc::json::decode(R"([ null ])"sv, composer, nullptr);
+        decode(R"([ null ])"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Multiple elements
         ExpectantComposer composer;
         composer.expectArray().expectNull().expectNull().expectNull().expectEnd();
-        qc::json::decode(R"([ null, null, null ])"sv, composer, nullptr);
+        decode(R"([ null, null, null ])"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // No space
         ExpectantComposer composer;
         composer.expectArray().expectNull().expectNull().expectEnd();
-        qc::json::decode(R"([null,null])"sv, composer, nullptr);
+        decode(R"([null,null])"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Weird spacing
         ExpectantComposer composer;
         composer.expectArray().expectNull().expectNull().expectEnd();
-        qc::json::decode(R"([null ,null])"sv, composer, nullptr);
+        decode(R"([null ,null])"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // No comma between elements
-        EXPECT_THROW(qc::json::decode(R"([ 0 1 ])", dummyComposer, nullptr), qc::json::DecodeError);
+        EXPECT_THROW(decode(R"([ 0 1 ])", dummyComposer, nullptr), DecodeError);
     }
     { // Comma after last element
-        EXPECT_THROW(qc::json::decode(R"([ 0, ])", dummyComposer, nullptr), qc::json::DecodeError);
-        EXPECT_THROW(qc::json::decode(R"([ 0, 1, ])", dummyComposer, nullptr), qc::json::DecodeError);
+        EXPECT_THROW(decode(R"([ 0, ])", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"([ 0, 1, ])", dummyComposer, nullptr), DecodeError);
     }
     { // Empty entry
-        EXPECT_THROW(qc::json::decode(R"([ 0, , 1 ])", dummyComposer, nullptr), qc::json::DecodeError);
+        EXPECT_THROW(decode(R"([ 0, , 1 ])", dummyComposer, nullptr), DecodeError);
     }
 }
 
@@ -211,67 +212,67 @@ TEST(decode, string) {
     { // Empty string
         ExpectantComposer composer;
         composer.expectString(""sv);
-        qc::json::decode(R"("")"sv, composer, nullptr);
+        decode(R"("")"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // All printable
         ExpectantComposer composer;
         composer.expectString(R"( !"#$%&'()*+,-.//0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~)"sv);
-        qc::json::decode(R"(" !\"#$%&'()*+,-./\/0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~")"sv, composer, nullptr);
+        decode(R"(" !\"#$%&'()*+,-./\/0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~")"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Escape characters
         ExpectantComposer composer;
         composer.expectString("\b\f\n\r\t"sv);
-        qc::json::decode(R"("\b\f\n\r\t")"sv, composer, nullptr);
+        decode(R"("\b\f\n\r\t")"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Missing escape sequence
         const std::string_view brokenSeq{R"("\\\")"};
-        EXPECT_THROW(qc::json::decode(brokenSeq, dummyComposer, nullptr), qc::json::DecodeError);
+        EXPECT_THROW(decode(brokenSeq, dummyComposer, nullptr), DecodeError);
         const std::string_view brokenSeqInArray{R"([ "\\\" ])"};
-        EXPECT_THROW(qc::json::decode(brokenSeqInArray, dummyComposer, nullptr), qc::json::DecodeError);
+        EXPECT_THROW(decode(brokenSeqInArray, dummyComposer, nullptr), DecodeError);
     }
     { // Unknown escape sequence
-        EXPECT_THROW(qc::json::decode(R"("\v")", dummyComposer, nullptr), qc::json::DecodeError);
+        EXPECT_THROW(decode(R"("\v")", dummyComposer, nullptr), DecodeError);
     }
     { // Unicode
         ExpectantComposer composer;
         composer.expectString("\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\u000B\u000E\u000F\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001A\u001B\u001C\u001D\u001E\u001F\u007F"sv);
-        qc::json::decode(R"("\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\u000B\u000E\u000F\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001A\u001B\u001C\u001D\u001E\u001F\u007F")"sv, composer, nullptr);
+        decode(R"("\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\u000B\u000E\u000F\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001A\u001B\u001C\u001D\u001E\u001F\u007F")"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Non-ascii unicode
         const std::string_view str1{R"("\u0080")"};
-        EXPECT_THROW(qc::json::decode(str1, dummyComposer, nullptr), qc::json::DecodeError);
+        EXPECT_THROW(decode(str1, dummyComposer, nullptr), DecodeError);
 
         const std::string_view str2{R"("\u0F00")"};
-        EXPECT_THROW(qc::json::decode(str2, dummyComposer, nullptr), qc::json::DecodeError);
+        EXPECT_THROW(decode(str2, dummyComposer, nullptr), DecodeError);
 
         const std::string_view str3{R"("\uF000")"};
-        EXPECT_THROW(qc::json::decode(str3, dummyComposer, nullptr), qc::json::DecodeError);
+        EXPECT_THROW(decode(str3, dummyComposer, nullptr), DecodeError);
     }
     { // Missing all unicode digits
 #pragma warning(push)
 #pragma warning(disable:4429) // Disable "improperly formed universal-characer-name" warning
-        EXPECT_THROW(qc::json::decode(R"("\u")", dummyComposer, nullptr), qc::json::DecodeError);
-        EXPECT_THROW(qc::json::decode(R"([ "\u" ])", dummyComposer, nullptr), qc::json::DecodeError);
-        EXPECT_THROW(qc::json::decode(R"("\u0")", dummyComposer, nullptr), qc::json::DecodeError);
-        EXPECT_THROW(qc::json::decode(R"([ "\u0" ])", dummyComposer, nullptr), qc::json::DecodeError);
-        EXPECT_THROW(qc::json::decode(R"("\u00")", dummyComposer, nullptr), qc::json::DecodeError);
-        EXPECT_THROW(qc::json::decode(R"([ "\u00" ])", dummyComposer, nullptr), qc::json::DecodeError);
-        EXPECT_THROW(qc::json::decode(R"("\u000")", dummyComposer, nullptr), qc::json::DecodeError);
-        EXPECT_THROW(qc::json::decode(R"([ "\u000" ])", dummyComposer, nullptr), qc::json::DecodeError);
+        EXPECT_THROW(decode(R"("\u")", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"([ "\u" ])", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"("\u0")", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"([ "\u0" ])", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"("\u00")", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"([ "\u00" ])", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"("\u000")", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"([ "\u000" ])", dummyComposer, nullptr), DecodeError);
 #pragma warning(pop)
     }
     { // Missing end quote
-        EXPECT_THROW(qc::json::decode(R"("abc)", dummyComposer, nullptr), qc::json::DecodeError);
-        EXPECT_THROW(qc::json::decode(R"([ "abc ])", dummyComposer, nullptr), qc::json::DecodeError);
+        EXPECT_THROW(decode(R"("abc)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"([ "abc ])", dummyComposer, nullptr), DecodeError);
     }
     { // Unknown content
-        EXPECT_THROW(qc::json::decode("\"\n\"", dummyComposer, nullptr), qc::json::DecodeError);
-        EXPECT_THROW(qc::json::decode("\"\t\"", dummyComposer, nullptr), qc::json::DecodeError);
-        EXPECT_THROW(qc::json::decode("\"\0\"", dummyComposer, nullptr), qc::json::DecodeError);
+        EXPECT_THROW(decode("\"\n\"", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode("\"\t\"", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode("\"\0\"", dummyComposer, nullptr), DecodeError);
     }
 }
 
@@ -279,44 +280,44 @@ TEST(decode, signedInteger) {
     { // Zero
         ExpectantComposer composer;
         composer.expectSignedInteger(0);
-        qc::json::decode(R"(0)"sv, composer, nullptr);
+        decode(R"(0)"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Normal
         ExpectantComposer composer;
         composer.expectSignedInteger(123);
-        qc::json::decode(R"(123)"sv, composer, nullptr);
+        decode(R"(123)"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Min
         ExpectantComposer composer;
         composer.expectSignedInteger(std::numeric_limits<int64_t>::min());
-        qc::json::decode(R"(-9223372036854775808)"sv, composer, nullptr);
+        decode(R"(-9223372036854775808)"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Max
         ExpectantComposer composer;
         composer.expectSignedInteger(std::numeric_limits<int64_t>::max());
-        qc::json::decode(R"(9223372036854775807)"sv, composer, nullptr);
+        decode(R"(9223372036854775807)"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Trailing zeroes
         ExpectantComposer composer;
         composer.expectSignedInteger(123);
-        qc::json::decode(R"(123.000)"sv, composer, nullptr);
+        decode(R"(123.000)"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Invalid minus sign
-        EXPECT_THROW(qc::json::decode(R"(-)", dummyComposer, nullptr), qc::json::DecodeError);
-        EXPECT_THROW(qc::json::decode(R"([ - ])", dummyComposer, nullptr), qc::json::DecodeError);
+        EXPECT_THROW(decode(R"(-)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"([ - ])", dummyComposer, nullptr), DecodeError);
     }
     { // Plus sign
-        EXPECT_THROW(qc::json::decode(R"(+)", dummyComposer, nullptr), qc::json::DecodeError);
-        EXPECT_THROW(qc::json::decode(R"(+123)", dummyComposer, nullptr), qc::json::DecodeError);
+        EXPECT_THROW(decode(R"(+)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(+123)", dummyComposer, nullptr), DecodeError);
     }
     { // Dangling decimal point
-        EXPECT_THROW(qc::json::decode(R"(123.)", dummyComposer, nullptr), qc::json::DecodeError);
-        EXPECT_THROW(qc::json::decode(R"([ 123. ])", dummyComposer, nullptr), qc::json::DecodeError);
+        EXPECT_THROW(decode(R"(123.)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"([ 123. ])", dummyComposer, nullptr), DecodeError);
     }
 }
 
@@ -324,32 +325,32 @@ TEST(decode, unsignedInteger) {
     { // Min unsigned
         ExpectantComposer composer;
         composer.expectUnsignedInteger(uint64_t(std::numeric_limits<int64_t>::max()) + 1u);
-        qc::json::decode(R"(9223372036854775808)"sv, composer, nullptr);
+        decode(R"(9223372036854775808)"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Max unsigned
         ExpectantComposer composer;
         composer.expectUnsignedInteger(std::numeric_limits<uint64_t>::max());
-        qc::json::decode(R"(18446744073709551615)"sv, composer, nullptr);
+        decode(R"(18446744073709551615)"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Trailing zeroes
         ExpectantComposer composer;
         composer.expectUnsignedInteger(10000000000000000000u);
-        qc::json::decode(R"(10000000000000000000.000)"sv, composer, nullptr);
+        decode(R"(10000000000000000000.000)"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Invalid minus sign
-        EXPECT_THROW(qc::json::decode(R"(-)", dummyComposer, nullptr), qc::json::DecodeError);
-        EXPECT_THROW(qc::json::decode(R"([ - ])", dummyComposer, nullptr), qc::json::DecodeError);
+        EXPECT_THROW(decode(R"(-)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"([ - ])", dummyComposer, nullptr), DecodeError);
     }
     { // Plus sign
-        EXPECT_THROW(qc::json::decode(R"(+)", dummyComposer, nullptr), qc::json::DecodeError);
-        EXPECT_THROW(qc::json::decode(R"(+123)", dummyComposer, nullptr), qc::json::DecodeError);
+        EXPECT_THROW(decode(R"(+)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(+123)", dummyComposer, nullptr), DecodeError);
     }
     { // Dangling decimal point
-        EXPECT_THROW(qc::json::decode(R"(10000000000000000000.)", dummyComposer, nullptr), qc::json::DecodeError);
-        EXPECT_THROW(qc::json::decode(R"([ 10000000000000000000. ])", dummyComposer, nullptr), qc::json::DecodeError);
+        EXPECT_THROW(decode(R"(10000000000000000000.)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"([ 10000000000000000000. ])", dummyComposer, nullptr), DecodeError);
     }
 }
 
@@ -357,92 +358,92 @@ TEST(decode, floater) {
     { // Fractional
         ExpectantComposer composer;
         composer.expectFloater(123.456);
-        qc::json::decode(R"(123.456)", composer, nullptr);
+        decode(R"(123.456)", composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Exponent lowercase
         ExpectantComposer composer;
         composer.expectFloater(123.456e17);
-        qc::json::decode(R"(123.456e17)", composer, nullptr);
+        decode(R"(123.456e17)", composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Exponent uppercase
         ExpectantComposer composer;
         composer.expectFloater(123.456e17);
-        qc::json::decode(R"(123.456E17)", composer, nullptr);
+        decode(R"(123.456E17)", composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Positive exponent
         ExpectantComposer composer;
         composer.expectFloater(123.456e17);
-        qc::json::decode(R"(123.456e+17)", composer, nullptr);
+        decode(R"(123.456e+17)", composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Negative exponent
         ExpectantComposer composer;
         composer.expectFloater(-123.456e-17);
-        qc::json::decode(R"(-123.456e-17)", composer, nullptr);
+        decode(R"(-123.456e-17)", composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Exponent without fraction
         ExpectantComposer composer;
         composer.expectFloater(123.0e34);
-        qc::json::decode(R"(123e34)", composer, nullptr);
+        decode(R"(123e34)", composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Max integer
         ExpectantComposer composer;
         composer.expectFloater(9007199254740991.0);
-        qc::json::decode(R"(9007199254740991.0e0)", composer, nullptr);
+        decode(R"(9007199254740991.0e0)", composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Oversized signed integer
         ExpectantComposer composer;
         composer.expectFloater(-9223372036854775809.0);
-        qc::json::decode(R"(-9223372036854775809)", composer, nullptr);
+        decode(R"(-9223372036854775809)", composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Oversized unsigned integer
         ExpectantComposer composer;
         composer.expectFloater(18446744073709551616.0);
-        qc::json::decode(R"(18446744073709551616)", composer, nullptr);
+        decode(R"(18446744073709551616)", composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // infinity
         ExpectantComposer composer;
         composer.expectFloater(std::numeric_limits<double>::infinity());
-        qc::json::decode(R"(inf)", composer, nullptr);
+        decode(R"(inf)", composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // -infinity
         ExpectantComposer composer;
         composer.expectFloater(-std::numeric_limits<double>::infinity());
-        qc::json::decode(R"(-inf)", composer, nullptr);
+        decode(R"(-inf)", composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // NaN
         ExpectantComposer composer;
         composer.expectFloater(std::numeric_limits<double>::quiet_NaN());
-        qc::json::decode(R"(nan)", composer, nullptr);
+        decode(R"(nan)", composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Dangling decimal point
-        EXPECT_THROW(qc::json::decode(R"(0.)", dummyComposer, nullptr), qc::json::DecodeError);
-        EXPECT_THROW(qc::json::decode(R"([ 0. ])", dummyComposer, nullptr), qc::json::DecodeError);
+        EXPECT_THROW(decode(R"(0.)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"([ 0. ])", dummyComposer, nullptr), DecodeError);
     }
     { // Dangling exponent
-        EXPECT_THROW(qc::json::decode(R"(0e)", dummyComposer, nullptr), qc::json::DecodeError);
-        EXPECT_THROW(qc::json::decode(R"([ 0e ])", dummyComposer, nullptr), qc::json::DecodeError);
-        EXPECT_THROW(qc::json::decode(R"(0e+)", dummyComposer, nullptr), qc::json::DecodeError);
-        EXPECT_THROW(qc::json::decode(R"([ 0e+ ])", dummyComposer, nullptr), qc::json::DecodeError);
-        EXPECT_THROW(qc::json::decode(R"(0e-)", dummyComposer, nullptr), qc::json::DecodeError);
-        EXPECT_THROW(qc::json::decode(R"([ 0e- ])", dummyComposer, nullptr), qc::json::DecodeError);
+        EXPECT_THROW(decode(R"(0e)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"([ 0e ])", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(0e+)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"([ 0e+ ])", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(0e-)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"([ 0e- ])", dummyComposer, nullptr), DecodeError);
     }
     { // Magnitude too large
-        EXPECT_THROW(qc::json::decode(R"(1e1000)", dummyComposer, nullptr), qc::json::DecodeError);
+        EXPECT_THROW(decode(R"(1e1000)", dummyComposer, nullptr), DecodeError);
     }
     { // Magnitude too small
-        EXPECT_THROW(qc::json::decode(R"(1e-1000)", dummyComposer, nullptr), qc::json::DecodeError);
+        EXPECT_THROW(decode(R"(1e-1000)", dummyComposer, nullptr), DecodeError);
     }
 }
 
@@ -450,13 +451,13 @@ TEST(decode, boolean) {
     { // True
         ExpectantComposer composer;
         composer.expectBoolean(true);
-        qc::json::decode(R"(true)"sv, composer, nullptr);
+        decode(R"(true)"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // False
         ExpectantComposer composer;
         composer.expectBoolean(false);
-        qc::json::decode(R"(false)"sv, composer, nullptr);
+        decode(R"(false)"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
 }
@@ -464,7 +465,7 @@ TEST(decode, boolean) {
 TEST(decode, null) {
     ExpectantComposer composer;
     composer.expectNull();
-    qc::json::decode(R"(null)"sv, composer, nullptr);
+    decode(R"(null)"sv, composer, nullptr);
     EXPECT_TRUE(composer.isDone());
 }
 
@@ -512,7 +513,7 @@ TEST(decode, general) {
         composer.expectEnd();
         composer.expectKey("Profit Margin").expectNull();
     composer.expectEnd();
-    qc::json::decode(
+    decode(
 R"({
     "Name": "Salt's Crust",
     "Founded": 1964,
@@ -549,28 +550,28 @@ R"({
 TEST(decode, noWhitespace) {
     ExpectantComposer composer;
     composer.expectObject().expectKey("a"sv).expectArray().expectString("abc"sv).expectSignedInteger(-123).expectFloater(-123.456e-78).expectBoolean(true).expectNull().expectEnd().expectEnd();
-    qc::json::decode(R"({"a":["abc",-123,-123.456e-78,true,null]})"sv, composer, nullptr);
+    decode(R"({"a":["abc",-123,-123.456e-78,true,null]})"sv, composer, nullptr);
     EXPECT_TRUE(composer.isDone());
 }
 
 TEST(decode, extraneousWhitespace) {
     ExpectantComposer composer;
     composer.expectObject().expectEnd();
-    qc::json::decode(" \t\n\r\v{} \t\n\r\v"sv, composer, nullptr);
+    decode(" \t\n\r\v{} \t\n\r\v"sv, composer, nullptr);
     EXPECT_TRUE(composer.isDone());
 }
 
 TEST(decode, misc) {
     { // Empty
-        EXPECT_THROW(qc::json::decode(R"()", dummyComposer, nullptr), qc::json::DecodeError);
+        EXPECT_THROW(decode(R"()", dummyComposer, nullptr), DecodeError);
     }
     { // Only whitespace
-        EXPECT_THROW(qc::json::decode(R"(   )", dummyComposer, nullptr), qc::json::DecodeError);
+        EXPECT_THROW(decode(R"(   )", dummyComposer, nullptr), DecodeError);
     }
     { // Unknown value
-        EXPECT_THROW(qc::json::decode(R"(v)", dummyComposer, nullptr), qc::json::DecodeError);
+        EXPECT_THROW(decode(R"(v)", dummyComposer, nullptr), DecodeError);
     }
     { // Multiple root values
-        EXPECT_THROW(qc::json::decode(R"(1 2)", dummyComposer, nullptr), qc::json::DecodeError);
+        EXPECT_THROW(decode(R"(1 2)", dummyComposer, nullptr), DecodeError);
     }
 }
