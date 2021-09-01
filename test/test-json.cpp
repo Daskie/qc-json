@@ -7,6 +7,8 @@
 using namespace std::string_literals;
 using namespace std::string_view_literals;
 
+using namespace qc::json::tokens;
+
 static constexpr bool gccSupportsFloatingCharconv{false};
 
 struct CustomVal { int x, y; };

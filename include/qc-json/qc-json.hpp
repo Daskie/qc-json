@@ -322,8 +322,10 @@ namespace qc::json
 
     Value decode(string_view json);
 
-    string encode(const Value & val, bool compact = config::defaultCompact);
+    string encode(const Value & val);
+    string encode(const Value & val, CompactToken);
 
+    Encoder & operator<<(Encoder & encoder, const Value & val);
 }
 
 ///
@@ -423,45 +425,6 @@ namespace qc::json
 
         string _key;
     };
-
-    inline void _encodeRecursive(Encoder & encoder, const Value & val, const bool compact)
-    {
-        switch (val.type()) {
-            case Type::null: {
-                encoder.val(nullptr);
-                break;
-            }
-            case Type::object: {
-                encoder.object(compact);
-                for (const auto & [key, v] : val.asObject<true>()) {
-                    encoder.key(key);
-                    _encodeRecursive(encoder, v, compact);
-                }
-                encoder.end();
-                break;
-            }
-            case Type::array: {
-                encoder.array(compact);
-                for (const auto & v : val.asArray<true>()) {
-                    _encodeRecursive(encoder, v, compact);
-                }
-                encoder.end();
-                break;
-            }
-            case Type::string: {
-                encoder.val(val.asString<true>());
-                break;
-            }
-            case Type::number: {
-                std::visit([&encoder](auto v) { encoder.val(v); }, val.asNumber<true>());
-                break;
-            }
-            case Type::boolean: {
-                encoder.val(val.asBoolean<true>());
-                break;
-            }
-        }
-    }
 
     inline Value::Value(Object && val) noexcept :
         Value{std::move(reinterpret_cast<Value &>(val))}
@@ -1220,10 +1183,57 @@ namespace qc::json
         return root;
     }
 
-    inline string encode(const Value & val, const bool compact)
+    inline string encode(const Value & val)
     {
-        Encoder encoder;
-        _encodeRecursive(encoder, val, compact);
+        Encoder encoder{};
+        encoder << val;
         return encoder.finish();
+    }
+
+    inline string encode(const Value & val, const CompactToken)
+    {
+        Encoder encoder{compact};
+        encoder << val;
+        return encoder.finish();
+    }
+
+    inline Encoder & operator<<(Encoder & encoder, const Value & val)
+    {
+        switch (val.type()) {
+            case Type::null: {
+                encoder << nullptr;
+                break;
+            }
+            case Type::object: {
+                encoder << object;
+                for (const auto & [key, v] : val.asObject<true>()) {
+                    encoder << key << v;
+                }
+                encoder << end;
+                break;
+            }
+            case Type::array: {
+                encoder << array;
+                for (const auto & v : val.asArray<true>()) {
+                    encoder << v;
+                }
+                encoder << end;
+                break;
+            }
+            case Type::string: {
+                encoder << val.asString<true>();
+                break;
+            }
+            case Type::number: {
+                std::visit([&encoder](auto v) { encoder << v; }, val.asNumber<true>());
+                break;
+            }
+            case Type::boolean: {
+                encoder << val.asBoolean<true>();
+                break;
+            }
+        }
+
+        return encoder;
     }
 }

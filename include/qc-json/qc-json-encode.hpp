@@ -46,11 +46,6 @@ namespace qc::json
     using namespace std::string_literals;
     using namespace std::string_view_literals;
 
-    namespace config
-    {
-        constexpr bool defaultCompact{false};
-    }
-
     ///
     /// This will be thrown if anything goes wrong during the encoding process.
     ///
@@ -60,6 +55,21 @@ namespace qc::json
     };
 
     ///
+    /// Namespace provided to allow the user to `using namespace qc::json::tokens` to avoid the verbosity of fully
+    /// qualifying the tokens' namespace.
+    ///
+    inline namespace tokens
+    {
+        constexpr enum class ObjectToken {} object{};
+
+        constexpr enum class ArrayToken {} array{};
+
+        constexpr enum class EndToken {} end{};
+
+        constexpr enum class CompactToken {} compact{};
+    }
+
+    ///
     /// Instantiate this class to do the encoding.
     ///
     class Encoder
@@ -67,6 +77,7 @@ namespace qc::json
         public:
 
         Encoder() = default;
+        Encoder(CompactToken);
 
         Encoder(const Encoder & other) = delete;
         Encoder(Encoder && other) noexcept;
@@ -76,32 +87,27 @@ namespace qc::json
 
         ~Encoder() = default;
 
-        Encoder & object(bool compact = config::defaultCompact);
-
-        Encoder & array(bool compact = config::defaultCompact);
-
-        Encoder & key(string_view k);
-
-        Encoder & val(string_view v);
-        Encoder & val(const string & v);
-        Encoder & val(const char * v);
-        Encoder & val(char * v);
-        Encoder & val(char v);
-        Encoder & val(int64_t v);
-        Encoder & val(int32_t v);
-        Encoder & val(int16_t v);
-        Encoder & val(int8_t v);
-        Encoder & val(uint64_t v);
-        Encoder & val(uint32_t v);
-        Encoder & val(uint16_t v);
-        Encoder & val(uint8_t v);
-        Encoder & val(double v);
-        Encoder & val(float v);
-        Encoder & val(bool v);
-        Encoder & val(std::nullptr_t);
-        template <typename T> Encoder & val(const T & v);
-
-        Encoder & end();
+        Encoder & operator<<(ObjectToken);
+        Encoder & operator<<(ArrayToken);
+        Encoder & operator<<(EndToken);
+        Encoder & operator<<(CompactToken);
+        Encoder & operator<<(string_view v);
+        Encoder & operator<<(const string & v);
+        Encoder & operator<<(const char * v);
+        Encoder & operator<<(char * v);
+        Encoder & operator<<(char v);
+        Encoder & operator<<(int64_t v);
+        Encoder & operator<<(int32_t v);
+        Encoder & operator<<(int16_t v);
+        Encoder & operator<<(int8_t v);
+        Encoder & operator<<(uint64_t v);
+        Encoder & operator<<(uint32_t v);
+        Encoder & operator<<(uint16_t v);
+        Encoder & operator<<(uint8_t v);
+        Encoder & operator<<(double v);
+        Encoder & operator<<(float v);
+        Encoder & operator<<(bool v);
+        Encoder & operator<<(std::nullptr_t);
 
         string finish();
 
@@ -109,15 +115,18 @@ namespace qc::json
 
         struct _State { bool array, compact, content; };
 
-        std::ostringstream _oss;
-        std::vector<_State> _state;
+        std::ostringstream _oss{};
+        std::vector<_State> _state{};
         int _indentation{0};
+        bool _compact{false};
         bool _isKey{false};
         bool _isComplete{false};
 
         template <typename T> void _val(T v);
 
-        void _prefix();
+        void _key(string_view key);
+
+        template <bool unchecked = false> void _prefix();
 
         void _indent();
 
@@ -133,18 +142,14 @@ namespace qc::json
 }
 
 ///
-/// Specialize `qc_json_encode` to enable encoding of custom types
-/// Example:
-///      template <>
-///      struct qc_json_encode<std::pair<int, int>>
-///      {
-///          void operator()(qc::json::Encoder & encoder, const std::pair<int, int> & v)
-///          {
-///              encoder.array(true).val(v.first).val(v.second).end();
-///          }
-///      };
+/// Specialize `qc::json::Encoder & operator<<(qc::json::Encoder &, const Custom &)` to enable encoding for `Custom` type
 ///
-template <typename T> struct qc_json_encode;
+/// Example:
+///     qc::json::Encoder & operator<<(qc::json::Encoder & encoder, const std::pair<int, int> & v)
+///     {
+///         return encoder.array(true).val(v.first).val(v.second).end();
+///     }
+///
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -154,163 +159,54 @@ namespace qc::json
         Error{msg}
     {}
 
+    inline Encoder::Encoder(const CompactToken) :
+        _compact{true}
+    {}
+
     inline Encoder::Encoder(Encoder && other) noexcept :
         _oss{std::move(other._oss)},
         _state{std::move(other._state)},
         _indentation{std::exchange(other._indentation, 0)},
+        _compact{std::exchange(other._compact, false)},
         _isKey{std::exchange(other._isKey, false)},
         _isComplete{std::exchange(other._isComplete, false)}
     {}
 
-    inline Encoder & Encoder::object(bool compact)
+    inline Encoder & Encoder::operator<<(const ObjectToken)
     {
         _checkPre();
         _prefix();
         _oss << '{';
+
+        bool compact_{_compact};
         if (!_state.empty()) {
             _state.back().content = true;
-            _isKey = false;
-            compact = compact || _state.back().compact;
+            compact_ = _state.back().compact;
         }
-        _state.push_back(_State{false, compact, false});
+        _state.push_back(_State{false, compact_, false});
+        _isKey = false;
 
         return *this;
     }
 
-    inline Encoder & Encoder::array(bool compact)
+    inline Encoder & Encoder::operator<<(const ArrayToken)
     {
         _checkPre();
         _prefix();
         _oss << '[';
+
+        bool compact_{_compact};
         if (!_state.empty()) {
             _state.back().content = true;
-            _isKey = false;
-            compact = compact || _state.back().compact;
+            compact_ = _state.back().compact;
         }
-        _state.push_back(_State{true, compact, false});
+        _state.push_back(_State{true, compact_, false});
+        _isKey = false;
 
         return *this;
     }
 
-    inline Encoder & Encoder::key(const string_view key)
-    {
-        if (_isKey) {
-            throw EncodeError{"A key has already been given"s};
-        }
-        if (_state.empty() || _state.back().array) {
-            throw EncodeError{"A key may only be givin within an object"s};
-        }
-        if (key.empty()) {
-            throw EncodeError{"Key must not be empty"s};
-        }
-
-        _prefix();
-        _encode(key);
-        _oss << ": "sv;
-        _isKey = true;
-
-        return *this;
-    }
-
-    inline Encoder & Encoder::val(const string_view v)
-    {
-        _val(v);
-        return *this;
-    }
-
-    inline Encoder & Encoder::val(const string & v)
-    {
-        return val(string_view(v));
-    }
-
-    inline Encoder & Encoder::val(const char * const v)
-    {
-        return val(string_view(v));
-    }
-
-    inline Encoder & Encoder::val(char * const v)
-    {
-        return val(string_view(v));
-    }
-
-    inline Encoder & Encoder::val(const char v)
-    {
-        return val(string_view(&v, 1u));
-    }
-
-    inline Encoder & Encoder::val(const int64_t v)
-    {
-        _val(v);
-        return *this;
-    }
-
-    inline Encoder & Encoder::val(const int32_t v)
-    {
-        return val(int64_t(v));
-    }
-
-    inline Encoder & Encoder::val(const int16_t v)
-    {
-        return val(int64_t(v));
-    }
-
-    inline Encoder & Encoder::val(const int8_t v)
-    {
-        return val(int64_t(v));
-    }
-
-    inline Encoder & Encoder::val(const uint64_t v)
-    {
-        _val(v);
-        return *this;
-    }
-
-    inline Encoder & Encoder::val(const uint32_t v)
-    {
-        return val(uint64_t(v));
-    }
-
-    inline Encoder & Encoder::val(const uint16_t v)
-    {
-        return val(uint64_t(v));
-    }
-
-    inline Encoder & Encoder::val(const uint8_t v)
-    {
-        return val(uint64_t(v));
-    }
-
-    inline Encoder & Encoder::val(const double v)
-    {
-        _val(v);
-        return *this;
-    }
-
-    inline Encoder & Encoder::val(const float v)
-    {
-        return val(double(v));
-    }
-
-    inline Encoder & Encoder::val(const bool v)
-    {
-        _val(v);
-        return *this;
-    }
-
-    inline Encoder & Encoder::val(const std::nullptr_t)
-    {
-        _val(nullptr);
-        return *this;
-    }
-
-    template <typename T>
-    inline Encoder & Encoder::val(const T & v)
-    {
-        qc_json_encode<T>()(*this, v);
-        return *this;
-    }
-
-    inline Encoder & Encoder::end()
+    inline Encoder & Encoder::operator<<(const EndToken)
     {
         if (_state.empty()) {
             throw EncodeError{"No object or array to end"s};
@@ -337,6 +233,120 @@ namespace qc::json
             _isComplete = true;
         }
 
+        return *this;
+    }
+
+    inline Encoder & Encoder::operator<<(const CompactToken)
+    {
+        if (_state.empty()) {
+            throw EncodeError{"Compact token must be given within an object or array"};
+        }
+
+        _State & state{_state.back()};
+
+        if (_isKey || state.content) {
+            throw EncodeError{"Compact token must be given at the start of the object or array"};
+        }
+
+        state.compact = true;
+
+        return *this;
+    }
+
+    inline Encoder & Encoder::operator<<(const string_view v)
+    {
+        if (!_state.empty() && !_state.back().array && !_isKey) {
+            _key(v);
+        }
+        else {
+            _val(v);
+        }
+
+        return *this;
+    }
+
+    inline Encoder & Encoder::operator<<(const string & v)
+    {
+        return operator<<(string_view(v));
+    }
+
+    inline Encoder & Encoder::operator<<(const char * const v)
+    {
+        return operator<<(string_view(v));
+    }
+
+    inline Encoder & Encoder::operator<<(char * const v)
+    {
+        return operator<<(string_view(v));
+    }
+
+    inline Encoder & Encoder::operator<<(const char v)
+    {
+        return operator<<(string_view(&v, 1u));
+    }
+
+    inline Encoder & Encoder::operator<<(const int64_t v)
+    {
+        _val(v);
+        return *this;
+    }
+
+    inline Encoder & Encoder::operator<<(const int32_t v)
+    {
+        return operator<<(int64_t(v));
+    }
+
+    inline Encoder & Encoder::operator<<(const int16_t v)
+    {
+        return operator<<(int64_t(v));
+    }
+
+    inline Encoder & Encoder::operator<<(const int8_t v)
+    {
+        return operator<<(int64_t(v));
+    }
+
+    inline Encoder & Encoder::operator<<(const uint64_t v)
+    {
+        _val(v);
+        return *this;
+    }
+
+    inline Encoder & Encoder::operator<<(const uint32_t v)
+    {
+        return operator<<(uint64_t(v));
+    }
+
+    inline Encoder & Encoder::operator<<(const uint16_t v)
+    {
+        return operator<<(uint64_t(v));
+    }
+
+    inline Encoder & Encoder::operator<<(const uint8_t v)
+    {
+        return operator<<(uint64_t(v));
+    }
+
+    inline Encoder & Encoder::operator<<(const double v)
+    {
+        _val(v);
+        return *this;
+    }
+
+    inline Encoder & Encoder::operator<<(const float v)
+    {
+        return operator<<(double(v));
+    }
+
+    inline Encoder & Encoder::operator<<(const bool v)
+    {
+        _val(v);
+        return *this;
+    }
+
+    inline Encoder & Encoder::operator<<(const std::nullptr_t)
+    {
+        _val(nullptr);
         return *this;
     }
 
@@ -368,13 +378,27 @@ namespace qc::json
         }
         else {
             _state.back().content = true;
-            _isKey = false;
         }
+        _isKey = false;
     }
 
+    inline void Encoder::_key(const string_view key)
+    {
+        if (key.empty()) {
+            throw EncodeError{"Key must not be empty"s};
+        }
+
+        _prefix<true>();
+        _encode(key);
+        _oss << ": "sv;
+        _isKey = true;
+    }
+
+    template <bool unchecked>
     inline void Encoder::_prefix()
     {
-        if (!_isKey && !_state.empty()) {
+        #pragma warning(suppress: 4127) // Condition intentionally constant when `unchecked` is true
+        if (unchecked || !_isKey && !_state.empty()) {
             const _State & state{_state.back()};
             if (state.content) {
                 _oss << ',';
