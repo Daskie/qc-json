@@ -12,7 +12,6 @@
 ///
 
 #include <cctype>
-#include <cerrno> // TODO: Remove once gcc supports floating-point `std::from_chars`
 
 #include <charconv>
 #include <limits>
@@ -27,12 +26,17 @@
 
 namespace qc::json
 {
+    using std::string;
+    using std::string_view;
+    using namespace std::string_literals;
+    using namespace std::string_view_literals;
+
     ///
     /// Common exception type used for all qc::json exceptions.
     ///
     struct Error : std::runtime_error
     {
-        explicit Error(const std::string & msg = {}) noexcept :
+        explicit Error(const string & msg = {}) noexcept :
             std::runtime_error(msg)
         {}
     };
@@ -42,11 +46,6 @@ namespace qc::json
 
 namespace qc::json
 {
-    using std::string;
-    using std::string_view;
-    using namespace std::string_literals;
-    using namespace std::string_view_literals;
-
     ///
     /// This will be thrown if anything goes wrong during the decoding process.
     /// `position` is the index into the string where the error occurred.
@@ -449,7 +448,6 @@ namespace qc::json
 
         void _ingestFloater(State & state)
         {
-#ifndef __GNUC__ // TODO: Update once GCC supports `std::from_chars`
             double val;
             const std::from_chars_result res{std::from_chars(_pos, _end, val)};
 
@@ -460,18 +458,6 @@ namespace qc::json
 
             _pos = res.ptr;
             _composer.val(val, state);
-#else
-#pragma message("`std::charconv` not supported by compiler - floating point deserialization quality may suffer")
-            errno = 0;
-            char * endPos{};
-            const double val{std::strtod(_pos, &endPos)};
-            if (endPos == _pos || errno == ERANGE) {
-                throw DecodeError{"Invalid floater", size_t(_pos - _start)};
-            }
-
-            _pos = endPos;
-            _composer.val(val, state);
-#endif
         }
     };
 

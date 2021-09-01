@@ -26,12 +26,17 @@
 
 namespace qc::json
 {
+    using std::string;
+    using std::string_view;
+    using namespace std::string_literals;
+    using namespace std::string_view_literals;
+
     ///
     /// Common exception type used for all `qc::json` exceptions.
     ///
     struct Error : std::runtime_error
     {
-        explicit Error(const std::string & msg = {}) noexcept :
+        explicit Error(const string & msg = {}) noexcept :
             std::runtime_error{msg}
         {}
     };
@@ -41,11 +46,6 @@ namespace qc::json
 
 namespace qc::json
 {
-    using std::string;
-    using std::string_view;
-    using namespace std::string_literals;
-    using namespace std::string_view_literals;
-
     ///
     /// This will be thrown if anything goes wrong during the encoding process.
     ///
@@ -496,16 +496,9 @@ namespace qc::json
 
     inline void Encoder::_encode(const double v)
     {
-#ifndef __GNUC__ // TODO: Update once GCC supports `std::to_chars`
         char buffer[32];
         const std::to_chars_result res{std::to_chars(buffer, buffer + sizeof(buffer), v)};
         _oss << string_view{buffer, size_t(res.ptr - buffer)};
-#else
-#pragma message("`std::charconv` not supported by compiler - floating point serialization quality may suffer")
-        char buffer[32];
-        const int len{sprintf(buffer, "%g", v)};
-        _oss << string_view{buffer, size_t(len)};
-#endif
     }
 
     inline void Encoder::_encode(const bool v)

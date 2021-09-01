@@ -93,23 +93,6 @@ class ExpectantComposer {
 
 };
 
-//namespace Microsoft { namespace VisualStudio { namespace CppUnitTestFramework {
-//    //template <> static std::wstring ToString<uint16_t>(const uint16_t & v) { return std::to_wstring(v); }
-//    template <> static std::wstring ToString<ExpectantComposer::Element>(const ExpectantComposer::Element & v) {
-//        if (std::holds_alternative<ExpectantComposer::Object>(v)) return L"Object"s;
-//        else if (std::holds_alternative<ExpectantComposer::Array>(v)) return L"Array"s;
-//        else if (std::holds_alternative<ExpectantComposer::End>(v)) return L"End"s;
-//        else if (std::holds_alternative<ExpectantComposer::Key>(v)) return L"Key `"s + std::wstring(std::get<ExpectantComposer::Key>(v).k.cbegin(), std::get<ExpectantComposer::Key>(v).k.cend()) + L"`"s;
-//        else if (std::holds_alternative<ExpectantComposer::String>(v)) return L"String `"s + std::wstring(std::get<ExpectantComposer::String>(v).v.cbegin(), std::get<ExpectantComposer::String>(v).v.cend()) + L"`"s;
-//        else if (std::holds_alternative<ExpectantComposer::SignedInteger>(v)) return L"Signed Integer `"s + std::to_wstring(std::get<ExpectantComposer::SignedInteger>(v).v) + L"`"s;
-//        else if (std::holds_alternative<ExpectantComposer::UnsignedInteger>(v)) return L"Unsigned Integer `"s + std::to_wstring(std::get<ExpectantComposer::UnsignedInteger>(v).v) + L"`"s;
-//        else if (std::holds_alternative<ExpectantComposer::Floater>(v)) return L"Floater `"s + std::to_wstring(std::get<ExpectantComposer::Floater>(v).v) + L"`"s;
-//        else if (std::holds_alternative<ExpectantComposer::Boolean>(v)) return L"Boolean `"s + (std::get<ExpectantComposer::Boolean>(v).v ? L"true"s : L"false"s) + L"`"s;
-//        else if (std::holds_alternative<ExpectantComposer::Null>(v)) return L"Null"s;
-//        else return L"Unknown Element";
-//    }
-//}}}
-
 TEST(decode, object) {
     { // Empty
         ExpectantComposer composer;

@@ -17,8 +17,6 @@ using qc::json::Type;
 using qc::json::TypeError;
 using namespace qc::json::tokens;
 
-static constexpr bool gccSupportsFloatingCharconv{false};
-
 struct CustomVal { int x, y; };
 
 bool operator==(const CustomVal & cv1, const CustomVal & cv2) {
@@ -147,69 +145,35 @@ TEST(json, encodeDecodeFloater) {
     }
     { // Max integer 64
         double val{reinterpret_cast<const double &>(val64 = 0b0'10000110011'1111111111111111111111111111111111111111111111111111u)};
-        if constexpr (gccSupportsFloatingCharconv) {
-            EXPECT_EQ(val, decode(encode(val)).as<double>());
-        }
-        else {
-            EXPECT_NEAR(1.0, decode(encode(val)).as<double>() / val, 0.001);
-        }
+        EXPECT_EQ(val, decode(encode(val)).as<double>());
     }
     { // Max integer 32
         double val{reinterpret_cast<const float &>(val32 = 0b0'10010110'11111111111111111111111u)};
-        if constexpr (gccSupportsFloatingCharconv) {
-            EXPECT_EQ(val, decode(encode(val)).as<double>());
-        }
-        else {
-            EXPECT_NEAR(1.0, decode(encode(val)).as<double>() / val, 0.001);
-        }
+        EXPECT_EQ(val, decode(encode(val)).as<double>());
     }
     { // Max 64
         double val{reinterpret_cast<const double &>(val64 = 0b0'11111111110'1111111111111111111111111111111111111111111111111111u)};
-        if constexpr (gccSupportsFloatingCharconv) {
-            EXPECT_EQ(val, decode(encode(val)).as<double>());
-        }
-        else {
-            EXPECT_NEAR(1.0, decode(encode(val)).as<double>() / val, 0.001);
-        }
+        EXPECT_EQ(val, decode(encode(val)).as<double>());
     }
     { // Max 32
         double val{reinterpret_cast<const float &>(val32 = 0b0'11111110'11111111111111111111111u)};
-        if constexpr (gccSupportsFloatingCharconv) {
-            EXPECT_EQ(val, decode(encode(val)).as<double>());
-        }
-        else {
-            EXPECT_NEAR(1.0, decode(encode(val)).as<double>() / val, 0.001);
-        }
+        EXPECT_EQ(val, decode(encode(val)).as<double>());
     }
     { // Min normal 64
         double val{reinterpret_cast<const double &>(val64 = 0b0'00000000001'0000000000000000000000000000000000000000000000000000u)};
-        if constexpr (gccSupportsFloatingCharconv) {
-            EXPECT_EQ(val, decode(encode(val)).as<double>());
-        }
+        EXPECT_EQ(val, decode(encode(val)).as<double>());
     }
     { // Min normal 32
         double val{reinterpret_cast<const float &>(val32 = 0b0'00000001'00000000000000000000000u)};
-        if constexpr (gccSupportsFloatingCharconv) {
-            EXPECT_EQ(val, decode(encode(val)).as<double>());
-        }
-        else {
-            EXPECT_NEAR(1.0, decode(encode(val)).as<double>() / val, 0.001);
-        }
+        EXPECT_EQ(val, decode(encode(val)).as<double>());
     }
     { // Min subnormal 64
         double val{reinterpret_cast<const double &>(val64 = 0b0'00000000000'0000000000000000000000000000000000000000000000000001u)};
-        if constexpr (gccSupportsFloatingCharconv) {
-            EXPECT_EQ(val, decode(encode(val)).as<double>());
-        }
+        EXPECT_EQ(val, decode(encode(val)).as<double>());
     }
     { // Min subnormal 32
         double val{reinterpret_cast<const float &>(val32 = 0b0'00000000'00000000000000000000001u)};
-        if constexpr (gccSupportsFloatingCharconv) {
-            EXPECT_EQ(val, decode(encode(val)).as<double>());
-        }
-        else {
-            EXPECT_NEAR(1.0, decode(encode(val)).as<double>() / val, 0.001);
-        }
+        EXPECT_EQ(val, decode(encode(val)).as<double>());
     }
     { // Positive infinity
         double val{std::numeric_limits<double>::infinity()};
