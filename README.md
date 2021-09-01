@@ -1,4 +1,4 @@
-# QC Json
+# QC JSON
 ###### Clean, quick, and simple JSON library for C++20
 
 ### Some JSON
@@ -17,13 +17,13 @@ Let's say it's in a string, `jsonStr`
 ### Decode some JSON
 
 ```c++
-qc::json::Value jsonVal(qc::json::decode(jsonStr));
+qc::json::Value jsonVal{qc::json::decode(jsonStr)};
 ```
 
 Let's get a reference to our top level object for easy access
 
 ```c++
-qc::json::Object & obj(jsonVal.asObject());
+qc::json::Object & obj{jsonVal.asObject()};
 ```
 
 Print the name
@@ -85,7 +85,7 @@ obj.add("Gluten Free", false);
 ### Encode some JSON
 
 ```c++
-std::string newJsonStr(qc::json::encode(jsonVal));
+std::string newJsonStr{qc::json::encode(jsonVal)};
 ```
 
 `newJsonStr` will contain:
@@ -106,18 +106,20 @@ std::string newJsonStr(qc::json::encode(jsonVal));
 ### Alternatively, encode some JSON directly
 
 ```c++
-qc::json::Encoder encoder;
-encoder.object();
-    encoder.key("Name").val("18 Leg Bouquet");
-    encoder.key("Price").val(17.99);
-    encoder.key("Ingredients).array(true).val("Crab").val("Octopus").end();
-    encoder.key("Gluten Free").val(true);
-    encoder.key("Sold").val(69);
-encoder.end();
-std::string altJsonStr(encoder.finish());
+using namespace qc::json::tokens; // Provides shorthand for `object`, `array`, `end`, and density control
+
+qc::json::Encoder encoder{};
+encoder << object;
+    encoder << "Name" << "18 Leg Bouquet";
+    encoder << "Price" << 17.99;
+    encoder << "Ingredients" << array << uniline << "Crab" << "Octopus" << end;
+    encoder << "Gluten Free" << true;
+    encoder << "Sold" << 69;
+encoder << end;
+std::string jsonStr{encoder.finish()};
 ```
 
-`altJsonStr` will contain:
+`jsonStr` will contain:
 
 ```json
 {
