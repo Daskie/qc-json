@@ -322,8 +322,7 @@ namespace qc::json
 
     Value decode(string_view json);
 
-    string encode(const Value & val);
-    string encode(const Value & val, CompactToken);
+    string encode(const Value & val, Density density = multiline);
 
     Encoder & operator<<(Encoder & encoder, const Value & val);
 }
@@ -1183,16 +1182,9 @@ namespace qc::json
         return root;
     }
 
-    inline string encode(const Value & val)
+    inline string encode(const Value & val, const Density density)
     {
-        Encoder encoder{};
-        encoder << val;
-        return encoder.finish();
-    }
-
-    inline string encode(const Value & val, const CompactToken)
-    {
-        Encoder encoder{compact};
+        Encoder encoder{density};
         encoder << val;
         return encoder.finish();
     }

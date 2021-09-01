@@ -20,56 +20,54 @@ struct CustomVal { int x, y; };
 
 Encoder & operator<<(Encoder & encoder, const CustomVal & v)
 {
-    return encoder << array << compact << v.x << v.y << end;
+    return encoder << array << uniline << v.x << v.y << end;
 }
 
 TEST(encode, object) {
-    { // Empty non-compact
+    { // Empty
         Encoder encoder{};
-        encoder << object << end;
+        encoder << object << multiline << end;
+        EXPECT_EQ(R"({})"s, encoder.finish());
+        encoder << object << uniline << end;
+        EXPECT_EQ(R"({})"s, encoder.finish());
+        encoder << object << compact << end;
         EXPECT_EQ(R"({})"s, encoder.finish());
     }
-    { // Empty compact
-        Encoder encoder{compact};
-        encoder << object << end;
-        EXPECT_EQ(R"({})"s, encoder.finish());
-    }
-    { // Non-compact
+    { // Non-empty
         Encoder encoder{};
-        encoder << object << "k1" << "abc" << "k2" << 123 << "k3" << true << end;
+        encoder << object << multiline << "k1" << "abc" << "k2" << 123 << "k3" << true << end;
         EXPECT_EQ(R"({
     "k1": "abc",
     "k2": 123,
     "k3": true
 })"s, encoder.finish());
-    }
-    { // Compact
-        Encoder encoder{compact};
-        encoder << object << "k1" << "abc" << "k2" << 123 << "k3" << true << end;
+        encoder << object << uniline << "k1" << "abc" << "k2" << 123 << "k3" << true << end;
         EXPECT_EQ(R"({ "k1": "abc", "k2": 123, "k3": true })"s, encoder.finish());
+        encoder << object << compact << "k1" << "abc" << "k2" << 123 << "k3" << true << end;
+        EXPECT_EQ(R"({"k1":"abc","k2":123,"k3":true})"s, encoder.finish());
     }
     { // String view key
-        Encoder encoder{compact};
+        Encoder encoder{uniline};
         encoder << object << "k"sv << "v" << end;
         EXPECT_EQ(R"({ "k": "v" })"s, encoder.finish());
     }
     { // String key
-        Encoder encoder{compact};
+        Encoder encoder{uniline};
         encoder << object << "k"s << "v" << end;
         EXPECT_EQ(R"({ "k": "v" })"s, encoder.finish());
     }
     { // Const C string key
-        Encoder encoder{compact};
+        Encoder encoder{uniline};
         encoder << object << "k" << "v" << end;
         EXPECT_EQ(R"({ "k": "v" })"s, encoder.finish());
     }
     { // Mutable C string key
-        Encoder encoder{compact};
+        Encoder encoder{uniline};
         encoder << object << const_cast<char *>("k") << "v" << end;
         EXPECT_EQ(R"({ "k": "v" })"s, encoder.finish());
     }
     { // Character key
-        Encoder encoder{compact};
+        Encoder encoder{uniline};
         encoder << object << 'k' << "v" << end;
         EXPECT_EQ(R"({ "k": "v" })"s, encoder.finish());
     }
@@ -106,29 +104,27 @@ TEST(encode, object) {
 }
 
 TEST(encode, array) {
-    { // Empty non-compact
+    { // Empty
         Encoder encoder{};
-        encoder << array << end;
+        encoder << array << multiline << end;
+        EXPECT_EQ(R"([])"s, encoder.finish());
+        encoder << array << uniline << end;
+        EXPECT_EQ(R"([])"s, encoder.finish());
+        encoder << array << compact << end;
         EXPECT_EQ(R"([])"s, encoder.finish());
     }
-    { // Empty compact
-        Encoder encoder{compact};
-        encoder << array << end;
-        EXPECT_EQ(R"([])"s, encoder.finish());
-    }
-    { // Compact
-        Encoder encoder{compact};
-        encoder << array << "abc" << 123 << true << end;
-        EXPECT_EQ(R"([ "abc", 123, true ])"s, encoder.finish());
-    }
-    { // Non-compact
+    { // Non-empty
         Encoder encoder{};
-        encoder << array << "abc" << 123 << true << end;
+        encoder << array << multiline << "abc" << 123 << true << end;
         EXPECT_EQ(R"([
     "abc",
     123,
     true
 ])"s, encoder.finish());
+        encoder << array << uniline << "abc" << 123 << true << end;
+        EXPECT_EQ(R"([ "abc", 123, true ])"s, encoder.finish());
+        encoder << array << compact << "abc" << 123 << true << end;
+        EXPECT_EQ(R"(["abc",123,true])"s, encoder.finish());
     }
 }
 
@@ -377,7 +373,7 @@ TEST(encode, custom) {
 
 TEST(encode, finish) {
     { // Encoder left in clean state after finish
-        Encoder encoder{compact};
+        Encoder encoder{uniline};
         encoder << object << "val" << 123 << end;
         EXPECT_EQ(R"({ "val": 123 })"s, encoder.finish());
         encoder << array << 321 << end;
@@ -399,33 +395,99 @@ TEST(encode, finish) {
     }
 }
 
+TEST(encode, density) {
+    { // Top level multiline
+        Encoder encoder{multiline};
+        encoder << object << "k1" << array << "v1" << "v2" << end << "k2" << "v3" << end;
+        EXPECT_EQ(R"({
+    "k1": [
+        "v1",
+        "v2"
+    ],
+    "k2": "v3"
+})"s, encoder.finish());
+    }
+    { // Top level uniline
+        Encoder encoder{uniline};
+        encoder << object << "k1" << array << "v1" << "v2" << end << "k2" << "v3" << end;
+        EXPECT_EQ(R"({ "k1": [ "v1", "v2" ], "k2": "v3" })"s, encoder.finish());
+    }
+    { // Top level compact
+        Encoder encoder{compact};
+        encoder << object << "k1" << array << "v1" << "v2" << end << "k2" << "v3" << end;
+        EXPECT_EQ(R"({"k1":["v1","v2"],"k2":"v3"})"s, encoder.finish());
+    }
+    { // Inner density
+        Encoder encoder{};
+        encoder << object;
+            encoder << "k1" << array << uniline << "v1" << array << compact << "v2" << "v3" << end << end;
+            encoder << "k2" << object << uniline << "k3" << "v4" << "k4" << object << compact << "k5" << "v5" << "k6" << "v6" << end << end;
+        encoder << end;
+        EXPECT_EQ(R"({
+    "k1": [ "v1", ["v2","v3"] ],
+    "k2": { "k3": "v4", "k4": {"k5":"v5","k6":"v6"} }
+})"s, encoder.finish());
+    }
+    { // Density priority
+        Encoder encoder{};
+        encoder << object << uniline << "k" << array << multiline << "v" << end << end;
+        EXPECT_EQ(R"({ "k": [ "v" ] })"s, encoder.finish());
+        encoder << array << uniline << object << multiline << "k" << "v" << end << end;
+        EXPECT_EQ(R"([ { "k": "v" } ])"s, encoder.finish());
+        encoder << object << compact << "k" << array << uniline << "v" << end << end;
+        EXPECT_EQ(R"({"k":["v"]})"s, encoder.finish());
+        encoder << array << compact << object << uniline << "k" << "v" << end << end;
+        EXPECT_EQ(R"([{"k":"v"}])"s, encoder.finish());
+    }
+    { // Missplaced density
+        Encoder encoder{};
+        EXPECT_THROW(encoder << multiline, EncodeError);
+        encoder << object << "k";
+        EXPECT_THROW(encoder << uniline, EncodeError);
+        encoder << "v";
+        EXPECT_THROW(encoder << compact, EncodeError);
+        encoder << "arr" << array << 123;
+        EXPECT_THROW(encoder << multiline, EncodeError);
+        encoder << end << end;
+        EXPECT_THROW(encoder << uniline, EncodeError);
+    }
+}
+
+TEST(encode, misc) {
+    { // Extraneous content
+        Encoder encoder{};
+        encoder << "a";
+        EXPECT_THROW(encoder << "b", EncodeError);
+    }
+}
+
 TEST(encode, general) {
     Encoder encoder{};
     encoder << object;
         encoder << "Name"sv << "Salt's Crust"sv;
         encoder << "Founded"sv << 1964;
         encoder << "Employees"sv << array;
-            encoder << object << compact << "Name"sv << "Ol' Joe Fisher"sv << "Title"sv << "Fisherman"sv << "Age"sv << 69 << end;
-            encoder << object << compact << "Name"sv << "Mark Rower"sv << "Title"sv << "Cook"sv << "Age"sv << 41 << end;
-            encoder << object << compact << "Name"sv << "Phineas"sv << "Title"sv << "Server Boy"sv << "Age"sv << 19 << end;
+            encoder << object << uniline << "Name"sv << "Ol' Joe Fisher"sv << "Title"sv << "Fisherman"sv << "Age"sv << 69 << end;
+            encoder << object << uniline << "Name"sv << "Mark Rower"sv << "Title"sv << "Cook"sv << "Age"sv << 41 << end;
+            encoder << object << uniline << "Name"sv << "Phineas"sv << "Title"sv << "Server Boy"sv << "Age"sv << 19 << end;
         encoder << end;
         encoder << "Dishes"sv << array;
             encoder << object;
                 encoder << "Name"sv << "Basket o' Barnacles"sv;
                 encoder << "Price"sv << 5.45;
-                encoder << "Ingredients"sv << array << compact << "Salt"sv << "Barnacles"sv << end;
+                encoder << "Ingredients"sv << array << uniline << "Salt"sv << "Barnacles"sv << end;
                 encoder << "Gluten Free"sv << false;
             encoder << end;
             encoder << object;
                 encoder << "Name"sv << "Two Tuna"sv;
                 encoder << "Price"sv << 14.99;
-                encoder << "Ingredients"sv << array << compact << "Tuna"sv << end;
+                encoder << "Ingredients"sv << array << uniline << "Tuna"sv << end;
                 encoder << "Gluten Free"sv << true;
             encoder << end;
             encoder << object;
                 encoder << "Name"sv << "18 Leg Bouquet"sv;
                 encoder << "Price"sv << 18.18;
-                encoder << "Ingredients"sv << array << compact << "Salt"sv << "Octopus"sv << "Crab"sv << end;
+                encoder << "Ingredients"sv << array << uniline << "Salt"sv << "Octopus"sv << "Crab"sv << end;
                 encoder << "Gluten Free"sv << false;
             encoder << end;
         encoder << end;
@@ -462,50 +524,4 @@ TEST(encode, general) {
     ],
     "Profit Margin": null
 })"s, encoder.finish());
-}
-
-TEST(encode, compact) {
-    { // Inner compact
-        Encoder encoder{};
-        encoder << object << "k" << array << compact << "v" << end << end;
-        EXPECT_EQ(R"({
-    "k": [ "v" ]
-})"s, encoder.finish());
-        encoder << array << object << compact << "k" << "v" << end << end;
-        EXPECT_EQ(R"([
-    { "k": "v" }
-])"s, encoder.finish());
-    }
-    { // Top level compact
-        Encoder encoder{compact};
-        encoder << object << "k" << array << "v" << end << end;
-        EXPECT_EQ(R"({ "k": [ "v" ] })"s, encoder.finish());
-    }
-    { // Compactness priority
-        Encoder encoder{};
-        encoder << object << compact << "k" << array << "v" << end << end;
-        EXPECT_EQ(R"({ "k": [ "v" ] })"s, encoder.finish());
-        encoder << array << compact << object << "k" << "v" << end << end;
-        EXPECT_EQ(R"([ { "k": "v" } ])"s, encoder.finish());
-    }
-    { // Missplaced compact
-        Encoder encoder{};
-        EXPECT_THROW(encoder << compact, EncodeError);
-        encoder << object << "k";
-        EXPECT_THROW(encoder << compact, EncodeError);
-        encoder << "v";
-        EXPECT_THROW(encoder << compact, EncodeError);
-        encoder << "arr" << array << 123;
-        EXPECT_THROW(encoder << compact, EncodeError);
-        encoder << end << end;
-        EXPECT_THROW(encoder << compact, EncodeError);
-    }
-}
-
-TEST(encode, misc) {
-    { // Extraneous content
-        Encoder encoder{};
-        encoder << "a";
-        EXPECT_THROW(encoder << "b", EncodeError);
-    }
 }

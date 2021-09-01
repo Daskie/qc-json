@@ -60,13 +60,13 @@ namespace qc::json
     ///
     inline namespace tokens
     {
-        constexpr enum class ObjectToken {} object{};
+        enum ObjectToken { object };
 
-        constexpr enum class ArrayToken {} array{};
+        enum ArrayToken { array };
 
-        constexpr enum class EndToken {} end{};
+        enum EndToken { end };
 
-        constexpr enum class CompactToken {} compact{};
+        enum Density { multiline, uniline, compact };
     }
 
     ///
@@ -76,8 +76,7 @@ namespace qc::json
     {
         public:
 
-        Encoder() = default;
-        Encoder(CompactToken);
+        Encoder(Density density = multiline);
 
         Encoder(const Encoder & other) = delete;
         Encoder(Encoder && other) noexcept;
@@ -90,7 +89,7 @@ namespace qc::json
         Encoder & operator<<(ObjectToken);
         Encoder & operator<<(ArrayToken);
         Encoder & operator<<(EndToken);
-        Encoder & operator<<(CompactToken);
+        Encoder & operator<<(Density);
         Encoder & operator<<(string_view v);
         Encoder & operator<<(const string & v);
         Encoder & operator<<(const char * v);
@@ -113,12 +112,17 @@ namespace qc::json
 
         private:
 
-        struct _State { bool array, compact, content; };
+        struct _State
+        {
+            bool array;
+            bool content;
+            Density density;
+        };
 
         std::ostringstream _oss{};
         std::vector<_State> _state{};
+        Density _baseDensity{multiline};
         int _indentation{0};
-        bool _compact{false};
         bool _isKey{false};
         bool _isComplete{false};
 
@@ -159,15 +163,15 @@ namespace qc::json
         Error{msg}
     {}
 
-    inline Encoder::Encoder(const CompactToken) :
-        _compact{true}
+    inline Encoder::Encoder(const Density density) :
+        _baseDensity{density}
     {}
 
     inline Encoder::Encoder(Encoder && other) noexcept :
         _oss{std::move(other._oss)},
         _state{std::move(other._state)},
+        _baseDensity{std::exchange(other._baseDensity, multiline)},
         _indentation{std::exchange(other._indentation, 0)},
-        _compact{std::exchange(other._compact, false)},
         _isKey{std::exchange(other._isKey, false)},
         _isComplete{std::exchange(other._isComplete, false)}
     {}
@@ -178,12 +182,12 @@ namespace qc::json
         _prefix();
         _oss << '{';
 
-        bool compact_{_compact};
+        Density density{_baseDensity};
         if (!_state.empty()) {
             _state.back().content = true;
-            compact_ = _state.back().compact;
+            density = _state.back().density;
         }
-        _state.push_back(_State{false, compact_, false});
+        _state.push_back(_State{false, false, density});
         _isKey = false;
 
         return *this;
@@ -195,12 +199,12 @@ namespace qc::json
         _prefix();
         _oss << '[';
 
-        bool compact_{_compact};
+        Density density{_baseDensity};
         if (!_state.empty()) {
             _state.back().content = true;
-            compact_ = _state.back().compact;
+            density = _state.back().density;
         }
-        _state.push_back(_State{true, compact_, false});
+        _state.push_back(_State{true, false, density});
         _isKey = false;
 
         return *this;
@@ -217,13 +221,17 @@ namespace qc::json
 
         const _State & state{_state.back()};
         if (state.content) {
-            if (state.compact) {
-                _oss << ' ';
-            }
-            else {
-                _oss << '\n';
-                --_indentation;
-                _indent();
+            switch (state.density) {
+                case multiline:
+                    _oss << '\n';
+                    --_indentation;
+                    _indent();
+                    break;
+                case uniline:
+                    _oss << ' ';
+                    break;
+                case compact:
+                    break;
             }
         }
         _oss << (state.array ? ']' : '}');
@@ -236,19 +244,21 @@ namespace qc::json
         return *this;
     }
 
-    inline Encoder & Encoder::operator<<(const CompactToken)
+    inline Encoder & Encoder::operator<<(const Density density)
     {
         if (_state.empty()) {
-            throw EncodeError{"Compact token must be given within an object or array"};
+            throw EncodeError{"Density must be given within an object or array"};
         }
 
         _State & state{_state.back()};
 
         if (_isKey || state.content) {
-            throw EncodeError{"Compact token must be given at the start of the object or array"};
+            throw EncodeError{"Density must be given at the start of the object or array"};
         }
 
-        state.compact = true;
+        if (density > state.density) {
+            state.density = density;
+        }
 
         return *this;
     }
@@ -390,7 +400,10 @@ namespace qc::json
 
         _prefix<true>();
         _encode(key);
-        _oss << ": "sv;
+        _oss << ':';
+        if (_state.back().density < compact) {
+            _oss << ' ';
+        }
         _isKey = true;
     }
 
@@ -403,13 +416,17 @@ namespace qc::json
             if (state.content) {
                 _oss << ',';
             }
-            if (state.compact) {
-                _oss << ' ';
-            }
-            else {
-                _oss << '\n';
-                _indentation += !state.content;
-                _indent();
+            switch (state.density) {
+                case multiline:
+                    _oss << '\n';
+                    _indentation += !state.content;
+                    _indent();
+                    break;
+                case uniline:
+                    _oss << ' ';
+                    break;
+                case compact:
+                    break;
             }
         }
     }

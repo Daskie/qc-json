@@ -744,8 +744,14 @@ TEST(json, string) {
     }
 }
 
-TEST(json, compact) {
-    EXPECT_EQ("[ 1, 2, 3 ]"s, encode(Array{1, 2, 3}, compact));
+TEST(json, density) {
+    EXPECT_EQ(R"([
+    1,
+    2,
+    3
+])"s, encode(Array{1, 2, 3}, multiline));
+    EXPECT_EQ("[ 1, 2, 3 ]"s, encode(Array{1, 2, 3}, uniline));
+    EXPECT_EQ("[1,2,3]"s, encode(Array{1, 2, 3}, compact));
 }
 
 TEST(json, general) {

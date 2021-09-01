@@ -469,6 +469,35 @@ TEST(decode, null) {
     EXPECT_TRUE(composer.isDone());
 }
 
+TEST(decode, noWhitespace) {
+    ExpectantComposer composer;
+    composer.expectObject().expectKey("a"sv).expectArray().expectString("abc"sv).expectSignedInteger(-123).expectFloater(-123.456e-78).expectBoolean(true).expectNull().expectEnd().expectEnd();
+    decode(R"({"a":["abc",-123,-123.456e-78,true,null]})"sv, composer, nullptr);
+    EXPECT_TRUE(composer.isDone());
+}
+
+TEST(decode, extraneousWhitespace) {
+    ExpectantComposer composer;
+    composer.expectObject().expectEnd();
+    decode(" \t\n\r\v{} \t\n\r\v"sv, composer, nullptr);
+    EXPECT_TRUE(composer.isDone());
+}
+
+TEST(decode, misc) {
+    { // Empty
+        EXPECT_THROW(decode(R"()", dummyComposer, nullptr), DecodeError);
+    }
+    { // Only whitespace
+        EXPECT_THROW(decode(R"(   )", dummyComposer, nullptr), DecodeError);
+    }
+    { // Unknown value
+        EXPECT_THROW(decode(R"(v)", dummyComposer, nullptr), DecodeError);
+    }
+    { // Multiple root values
+        EXPECT_THROW(decode(R"(1 2)", dummyComposer, nullptr), DecodeError);
+    }
+}
+
 TEST(decode, general) {
     ExpectantComposer composer;
     composer.expectObject();
@@ -545,33 +574,4 @@ R"({
     "Profit Margin": null
 })"sv, composer, nullptr);
     EXPECT_TRUE(composer.isDone());
-}
-
-TEST(decode, noWhitespace) {
-    ExpectantComposer composer;
-    composer.expectObject().expectKey("a"sv).expectArray().expectString("abc"sv).expectSignedInteger(-123).expectFloater(-123.456e-78).expectBoolean(true).expectNull().expectEnd().expectEnd();
-    decode(R"({"a":["abc",-123,-123.456e-78,true,null]})"sv, composer, nullptr);
-    EXPECT_TRUE(composer.isDone());
-}
-
-TEST(decode, extraneousWhitespace) {
-    ExpectantComposer composer;
-    composer.expectObject().expectEnd();
-    decode(" \t\n\r\v{} \t\n\r\v"sv, composer, nullptr);
-    EXPECT_TRUE(composer.isDone());
-}
-
-TEST(decode, misc) {
-    { // Empty
-        EXPECT_THROW(decode(R"()", dummyComposer, nullptr), DecodeError);
-    }
-    { // Only whitespace
-        EXPECT_THROW(decode(R"(   )", dummyComposer, nullptr), DecodeError);
-    }
-    { // Unknown value
-        EXPECT_THROW(decode(R"(v)", dummyComposer, nullptr), DecodeError);
-    }
-    { // Multiple root values
-        EXPECT_THROW(decode(R"(1 2)", dummyComposer, nullptr), DecodeError);
-    }
 }
