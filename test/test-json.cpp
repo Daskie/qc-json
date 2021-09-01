@@ -26,7 +26,7 @@ bool operator==(const CustomVal & cv1, const CustomVal & cv2) {
 }
 
 template <bool safe>
-struct qc_json_valueTo<CustomVal, safe> {
+struct qc::json::valueTo<CustomVal, safe> {
     CustomVal operator()(const Value & val) const {
         const Array & arr(val.asArray<safe>());
         return {arr.at(0).as<int, safe>(), arr.at(1).as<int, safe>()};
@@ -34,7 +34,7 @@ struct qc_json_valueTo<CustomVal, safe> {
 };
 
 template <>
-struct qc_json_valueFrom<CustomVal> {
+struct qc::json::valueFrom<CustomVal> {
     Value operator()(const CustomVal & v) const {
         return Array(v.x, v.y);
     }

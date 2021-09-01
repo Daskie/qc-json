@@ -158,7 +158,7 @@ namespace qc::json
         ///   - any signed integer type (`int64_t`, `int32_t`, `int16_t`, `int8_t`), but only if it can fit
         /// ...and the value is not an integer, it may only be accessed as a floater (`double`, `float`)
         ///
-        /// If `T` is an unrecognized type, then we attempt to use the specialized `qc_json_valueTo` struct.
+        /// If `T` is an unrecognized type, then we attempt to use the specialized `qc::json::valueTo` struct.
         ///
         template <typename T, bool safe = true> T as() const;
 
@@ -325,32 +325,34 @@ namespace qc::json
     string encode(const Value & val, Density density = multiline);
 
     Encoder & operator<<(Encoder & encoder, const Value & val);
+
+    ///
+    /// Specialize `qc::json::valueTo` to enable `Value::as` for custom types.
+    ///
+    /// Example:
+    ///     template <bool safe>
+    ///     struct qc::json::valueTo<std::pair<int, int>, safe> {
+    ///         std::pair<int, int> operator()(const qc::json::Value & v) {
+    ///             const qc::json::Array & arr{v.asArray<safe>()};
+    ///             return {arr.at(0u)->asInteger<safe>(), arr.at(1u)->asInteger<safe>()};
+    ///         }
+    ///     };
+    ///
+    template <typename T, bool safe> struct valueTo;
+
+    ///
+    /// Specialize `qc::json::valueFrom` to enable `Value` construction from custom types
+    ///
+    /// Example:
+    ///     template <>
+    ///     struct qc::json::valueFrom<std::pair<int, int>> {
+    ///         qc::json::Value operator()(const std::pair<int, int> & v) {
+    ///             return qc::json::Array{v.first, f.second};
+    ///         }
+    ///     };
+    ///
+    template <typename T> struct valueFrom;
 }
-
-///
-/// Specialize `qc_json_valueTo` to enable Value::as for custom types.
-/// Example:
-///      template <bool safe>
-///      struct qc_json_valueTo<std::pair<int, int>, safe> {
-///          std::pair<int, int> operator()(const qc::json::Value & v) {
-///              const qc::json::Array & arr{v.asArray<safe>()};
-///              return {arr.at(0u)->asInteger<safe>(), arr.at(1u)->asInteger<safe>()};
-///          }
-///      };
-///
-template <typename T, bool safe> struct qc_json_valueTo;
-
-///
-/// Specialize `qc_json_valueFrom` to enable Value construction from custom types
-/// Example:
-///      template <>
-///      struct qc_json_valueFrom<std::pair<int, int>> {
-///          qc::json::Value operator()(const std::pair<int, int> & v) {
-///              return qc::json::Array{v.first, f.second};
-///          }
-///      };
-///
-template <typename T> struct qc_json_valueFrom;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -509,7 +511,7 @@ namespace qc::json
 
     template <typename T>
     inline Value::Value(const T & val) :
-        Value{qc_json_valueFrom<T>()(val)}
+        Value{::qc::json::valueFrom<T>()(val)}
     {}
 
     inline Value::Value(Value && other) noexcept :
@@ -739,7 +741,7 @@ namespace qc::json
         }
         // Other
         else {
-            return qc_json_valueTo<U, safe>()(*this);
+            return ::qc::json::valueTo<U, safe>()(*this);
         }
     }
 
