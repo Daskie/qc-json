@@ -4,15 +4,12 @@ find_package(GTest CONFIG REQUIRED)
 
 ### QC-JSON-TEST ###############################################################
 
-file(GLOB SRC_FILES *.cpp)
-
-add_executable(qc-json-test ${SRC_FILES})
-
-target_compile_options(qc-json-test PRIVATE ${QC_WARNINGS_ERROR})
-
-target_link_libraries(
+qc_setup_target(
     qc-json-test
-    PRIVATE
+    EXECUTABLE
+    SOURCE_FILES
+        *.cpp
+    PRIVATE_LINKS
         qc-json
         GTest::gtest_main
 )
