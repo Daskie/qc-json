@@ -1,7 +1,7 @@
 #pragma once
 
 ///
-/// QC JSON 1.4.1
+/// QC JSON 1.4.2
 /// Austin Quick
 /// 2019 - 2021
 /// https://github.com/Daskie/qc-json
@@ -544,7 +544,7 @@ namespace qc::json
                     case '\f': _oss << R"(\f)"; break;
                     case '\r': _oss << R"(\r)"; break;
                     default:
-                        _oss << R"(\u00)"sv << hexChars[(uchar(c) >> 4) & 0xF] << hexChars[uchar(c) & 0xF];
+                        _oss << "\\x"sv << hexChars[(uchar(c) >> 4) & 0xF] << hexChars[uchar(c) & 0xF];
                 }
             }
         }

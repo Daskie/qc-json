@@ -161,23 +161,23 @@ TEST(encode, string) {
         encoder << "\0\b\t\n\v\f\r"sv;
         EXPECT_EQ(R"("\0\b\t\n\v\f\r")"s, encoder.finish());
     }
-    { // `\u` code point
+    { // `\x` code point
         std::string decodeStr(154, '\0');
-        std::string expectedStr(1 + 154 * 6 + 1, '\0');
+        std::string expectedStr(1 + 154 * 4 + 1, '\0');
         expectedStr.front() = '"';
         expectedStr.back() = '"';
         int i{0};
         for (int cp{1}; cp < 8; ++cp, ++i) {
             decodeStr[i] = char(cp);
-            std::format_to_n(&expectedStr[1 + 6 * i], 6, "\\u{:04X}"sv, cp);
+            std::format_to_n(&expectedStr[1 + 4 * i], 6, "\\x{:02X}"sv, cp);
         }
         for (int cp{14}; cp < 32; ++cp, ++i) {
             decodeStr[i] = char(cp);
-            std::format_to_n(&expectedStr[1 + 6 * i], 6, "\\u{:04X}"sv, cp);
+            std::format_to_n(&expectedStr[1 + 4 * i], 6, "\\x{:02X}"sv, cp);
         }
         for (int cp{127}; cp < 256; ++cp, ++i) {
             decodeStr[i] = char(cp);
-            std::format_to_n(&expectedStr[1 + 6 * i], 6, "\\u{:04X}"sv, cp);
+            std::format_to_n(&expectedStr[1 + 4 * i], 6, "\\x{:02X}"sv, cp);
         }
         Encoder encoder{};
         encoder << decodeStr;
@@ -498,6 +498,17 @@ TEST(encode, general) {
             encoder << end;
         encoder << end;
         encoder << "Profit Margin"sv << nullptr;
+        encoder << "Ha\x03r Name"sv << "M\0\0n"sv;
+        encoder << "Green Eggs and Ham"sv <<
+R"(I do not like them in a box
+I do not like them with a fox
+I do not like them in a house
+I do not like them with a mouse
+I do not like them here or there
+I do not like them anywhere
+I do not like green eggs and ham
+I do not like them Sam I am
+)";
     encoder << end;
 
     EXPECT_EQ(R"({
@@ -528,6 +539,8 @@ TEST(encode, general) {
             "Gluten Free": false
         }
     ],
-    "Profit Margin": null
+    "Profit Margin": null,
+    "Ha\x03r Name": "M\0\0n",
+    "Green Eggs and Ham": "I do not like them in a box\nI do not like them with a fox\nI do not like them in a house\nI do not like them with a mouse\nI do not like them here or there\nI do not like them anywhere\nI do not like green eggs and ham\nI do not like them Sam I am\n"
 })"s, encoder.finish());
 }

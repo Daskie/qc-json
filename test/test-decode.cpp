@@ -94,6 +94,21 @@ class ExpectantComposer {
 
 };
 
+std::ostream & operator<<(std::ostream & os, const ExpectantComposer::Element & v)
+{
+    if (std::holds_alternative<ExpectantComposer::Object>(v)) return os << "Object";
+    if (std::holds_alternative<ExpectantComposer::Array>(v)) return os << "Array";
+    if (std::holds_alternative<ExpectantComposer::End>(v)) return os << "End";
+    if (std::holds_alternative<ExpectantComposer::Key>(v)) return os << "Key `" << std::get<ExpectantComposer::Key>(v).k << "`";
+    if (std::holds_alternative<ExpectantComposer::String>(v)) return os << "String `" << std::get<ExpectantComposer::String>(v).v << "`";
+    if (std::holds_alternative<ExpectantComposer::SignedInteger>(v)) return os << "Signed Integer `" << std::get<ExpectantComposer::SignedInteger>(v).v << "`";
+    if (std::holds_alternative<ExpectantComposer::UnsignedInteger>(v)) return os << "Unsigned Integer `" << std::get<ExpectantComposer::UnsignedInteger>(v).v << "`";
+    if (std::holds_alternative<ExpectantComposer::Floater>(v)) return os << "Floater `" << std::get<ExpectantComposer::Floater>(v).v << "`";
+    if (std::holds_alternative<ExpectantComposer::Boolean>(v)) return os << "Boolean `" << (std::get<ExpectantComposer::Boolean>(v).v ? "true" : "false") << "`";
+    if (std::holds_alternative<ExpectantComposer::Null>(v)) return os << "Null";
+    return os << "Unknown Element";
+}
+
 TEST(decode, object) {
     { // Empty
         ExpectantComposer composer;
@@ -275,6 +290,20 @@ TEST(decode, string) {
     { // Missing end quote
         EXPECT_THROW(decode(R"("abc)", dummyComposer, nullptr), DecodeError);
         EXPECT_THROW(decode(R"([ "abc ])", dummyComposer, nullptr), DecodeError);
+    }
+    { // Excaped newlines
+        ExpectantComposer composer{};
+        composer.expectString("abc");
+        decode("\"a\\\nb\\\nc\"", composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectString("abc");
+        decode("\"a\\\r\nb\\\r\nc\"", composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectString("");
+        decode("\"\\\n\\\n\\\n\"", composer, nullptr);
+        composer.expectString("");
+        decode("\"\\\r\n\\\n\\\r\n\"", composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
     }
 }
 
@@ -542,7 +571,18 @@ TEST(decode, general) {
                 composer.expectKey("Gluten Free"sv).expectBoolean(false);
             composer.expectEnd();
         composer.expectEnd();
-        composer.expectKey("Profit Margin").expectNull();
+        composer.expectKey("Profit Margin"sv).expectNull();
+        composer.expectKey("Ha\x03r Name"sv).expectString("M\0\0n"sv);
+        composer.expectKey("Green Eggs and Ham"sv).expectString(
+R"(I do not like them in a box
+I do not like them with a fox
+I do not like them in a house
+I do not like them with a mouse
+I do not like them here or there
+I do not like them anywhere
+I do not like green eggs and ham
+I do not like them Sam I am
+)");
     composer.expectEnd();
     decode(
 R"({
@@ -573,7 +613,19 @@ R"({
             "Gluten Free": false
         }
     ],
-    "Profit Margin": null
+    "Profit Margin": null,
+    "Ha\x03r Name": "M\u0000\0n",
+    "Green Eggs and Ham":
+"\
+I do not like them in a box\n\
+I do not like them with a fox\n\
+I do not like them in a house\n\
+I do not like them with a mouse\n\
+I do not like them here or there\n\
+I do not like them anywhere\n\
+I do not like green eggs and ham\n\
+I do not like them Sam I am\n\
+"
 })"sv, composer, nullptr);
     EXPECT_TRUE(composer.isDone());
 }

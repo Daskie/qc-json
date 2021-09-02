@@ -147,7 +147,7 @@ TODO
 
 TODO
 
-A string may only contain [printable](https://en.cppreference.com/w/cpp/string/byte/isprint) characters. (TODO newlines)
+A string may only contain [printable](https://en.cppreference.com/w/cpp/string/byte/isprint) characters, with the exception of escaped newlines.
 
 #### Escape Sequences
 
@@ -170,7 +170,18 @@ Examples:
 - `\x5A` yields `U+005A` or `Z`
 - `\u007E` yields `U+007E` or `~`
 
-In all other circumstances, a backslash followed by character simply yeilds that character. (TODO: newlines)
+Finally, newlines can be escaped; either `\n` or `\r\n`. This allows long string to be split accross multiple lines
+without introducing newlines into the data.
+
+Example:
+```json5
+"This is a longer string. \
+Yep. \
+Sure is that."
+```
+...would decode into `This is a longer string. Yep. Sure is that.`.
+
+In all other circumstances, a backslash followed by character simply yeilds that character.
 
 Examples:
 - `\A` yields `A`

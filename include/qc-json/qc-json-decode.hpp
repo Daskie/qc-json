@@ -1,7 +1,7 @@
 #pragma once
 
 ///
-/// QC JSON 1.4.1
+/// QC JSON 1.4.2
 /// Austin Quick
 /// 2019 - 2021
 /// https://github.com/Daskie/qc-json
@@ -293,7 +293,17 @@ namespace qc::json
                 }
                 else if (c == '\\') {
                     ++_pos;
-                    _stringBuffer.push_back(_consumeEscaped());
+
+                    // Check for escaped newline
+                    if (*_pos == '\n') {
+                        ++_pos;
+                    }
+                    else if (*_pos == '\r' && _pos + 1 < _end && _pos[1] == '\n') {
+                        _pos += 2;
+                    }
+                    else {
+                        _stringBuffer.push_back(_consumeEscaped());
+                    }
                 }
                 else if (std::isprint(uchar(c))) {
                     _stringBuffer.push_back(c);
@@ -325,7 +335,7 @@ namespace qc::json
                 case 'x': return _consumeCodePoint(2);
                 case 'u': return _consumeCodePoint(4);
                 default:
-                    if (std::isprint(static_cast<unsigned char>(c))) {
+                    if (std::isprint(uchar(c))) {
                         return c;
                     }
                     else {
