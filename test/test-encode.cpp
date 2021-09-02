@@ -459,6 +459,34 @@ TEST(encode, density) {
     }
 }
 
+TEST(encode, identifiers) {
+    { // Valid identifiers
+        Encoder encoder{uniline, true};
+        encoder << object << "a" << "v" << end;
+        EXPECT_EQ(R"({ a: "v" })"s, encoder.finish());
+        encoder << object << "A" << "v" << end;
+        EXPECT_EQ(R"({ A: "v" })"s, encoder.finish());
+        encoder << object << "0" << "v" << end;
+        EXPECT_EQ(R"({ 0: "v" })"s, encoder.finish());
+        encoder << object << "_" << "v" << end;
+        EXPECT_EQ(R"({ _: "v" })"s, encoder.finish());
+        encoder << object << "_0a" << "v" << end;
+        EXPECT_EQ(R"({ _0a: "v" })"s, encoder.finish());
+        encoder << object << "_0a" << "v" << end;
+        EXPECT_EQ(R"({ _0a: "v" })"s, encoder.finish());
+    }
+    { // Invalid identifiers
+        Encoder encoder{uniline, true};
+        encoder << object << "w o a" << "v" << end;
+        EXPECT_EQ(R"({ "w o a": "v" })"s, encoder.finish());
+    }
+    { // Preference off
+        Encoder encoder{uniline, false};
+        encoder << object << "k" << "v" << end;
+        EXPECT_EQ(R"({ "k": "v" })"s, encoder.finish());
+    }
+}
+
 TEST(encode, misc) {
     { // Extraneous content
         Encoder encoder{};

@@ -14,6 +14,7 @@
 #include <cctype>
 #include <cstddef>
 
+#include <algorithm>
 #include <charconv>
 #include <sstream>
 #include <stdexcept>
@@ -99,8 +100,9 @@ namespace qc::json
         /// Construct a new `Encoder`
         ///
         /// @param density the starting density for the JSON
+        /// @param preferIdentifiers whether to encode all eligible keys as identifiers instead of strings
         ///
-        Encoder(Density density = multiline);
+        Encoder(Density density = multiline, bool preferIdentifiers = false);
 
         Encoder(const Encoder & other) = delete;
         Encoder(Encoder && other) noexcept;
@@ -182,9 +184,10 @@ namespace qc::json
             Density density;
         };
 
+        Density _baseDensity{multiline};
+        bool _preferIdentifiers{false};
         std::ostringstream _oss{};
         std::vector<_State> _state{};
-        Density _baseDensity{multiline};
         int _indentation{0};
         bool _isKey{false};
         bool _isComplete{false};
@@ -226,14 +229,16 @@ namespace qc::json
         Error{msg}
     {}
 
-    inline Encoder::Encoder(const Density density) :
-        _baseDensity{density}
+    inline Encoder::Encoder(const Density density, bool preferIdentifiers) :
+        _baseDensity{density},
+        _preferIdentifiers{preferIdentifiers}
     {}
 
     inline Encoder::Encoder(Encoder && other) noexcept :
+        _baseDensity{std::exchange(other._baseDensity, multiline)},
+        _preferIdentifiers{std::exchange(other._preferIdentifiers, false)},
         _oss{std::move(other._oss)},
         _state{std::move(other._state)},
-        _baseDensity{std::exchange(other._baseDensity, multiline)},
         _indentation{std::exchange(other._indentation, 0)},
         _isKey{std::exchange(other._isKey, false)},
         _isComplete{std::exchange(other._isComplete, false)}
@@ -241,9 +246,10 @@ namespace qc::json
 
     inline Encoder & Encoder::operator=(Encoder && other) noexcept
     {
+        _baseDensity = std::exchange(other._baseDensity, multiline);
+        _preferIdentifiers = std::exchange(other._preferIdentifiers, false);
         _oss = std::move(other._oss);
         _state = std::move(other._state);
-        _baseDensity = std::exchange(other._baseDensity, multiline);
         _indentation = std::exchange(other._indentation, 0);
         _isKey = std::exchange(other._isKey, false);
         _isComplete = std::exchange(other._isComplete, false);
@@ -473,12 +479,28 @@ namespace qc::json
             throw EncodeError{"Key must not be empty"s};
         }
 
+        bool asIdentifier{false};
+        if (_preferIdentifiers) {
+            // Ensure the key has only alphanumeric and underscore characters
+            if (std::find_if(key.cbegin(), key.cend(), [](const char c) { return !std::isalnum(uchar(c)) && c != '_'; }) == key.cend()) {
+                asIdentifier = true;
+            }
+        }
+
         _prefix<true>();
-        _encode(key);
+
+        if (asIdentifier) {
+            _oss << key;
+        }
+        else {
+            _encode(key);
+        }
+
         _oss << ':';
         if (_state.back().density < compact) {
             _oss << ' ';
         }
+
         _isKey = true;
     }
 

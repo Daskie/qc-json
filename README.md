@@ -139,7 +139,25 @@ std::string jsonStr{encoder.finish()};
 
 TODO
 
+The key can be either a string or an identifier, where an identifier is an unquoted string of alphanumeric characters
+and underscores.
+
+Example:
+
+```json5
+{
+     abc  : "letters",    
+     123  : "numbers",    
+     ___  : "underscores",    
+    "! -" : "any string value"
+}
+```
+
+The last element in the object may have a trailing comma.
+
 ### Array
+
+The last element in the array may have a trailing comma.
 
 TODO
 
