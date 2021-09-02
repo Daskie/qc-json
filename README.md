@@ -133,6 +133,57 @@ std::string jsonStr{encoder.finish()};
 
 ---
 
+## Value Types
+
+### Object
+
+TODO
+
+### Array
+
+TODO
+
+### String
+
+TODO
+
+A string may only contain [printable](https://en.cppreference.com/w/cpp/string/byte/isprint) characters. (TODO newlines)
+
+#### Escape Sequences
+
+The following escape sequences are replaced with their corresponding code point:
+
+| Sequence | Name | Code Point |
+|:---:|:---:|:---:|
+| `\0` | Null | `U+0000` |
+| `\b` | Backspace | `U+0008` |
+| `\t` | Horizontal Tab | `U+0009` |
+| `\n` | New Line | `U+000A` |
+| `\v` | Vertical Tab | `U+000B` |
+| `\f` | Form Feed | `U+000C` |
+| `\r` | Carriage Return | `U+000D` |
+
+In addition, a specific code point can be specified with `\x` followed by two hex digits, or `\u` followed by four hex digits.
+Currently, only extended ASCII is supported, i.e.`U+0000` through `U+00FF`. 
+
+Examples:
+- `\x5A` yields `U+005A` or `Z`
+- `\u007E` yields `U+007E` or `~`
+
+In all other circumstances, a backslash followed by character simply yeilds that character. (TODO: newlines)
+
+Examples:
+- `\A` yields `A`
+- `\\` yields `\ `
+
+### Number
+
+TODO
+
+### Null
+
+TODO
+
 ## Features (in no particular order)
 
 ### Remember, `char` is a different type from `signed char` or `unsigned char`

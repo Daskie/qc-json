@@ -1,3 +1,5 @@
+#include <format>
+
 #include <gtest/gtest.h>
 
 #include <qc-json/qc-json-encode.hpp>
@@ -156,24 +158,35 @@ TEST(encode, string) {
     }
     { // Escape characters
         Encoder encoder{};
-        encoder << "\b\f\n\r\t";
-        EXPECT_EQ(R"("\b\f\n\r\t")"s, encoder.finish());
+        encoder << "\0\b\t\n\v\f\r"sv;
+        EXPECT_EQ(R"("\0\b\t\n\v\f\r")"s, encoder.finish());
     }
-    { // Unicode
+    { // `\u` code point
+        std::string decodeStr(154, '\0');
+        std::string expectedStr(1 + 154 * 6 + 1, '\0');
+        expectedStr.front() = '"';
+        expectedStr.back() = '"';
+        int i{0};
+        for (int cp{1}; cp < 8; ++cp, ++i) {
+            decodeStr[i] = char(cp);
+            std::format_to_n(&expectedStr[1 + 6 * i], 6, "\\u{:04X}"sv, cp);
+        }
+        for (int cp{14}; cp < 32; ++cp, ++i) {
+            decodeStr[i] = char(cp);
+            std::format_to_n(&expectedStr[1 + 6 * i], 6, "\\u{:04X}"sv, cp);
+        }
+        for (int cp{127}; cp < 256; ++cp, ++i) {
+            decodeStr[i] = char(cp);
+            std::format_to_n(&expectedStr[1 + 6 * i], 6, "\\u{:04X}"sv, cp);
+        }
         Encoder encoder{};
-        encoder << "\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\u000B\u000E\u000F\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001A\u001B\u001C\u001D\u001E\u001F\u007F"sv;
-        EXPECT_EQ(R"("\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\u000B\u000E\u000F\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001A\u001B\u001C\u001D\u001E\u001F\u007F")"s, encoder.finish());
+        encoder << decodeStr;
+        EXPECT_EQ(expectedStr, encoder.finish());
     }
     { // Single char
         Encoder encoder{};
         encoder << 'a';
         EXPECT_EQ(R"("a")"s, encoder.finish());
-    }
-    { // Non-ASCII unicode
-        for (char c(-128); c < 0; ++c) {
-            Encoder encoder{};
-            EXPECT_THROW(encoder << c, EncodeError);
-        }
     }
 }
 

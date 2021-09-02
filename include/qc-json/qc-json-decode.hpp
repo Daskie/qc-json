@@ -1,7 +1,7 @@
 #pragma once
 
 ///
-/// QC JSON 1.4.0
+/// QC JSON 1.4.1
 /// Austin Quick
 /// 2019 - 2021
 /// https://github.com/Daskie/qc-json
@@ -30,6 +30,8 @@ namespace qc::json
     using std::string_view;
     using namespace std::string_literals;
     using namespace std::string_view_literals;
+
+    using uchar = unsigned char;
 
     ///
     /// Common exception type used for all `qc::json` exceptions
@@ -112,7 +114,7 @@ namespace qc::json
 
         void _skipWhitespace()
         {
-            while (_pos < _end && std::isspace(*_pos)) ++_pos;
+            while (_pos < _end && std::isspace(uchar(*_pos))) ++_pos;
         }
 
         bool _tryConsumeChar(const char c)
@@ -173,7 +175,7 @@ namespace qc::json
                     break;
                 }
                 case '-': {
-                    if (_end - _pos > 1 && std::isdigit(_pos[1])) {
+                    if (_end - _pos > 1 && std::isdigit(uchar(_pos[1]))) {
                         _ingestNumber(state);
                         break;
                     }
@@ -293,12 +295,12 @@ namespace qc::json
                     ++_pos;
                     _stringBuffer.push_back(_consumeEscaped());
                 }
-                else if (std::isprint(c)) {
+                else if (std::isprint(uchar(c))) {
                     _stringBuffer.push_back(c);
                     ++_pos;
                 }
                 else {
-                    throw DecodeError{"Unknown string content"s, size_t(_pos - _start)};
+                    throw DecodeError{"Invalid string content"s, size_t(_pos - _start)};
                 }
             }
         }
@@ -309,39 +311,42 @@ namespace qc::json
                 throw DecodeError{"Expected escape sequence"s, size_t(_pos - _start)};
             }
 
-            switch (*_pos++) {
-                case  '"': return  '"';
-                case '\\': return '\\';
-                case  '/': return  '/';
-                case  'b': return '\b';
-                case  'f': return '\f';
-                case  'n': return '\n';
-                case  'r': return '\r';
-                case  't': return '\t';
-                case  'u': return _consumeUnicode();
+            const char c{*_pos};
+            ++_pos;
+
+            switch (c) {
+                case '0': return '\0';
+                case 'b': return '\b';
+                case 't': return '\t';
+                case 'n': return '\n';
+                case 'v': return '\v';
+                case 'f': return '\f';
+                case 'r': return '\r';
+                case 'x': return _consumeCodePoint(2);
+                case 'u': return _consumeCodePoint(4);
                 default:
-                    throw DecodeError{"Unknown escape sequence"s, size_t(_pos - _start - 1)};
+                    if (std::isprint(static_cast<unsigned char>(c))) {
+                        return c;
+                    }
+                    else {
+                        throw DecodeError{"Invalid escape sequence"s, size_t(_pos - _start - 1)};
+                    }
             }
         }
 
-        char _consumeUnicode()
+        char _consumeCodePoint(const int digits)
         {
-            if (_end - _pos < 4) {
-                throw DecodeError{"Expected four digits of unicode"s, size_t(_pos - _start)};
+            if (_end - _pos < digits) {
+                throw DecodeError{"Expected "s + std::to_string(digits) + " code point digits"s, size_t(_pos - _start)};
             }
 
             uint32_t val;
-            const std::from_chars_result res{std::from_chars(_pos, _pos + 4, val, 16)};
+            const std::from_chars_result res{std::from_chars(_pos, _pos + digits, val, 16)};
             if (res.ec != std::errc{}) {
-                throw DecodeError{"Invalid unicode"s, size_t(_pos - _start)};
+                throw DecodeError{"Invalid code point"s, size_t(_pos - _start)};
             }
 
-            // Is the high bit set?
-            if (val & ~0x7Fu) {
-                throw DecodeError{"Non-ASCII unicode is unsupported"s, size_t(_pos - _start)};
-            }
-
-            _pos += 4;
+            _pos += digits;
 
             return char(val);
         }
@@ -351,7 +356,7 @@ namespace qc::json
             // A precondition is that we know that the first character is either a digit or `-`
             const char * pos{_pos + 1};
             // Skip all remaining leading digits
-            while (pos < _end && std::isdigit(*pos)) ++pos;
+            while (pos < _end && std::isdigit(uchar(*pos))) ++pos;
             // If that's it, we're an integer
             if (pos >= _end) {
                 return true;
@@ -362,7 +367,7 @@ namespace qc::json
                 // Skip all zeroes
                 while (pos < _end && *pos == '0') ++pos;
                 // If there's a digit or an exponent, we must be a floater
-                if (pos < _end && (std::isdigit(*pos) || *pos == 'e' || *pos == 'E')) {
+                if (pos < _end && (std::isdigit(uchar(*pos)) || *pos == 'e' || *pos == 'E')) {
                     return false;
                 }
                 // Otherwise, we're an integer

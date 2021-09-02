@@ -1,7 +1,8 @@
 #include <cmath>
 
-#include <variant>
 #include <deque>
+#include <format>
+#include <variant>
 
 #include <gtest/gtest.h>
 
@@ -200,14 +201,23 @@ TEST(decode, string) {
     }
     { // All printable
         ExpectantComposer composer;
-        composer.expectString(R"( !"#$%&'()*+,-.//0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~)"sv);
-        decode(R"(" !\"#$%&'()*+,-./\/0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~")"sv, composer, nullptr);
+        composer.expectString(R"( !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~)"sv);
+        decode(R"(" !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~")"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
+    }
+    { // All non-printable
+        std::string decodeStr{R"(" ")"};
+        for (int i{0}; i < 256; ++i) {
+            if (!std::isprint(i)) {
+                decodeStr[1] = char(i);
+                EXPECT_THROW(decode(decodeStr, dummyComposer, nullptr), DecodeError);
+            }
+        }
     }
     { // Escape characters
         ExpectantComposer composer;
-        composer.expectString("\b\f\n\r\t"sv);
-        decode(R"("\b\f\n\r\t")"sv, composer, nullptr);
+        composer.expectString("\0\b\t\n\v\f\r"sv);
+        decode(R"("\0\b\t\n\v\f\r")"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Missing escape sequence
@@ -217,45 +227,54 @@ TEST(decode, string) {
         EXPECT_THROW(decode(brokenSeqInArray, dummyComposer, nullptr), DecodeError);
     }
     { // Unknown escape sequence
-        EXPECT_THROW(decode(R"("\v")", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode("\"\\\0\"", dummyComposer, nullptr), DecodeError);
     }
-    { // Unicode
+    { // 'x' code point
         ExpectantComposer composer;
-        composer.expectString("\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\u000B\u000E\u000F\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001A\u001B\u001C\u001D\u001E\u001F\u007F"sv);
-        decode(R"("\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\u000B\u000E\u000F\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001A\u001B\u001C\u001D\u001E\u001F\u007F")"sv, composer, nullptr);
+        std::string expectedStr(256, '\0');
+        std::string decodeStr(1 + 256 * 4 + 1, '\0');
+        decodeStr.front() = '"';
+        decodeStr.back() = '"';
+        for (int i{0}; i < 256; ++i) {
+            expectedStr[i] = char(i);
+            std::format_to_n(&decodeStr[1 + 4 * i], 4, "\\x{:02X}"sv, i);
+        }
+        composer.expectString(expectedStr);
+        decode(decodeStr, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
-    { // Non-ascii unicode
-        const std::string_view str1{R"("\u0080")"};
-        EXPECT_THROW(decode(str1, dummyComposer, nullptr), DecodeError);
-
-        const std::string_view str2{R"("\u0F00")"};
-        EXPECT_THROW(decode(str2, dummyComposer, nullptr), DecodeError);
-
-        const std::string_view str3{R"("\uF000")"};
-        EXPECT_THROW(decode(str3, dummyComposer, nullptr), DecodeError);
+    { // 'u' code point
+        ExpectantComposer composer;
+        std::string expectedStr(256, '\0');
+        std::string decodeStr(1 + 256 * 6 + 1, '\0');
+        decodeStr.front() = '"';
+        decodeStr.back() = '"';
+        for (int i{0}; i < 256; ++i) {
+            expectedStr[i] = char(i);
+            std::format_to_n(&decodeStr[1 + 6 * i], 6, "\\u{:04X}"sv, i);
+        }
+        composer.expectString(expectedStr);
+        decode(decodeStr, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
     }
-    { // Missing all unicode digits
-#pragma warning(push)
-#pragma warning(disable:4429) // Disable "improperly formed universal-characer-name" warning
-        EXPECT_THROW(decode(R"("\u")", dummyComposer, nullptr), DecodeError);
-        EXPECT_THROW(decode(R"([ "\u" ])", dummyComposer, nullptr), DecodeError);
-        EXPECT_THROW(decode(R"("\u0")", dummyComposer, nullptr), DecodeError);
-        EXPECT_THROW(decode(R"([ "\u0" ])", dummyComposer, nullptr), DecodeError);
-        EXPECT_THROW(decode(R"("\u00")", dummyComposer, nullptr), DecodeError);
-        EXPECT_THROW(decode(R"([ "\u00" ])", dummyComposer, nullptr), DecodeError);
-        EXPECT_THROW(decode(R"("\u000")", dummyComposer, nullptr), DecodeError);
-        EXPECT_THROW(decode(R"([ "\u000" ])", dummyComposer, nullptr), DecodeError);
-#pragma warning(pop)
+    { // Uppercase and lowercase code point hex digits
+        ExpectantComposer composer{};
+        composer.expectString("\u00AA\u00BB\u00CC\u00DD");
+        decode(R"("\u00aa\u00BB\u00cC\u00Dd")", composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+    }
+    { // Incorrect number of code point digits
+        // Raw strings, `\x`/`\u`, and macros don't play nice together
+        EXPECT_THROW(decode("\"\\x\"", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode("\"\\x1\"", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode("\"\\u\"", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode("\"\\u1\"", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode("\"\\u11\"", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode("\"\\u111\"", dummyComposer, nullptr), DecodeError);
     }
     { // Missing end quote
         EXPECT_THROW(decode(R"("abc)", dummyComposer, nullptr), DecodeError);
         EXPECT_THROW(decode(R"([ "abc ])", dummyComposer, nullptr), DecodeError);
-    }
-    { // Unknown content
-        EXPECT_THROW(decode("\"\n\"", dummyComposer, nullptr), DecodeError);
-        EXPECT_THROW(decode("\"\t\"", dummyComposer, nullptr), DecodeError);
-        EXPECT_THROW(decode("\"\0\"", dummyComposer, nullptr), DecodeError);
     }
 }
 

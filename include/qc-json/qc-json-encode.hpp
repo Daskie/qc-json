@@ -1,7 +1,7 @@
 #pragma once
 
 ///
-/// QC JSON 1.4.0
+/// QC JSON 1.4.1
 /// Austin Quick
 /// 2019 - 2021
 /// https://github.com/Daskie/qc-json
@@ -30,6 +30,8 @@ namespace qc::json
     using std::string_view;
     using namespace std::string_literals;
     using namespace std::string_view_literals;
+
+    using uchar = unsigned char;
 
     ///
     /// Common exception type used for all `qc::json` exceptions
@@ -527,25 +529,22 @@ namespace qc::json
 
         _oss << '"';
 
-        for (const unsigned char c : v) {
-            if (std::isprint(c)) {
+        for (const char c : v) {
+            if (std::isprint(uchar(c))) {
                 if (c == '"' || c == '\\') _oss << '\\';
                 _oss << c;
             }
             else {
                 switch (c) {
+                    case '\0': _oss << R"(\0)"; break;
                     case '\b': _oss << R"(\b)"; break;
-                    case '\f': _oss << R"(\f)"; break;
-                    case '\n': _oss << R"(\n)"; break;
-                    case '\r': _oss << R"(\r)"; break;
                     case '\t': _oss << R"(\t)"; break;
+                    case '\n': _oss << R"(\n)"; break;
+                    case '\v': _oss << R"(\v)"; break;
+                    case '\f': _oss << R"(\f)"; break;
+                    case '\r': _oss << R"(\r)"; break;
                     default:
-                        if (c < 128) {
-                            _oss << R"(\u00)" << hexChars[(c >> 4) & 0xF] << hexChars[c & 0xF];
-                        }
-                        else {
-                            throw EncodeError{"Non-ASCII unicode is not supported"s};
-                        }
+                        _oss << R"(\u00)"sv << hexChars[(uchar(c) >> 4) & 0xF] << hexChars[uchar(c) & 0xF];
                 }
             }
         }
