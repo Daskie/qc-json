@@ -1,7 +1,7 @@
 #pragma once
 
 ///
-/// QC JSON 1.4.3
+/// QC JSON 1.4.4
 /// Austin Quick
 /// 2019 - 2021
 /// https://github.com/Daskie/qc-json
@@ -172,7 +172,11 @@ namespace qc::json
                     break;
                 }
                 case '"': {
-                    _ingestString(state);
+                    _ingestString(state, '"');
+                    break;
+                }
+                case '\'': {
+                    _ingestString(state, '\'');
                     break;
                 }
                 case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': case '9': {
@@ -225,7 +229,8 @@ namespace qc::json
                     if (_pos >= _end) {
                         throw DecodeError{"Expected key", size_t(_pos -_start)};
                     }
-                    const string_view key{*_pos == '"' ? _consumeString() : _consumeIdentifier()};
+                    const char c{*_pos};
+                    const string_view key{(c == '"' || c == '\'') ? _consumeString(c) : _consumeIdentifier()};
                     _composer.key(string{key}, innerState);
                     _skipWhitespace();
 
@@ -283,16 +288,16 @@ namespace qc::json
             _composer.end(std::move(innerState), outerState);
         }
 
-        void _ingestString(State & state)
+        void _ingestString(State & state, const char quote)
         {
-            _composer.val(_consumeString(), state);
+            _composer.val(_consumeString(quote), state);
         }
 
-        string_view _consumeString()
+        string_view _consumeString(const char quote)
         {
             _stringBuffer.clear();
 
-            ++_pos; // We already know we have `"`
+            ++_pos; // We already know we have `"` or `'`
 
             while (true) {
                 if (_pos >= _end) {
@@ -300,7 +305,7 @@ namespace qc::json
                 }
 
                 const char c{*_pos};
-                if (c == '"') {
+                if (c == quote) {
                     ++_pos;
                     return _stringBuffer;
                 }

@@ -188,6 +188,32 @@ TEST(encode, string) {
         encoder << 'a';
         EXPECT_EQ(R"("a")"s, encoder.finish());
     }
+    { // Double quotes
+        Encoder encoder{uniline, false};
+        std::string expected{};
+        encoder << R"(s"t'r)";
+        expected = R"("s\"t'r")"s;
+        EXPECT_EQ(expected, encoder.finish());
+        encoder << object << R"(""")" << R"(''')" << end;
+        expected = R"({ "\"\"\"": "'''" })"s;
+        EXPECT_EQ(expected, encoder.finish());
+        encoder << object << R"(''')" << R"(""")" << end;
+        expected = R"({ "'''": "\"\"\"" })"s;
+        EXPECT_EQ(expected, encoder.finish());
+    }
+    { // Single quotes
+        Encoder encoder{uniline, true};
+        std::string expected{};
+        encoder << R"(s"t'r)";
+        expected = R"('s"t\'r')"s;
+        EXPECT_EQ(expected, encoder.finish());
+        encoder << object << R"(""")" << R"(''')" << end;
+        expected = R"({ '"""': '\'\'\'' })"s;
+        EXPECT_EQ(expected, encoder.finish());
+        encoder << object << R"(''')" << R"(""")" << end;
+        expected = R"({ '\'\'\'': '"""' })"s;
+        EXPECT_EQ(expected, encoder.finish());
+    }
 }
 
 TEST(encode, signedInteger) {
@@ -461,7 +487,7 @@ TEST(encode, density) {
 
 TEST(encode, identifiers) {
     { // Valid identifiers
-        Encoder encoder{uniline, true};
+        Encoder encoder{uniline, false, true};
         encoder << object << "a" << "v" << end;
         EXPECT_EQ(R"({ a: "v" })"s, encoder.finish());
         encoder << object << "A" << "v" << end;
@@ -476,12 +502,12 @@ TEST(encode, identifiers) {
         EXPECT_EQ(R"({ _0a: "v" })"s, encoder.finish());
     }
     { // Invalid identifiers
-        Encoder encoder{uniline, true};
+        Encoder encoder{uniline, false, true};
         encoder << object << "w o a" << "v" << end;
         EXPECT_EQ(R"({ "w o a": "v" })"s, encoder.finish());
     }
     { // Preference off
-        Encoder encoder{uniline, false};
+        Encoder encoder{uniline, false, false};
         encoder << object << "k" << "v" << end;
         EXPECT_EQ(R"({ "k": "v" })"s, encoder.finish());
     }
@@ -509,7 +535,7 @@ TEST(encode, general) {
             encoder << object;
                 encoder << "Name"sv << "Basket o' Barnacles"sv;
                 encoder << "Price"sv << 5.45;
-                encoder << "Ingredients"sv << array << uniline << "Salt"sv << "Barnacles"sv << end;
+                encoder << "Ingredients"sv << array << uniline << "\"Salt\""sv << "Barnacles"sv << end;
                 encoder << "Gluten Free"sv << false;
             encoder << end;
             encoder << object;
@@ -521,7 +547,7 @@ TEST(encode, general) {
             encoder << object;
                 encoder << "Name"sv << "18 Leg Bouquet"sv;
                 encoder << "Price"sv << 18.18;
-                encoder << "Ingredients"sv << array << uniline << "Salt"sv << "Octopus"sv << "Crab"sv << end;
+                encoder << "Ingredients"sv << array << uniline << "\"Salt\""sv << "Octopus"sv << "Crab"sv << end;
                 encoder << "Gluten Free"sv << false;
             encoder << end;
         encoder << end;
@@ -551,7 +577,7 @@ I do not like them Sam I am
         {
             "Name": "Basket o' Barnacles",
             "Price": 5.45,
-            "Ingredients": [ "Salt", "Barnacles" ],
+            "Ingredients": [ "\"Salt\"", "Barnacles" ],
             "Gluten Free": false
         },
         {
@@ -563,7 +589,7 @@ I do not like them Sam I am
         {
             "Name": "18 Leg Bouquet",
             "Price": 18.18,
-            "Ingredients": [ "Salt", "Octopus", "Crab" ],
+            "Ingredients": [ "\"Salt\"", "Octopus", "Crab" ],
             "Gluten Free": false
         }
     ],

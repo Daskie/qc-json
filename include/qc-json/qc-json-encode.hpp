@@ -1,7 +1,7 @@
 #pragma once
 
 ///
-/// QC JSON 1.4.3
+/// QC JSON 1.4.4
 /// Austin Quick
 /// 2019 - 2021
 /// https://github.com/Daskie/qc-json
@@ -100,9 +100,10 @@ namespace qc::json
         /// Construct a new `Encoder`
         ///
         /// @param density the starting density for the JSON
-        /// @param preferIdentifiers whether to encode all eligible keys as identifiers instead of strings
+        /// @param singleQuotes whether to use `'` instead of `"` for strings
+        /// @param identifiers whether to encode all eligible keys as identifiers instead of strings
         ///
-        Encoder(Density density = multiline, bool preferIdentifiers = false);
+        Encoder(Density density = multiline, bool singleQuotes = false, bool identifiers = false);
 
         Encoder(const Encoder & other) = delete;
         Encoder(Encoder && other) noexcept;
@@ -185,7 +186,8 @@ namespace qc::json
         };
 
         Density _baseDensity{multiline};
-        bool _preferIdentifiers{false};
+        char _quote{'"'};
+        bool _identifiers{false};
         std::ostringstream _oss{};
         std::vector<_State> _state{};
         int _indentation{0};
@@ -229,14 +231,16 @@ namespace qc::json
         Error{msg}
     {}
 
-    inline Encoder::Encoder(const Density density, bool preferIdentifiers) :
+    inline Encoder::Encoder(const Density density, bool singleQuotes, bool preferIdentifiers) :
         _baseDensity{density},
-        _preferIdentifiers{preferIdentifiers}
+        _quote{singleQuotes ? '\'' : '"'},
+        _identifiers{preferIdentifiers}
     {}
 
     inline Encoder::Encoder(Encoder && other) noexcept :
         _baseDensity{std::exchange(other._baseDensity, multiline)},
-        _preferIdentifiers{std::exchange(other._preferIdentifiers, false)},
+        _quote{std::exchange(other._quote, '"')},
+        _identifiers{std::exchange(other._identifiers, false)},
         _oss{std::move(other._oss)},
         _state{std::move(other._state)},
         _indentation{std::exchange(other._indentation, 0)},
@@ -247,7 +251,8 @@ namespace qc::json
     inline Encoder & Encoder::operator=(Encoder && other) noexcept
     {
         _baseDensity = std::exchange(other._baseDensity, multiline);
-        _preferIdentifiers = std::exchange(other._preferIdentifiers, false);
+        _quote = std::exchange(other._quote, '"');
+        _identifiers = std::exchange(other._identifiers, false);
         _oss = std::move(other._oss);
         _state = std::move(other._state);
         _indentation = std::exchange(other._indentation, 0);
@@ -479,17 +484,17 @@ namespace qc::json
             throw EncodeError{"Key must not be empty"s};
         }
 
-        bool asIdentifier{false};
-        if (_preferIdentifiers) {
+        bool identifier{false};
+        if (_identifiers) {
             // Ensure the key has only alphanumeric and underscore characters
             if (std::find_if(key.cbegin(), key.cend(), [](const char c) { return !std::isalnum(uchar(c)) && c != '_'; }) == key.cend()) {
-                asIdentifier = true;
+                identifier = true;
             }
         }
 
         _prefix<true>();
 
-        if (asIdentifier) {
+        if (identifier) {
             _oss << key;
         }
         else {
@@ -549,11 +554,11 @@ namespace qc::json
     {
         static constexpr char hexChars[16]{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
 
-        _oss << '"';
+        _oss << _quote;
 
         for (const char c : v) {
             if (std::isprint(uchar(c))) {
-                if (c == '"' || c == '\\') _oss << '\\';
+                if (c == _quote || c == '\\') _oss << '\\';
                 _oss << c;
             }
             else {
@@ -571,7 +576,7 @@ namespace qc::json
             }
         }
 
-        _oss << '"';
+        _oss << _quote;
     }
 
     inline void Encoder::_encode(const int64_t v)

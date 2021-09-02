@@ -726,7 +726,7 @@ TEST(json, general) {
         {
             "Gluten Free": false,
             "Ingredients": [
-                "Salt",
+                "\"Salt\"",
                 "Barnacles"
             ],
             "Name": "Basket o' Barnacles",
@@ -743,7 +743,7 @@ TEST(json, general) {
         {
             "Gluten Free": false,
             "Ingredients": [
-                "Salt",
+                "\"Salt\"",
                 "Octopus",
                 "Crab"
             ],

@@ -333,6 +333,21 @@ TEST(decode, string) {
         decode("\"\\\r\n\\\n\\\r\n\"", composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
+    { // Single/double quotes
+        ExpectantComposer composer{};
+        composer.expectString(R"(a'b"c)");
+        decode(R"('a\'b"c')", composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectString(R"(a'b"c)");
+        decode(R"("a'b\"c")", composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectObject().expectKey(R"(""")").expectString(R"(''')").expectEnd();
+        decode(R"({ '"""': "'''" })", composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectObject().expectKey(R"(''')").expectString(R"(""")").expectEnd();
+        decode(R"({ '\'\'\'': "\"\"\"" })", composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+    }
 }
 
 TEST(decode, signedInteger) {
@@ -685,7 +700,7 @@ TEST(decode, general) {
             composer.expectObject();
                 composer.expectKey("Name"sv).expectString("Basket o' Barnacles"sv);
                 composer.expectKey("Price"sv).expectFloater(5.45);
-                composer.expectKey("Ingredients"sv).expectArray().expectString("Salt"sv).expectString("Barnacles"sv).expectEnd();
+                composer.expectKey("Ingredients"sv).expectArray().expectString("\"Salt\""sv).expectString("Barnacles"sv).expectEnd();
                 composer.expectKey("Gluten Free"sv).expectBoolean(false);
             composer.expectEnd();
             composer.expectObject();
@@ -697,7 +712,7 @@ TEST(decode, general) {
             composer.expectObject();
                 composer.expectKey("Name"sv).expectString("18 Leg Bouquet"sv);
                 composer.expectKey("Price"sv).expectFloater(18.18);
-                composer.expectKey("Ingredients"sv).expectArray().expectString("Salt"sv).expectString("Octopus"sv).expectString("Crab"sv).expectEnd();
+                composer.expectKey("Ingredients"sv).expectArray().expectString("\"Salt\""sv).expectString("Octopus"sv).expectString("Crab"sv).expectEnd();
                 composer.expectKey("Gluten Free"sv).expectBoolean(false);
             composer.expectEnd();
         composer.expectEnd();
@@ -725,10 +740,10 @@ R"({
     ],
     "Dishes": [
         {
-            "Name": "Basket o' Barnacles",
-            "Price": 5.45,
-            "Ingredients": [ "Salt", "Barnacles" ],
-            "Gluten Free": false
+            'Name': 'Basket o\' Barnacles',
+            'Price': 5.45,
+            'Ingredients': [ '"Salt"', 'Barnacles' ],
+            'Gluten Free': false
         },
         {
             "Name": "Two Tuna",
@@ -739,7 +754,7 @@ R"({
         {
             "Name": "18 Leg Bouquet",
             "Price": 18.18,
-            "Ingredients": [ "Salt", "Octopus", "Crab", ],
+            "Ingredients": [ "\"Salt\"", "Octopus", "Crab", ],
             "Gluten Free": false
         }
     ],
