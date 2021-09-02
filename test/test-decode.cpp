@@ -155,10 +155,6 @@ TEST(decode, object) {
     { // No comma between elements
         EXPECT_THROW(decode(R"({ "a": 0 "b": 1 })", dummyComposer, nullptr), DecodeError);
     }
-    { // Comma after last element
-        EXPECT_THROW(decode(R"({ "a": 0, })", dummyComposer, nullptr), DecodeError);
-        EXPECT_THROW(decode(R"({ "a": 0, "b": 1, })", dummyComposer, nullptr), DecodeError);
-    }
     { // Empty entry
         EXPECT_THROW(decode(R"({ "a": 0, , "b": 1 })", dummyComposer, nullptr), DecodeError);
     }
@@ -197,10 +193,6 @@ TEST(decode, array) {
     }
     { // No comma between elements
         EXPECT_THROW(decode(R"([ 0 1 ])", dummyComposer, nullptr), DecodeError);
-    }
-    { // Comma after last element
-        EXPECT_THROW(decode(R"([ 0, ])", dummyComposer, nullptr), DecodeError);
-        EXPECT_THROW(decode(R"([ 0, 1, ])", dummyComposer, nullptr), DecodeError);
     }
     { // Empty entry
         EXPECT_THROW(decode(R"([ 0, , 1 ])", dummyComposer, nullptr), DecodeError);
@@ -514,18 +506,65 @@ TEST(decode, extraneousWhitespace) {
     EXPECT_TRUE(composer.isDone());
 }
 
+TEST(decode, trailingComma) {
+    { // Valid
+        ExpectantComposer composer;
+        composer.expectSignedInteger(0);
+        decode(R"(0,)"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectSignedInteger(0);
+        decode(R"(0, )"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectSignedInteger(0);
+        decode(R"(0 ,)"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectArray().expectSignedInteger(0).expectEnd();
+        decode(R"([0,])"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectArray().expectSignedInteger(0).expectEnd();
+        decode(R"([0, ])"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectArray().expectSignedInteger(0).expectEnd();
+        decode(R"([0 ,])"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectObject().expectKey("k"sv).expectSignedInteger(0).expectEnd();
+        decode(R"({"k":0,})"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectObject().expectKey("k"sv).expectSignedInteger(0).expectEnd();
+        decode(R"({"k":0, })"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectObject().expectKey("k"sv).expectSignedInteger(0).expectEnd();
+        decode(R"({"k":0 ,})"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+    }
+    { // Invalid
+        EXPECT_THROW(decode(R"(0,,)"sv, dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(0 ,,)"sv, dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(0, ,)"sv, dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(0,, )"sv, dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"([0,,])"sv, dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"([0 ,,])"sv, dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"([0, ,])"sv, dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"([0,, ])"sv, dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"({"k":0,,})"sv, dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"({"k":0 ,,})"sv, dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"({"k":0, ,})"sv, dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"({"k":0,, })"sv, dummyComposer, nullptr), DecodeError);
+    }
+}
+
 TEST(decode, misc) {
     { // Empty
-        EXPECT_THROW(decode(R"()", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"()"sv, dummyComposer, nullptr), DecodeError);
     }
     { // Only whitespace
-        EXPECT_THROW(decode(R"(   )", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(   )"sv, dummyComposer, nullptr), DecodeError);
     }
     { // Unknown value
-        EXPECT_THROW(decode(R"(v)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(v)"sv, dummyComposer, nullptr), DecodeError);
     }
     { // Multiple root values
-        EXPECT_THROW(decode(R"(1 2)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(1 2)"sv, dummyComposer, nullptr), DecodeError);
     }
 }
 
@@ -591,7 +630,7 @@ R"({
     "Employees": [
         { "Name": "Ol' Joe Fisher", "Title": "Fisherman", "Age": 69 },
         { "Name": "Mark Rower", "Title": "Cook", "Age": 41 },
-        { "Name": "Phineas", "Title": "Server Boy", "Age": 19 }
+        { "Name": "Phineas", "Title": "Server Boy", "Age": 19 },
     ],
     "Dishes": [
         {
@@ -609,7 +648,7 @@ R"({
         {
             "Name": "18 Leg Bouquet",
             "Price": 18.18,
-            "Ingredients": [ "Salt", "Octopus", "Crab" ],
+            "Ingredients": [ "Salt", "Octopus", "Crab", ],
             "Gluten Free": false
         }
     ],
@@ -625,7 +664,7 @@ I do not like them here or there\n\
 I do not like them anywhere\n\
 I do not like green eggs and ham\n\
 I do not like them Sam I am\n\
-"
+",
 })"sv, composer, nullptr);
     EXPECT_TRUE(composer.isDone());
 }

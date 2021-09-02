@@ -1,7 +1,7 @@
 #pragma once
 
 ///
-/// QC JSON 1.4.2
+/// QC JSON 1.4.3
 /// Austin Quick
 /// 2019 - 2021
 /// https://github.com/Daskie/qc-json
@@ -96,6 +96,11 @@ namespace qc::json
             _skipWhitespace();
             _ingestValue(initialState);
             _skipWhitespace();
+
+            // Allow trailing comma
+            if (_tryConsumeChar(',')) {
+                _skipWhitespace();
+            }
 
             if (_pos != _end) {
                 throw DecodeError{"Extraneous content"s, size_t(_pos - _start)};
@@ -238,6 +243,11 @@ namespace qc::json
                     else {
                         _consumeChar(',');
                         _skipWhitespace();
+
+                        // Allow trailing comma
+                        if (_tryConsumeChar('}')) {
+                            break;
+                        }
                     }
                 }
             }
@@ -263,6 +273,11 @@ namespace qc::json
                     else {
                         _consumeChar(',');
                         _skipWhitespace();
+
+                        // Allow trailing comma
+                        if (_tryConsumeChar(']')) {
+                            break;
+                        }
                     }
                 }
             }
