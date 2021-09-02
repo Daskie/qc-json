@@ -111,43 +111,43 @@ std::ostream & operator<<(std::ostream & os, const ExpectantComposer::Element & 
 
 TEST(decode, object) {
     { // Empty
-        ExpectantComposer composer;
+        ExpectantComposer composer{};
         composer.expectObject().expectEnd();
         decode(R"({})"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Single key
-        ExpectantComposer composer;
+        ExpectantComposer composer{};
         composer.expectObject().expectKey("a"sv).expectNull().expectEnd();
         decode(R"({ "a": null })"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Multiple keys
-        ExpectantComposer composer;
+        ExpectantComposer composer{};
         composer.expectObject().expectKey("a"sv).expectNull().expectKey("b"sv).expectNull().expectKey("c"sv).expectNull().expectEnd();
         decode(R"({ "a": null, "b": null, "c": null })"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // No space
-        ExpectantComposer composer;
+        ExpectantComposer composer{};
         composer.expectObject().expectKey("a"sv).expectNull().expectKey("b"sv).expectNull().expectEnd();
         decode(R"({"a":null,"b":null})"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Weird spacing
-        ExpectantComposer composer;
+        ExpectantComposer composer{};
         composer.expectObject().expectKey("a"sv).expectNull().expectKey("b"sv).expectNull().expectEnd();
         decode(R"({"a" :null ,"b" :null})"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
-    { // Key not within quotes
-        EXPECT_THROW(decode(R"({ a: 0 })", dummyComposer, nullptr), DecodeError);
+    { // Empty key
+        ExpectantComposer composer{};
+        composer.expectObject().expectKey(""sv).expectNull().expectEnd();
+        decode(R"({ "": null })"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
     }
     { // No colon after key
         EXPECT_THROW(decode(R"({ "a" 0 })", dummyComposer, nullptr), DecodeError);
-    }
-    { // Empty key
-        EXPECT_THROW(decode(R"({ "": 0 })", dummyComposer, nullptr), DecodeError);
     }
     { // Missing value
         EXPECT_THROW(decode(R"({ "a": })", dummyComposer, nullptr), DecodeError);
@@ -158,35 +158,61 @@ TEST(decode, object) {
     { // Empty entry
         EXPECT_THROW(decode(R"({ "a": 0, , "b": 1 })", dummyComposer, nullptr), DecodeError);
     }
+    { // Cut off
+        EXPECT_THROW(decode(R"({)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"({")", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"({"a)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"({"a")", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"({"a":)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"({"a":0)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"({"a":0,)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"({"a":0,")", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"({"a":0,"b)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"({"a":0,"b")", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"({"a":0,"b":)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"({"a":0,"b":1)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"("a":0,"b":1})", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(a":0,"b":1})", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(":0,"b":1})", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(:0,"b":1})", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(0,"b":1})", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(,"b":1})", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"("b":1})", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(b":1})", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(":1})", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(:1})", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(1})", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(})", dummyComposer, nullptr), DecodeError);
+    }
 }
 
 TEST(decode, array) {
     { // Empty
-        ExpectantComposer composer;
+        ExpectantComposer composer{};
         composer.expectArray().expectEnd();
         decode(R"([])"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Single element
-        ExpectantComposer composer;
+        ExpectantComposer composer{};
         composer.expectArray().expectNull().expectEnd();
         decode(R"([ null ])"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Multiple elements
-        ExpectantComposer composer;
+        ExpectantComposer composer{};
         composer.expectArray().expectNull().expectNull().expectNull().expectEnd();
         decode(R"([ null, null, null ])"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // No space
-        ExpectantComposer composer;
+        ExpectantComposer composer{};
         composer.expectArray().expectNull().expectNull().expectEnd();
         decode(R"([null,null])"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Weird spacing
-        ExpectantComposer composer;
+        ExpectantComposer composer{};
         composer.expectArray().expectNull().expectNull().expectEnd();
         decode(R"([null ,null])"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
@@ -197,17 +223,27 @@ TEST(decode, array) {
     { // Empty entry
         EXPECT_THROW(decode(R"([ 0, , 1 ])", dummyComposer, nullptr), DecodeError);
     }
+    { // Cut off
+        EXPECT_THROW(decode(R"([)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"([0)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"([0,)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"([0,1)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(0,1])", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(,1])", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(1])", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(])", dummyComposer, nullptr), DecodeError);
+    }
 }
 
 TEST(decode, string) {
     { // Empty string
-        ExpectantComposer composer;
+        ExpectantComposer composer{};
         composer.expectString(""sv);
         decode(R"("")"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // All printable
-        ExpectantComposer composer;
+        ExpectantComposer composer{};
         composer.expectString(R"( !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~)"sv);
         decode(R"(" !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~")"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
@@ -222,7 +258,7 @@ TEST(decode, string) {
         }
     }
     { // Escape characters
-        ExpectantComposer composer;
+        ExpectantComposer composer{};
         composer.expectString("\0\b\t\n\v\f\r"sv);
         decode(R"("\0\b\t\n\v\f\r")"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
@@ -237,7 +273,7 @@ TEST(decode, string) {
         EXPECT_THROW(decode("\"\\\0\"", dummyComposer, nullptr), DecodeError);
     }
     { // 'x' code point
-        ExpectantComposer composer;
+        ExpectantComposer composer{};
         std::string expectedStr(256, '\0');
         std::string decodeStr(1 + 256 * 4 + 1, '\0');
         decodeStr.front() = '"';
@@ -251,7 +287,7 @@ TEST(decode, string) {
         EXPECT_TRUE(composer.isDone());
     }
     { // 'u' code point
-        ExpectantComposer composer;
+        ExpectantComposer composer{};
         std::string expectedStr(256, '\0');
         std::string decodeStr(1 + 256 * 6 + 1, '\0');
         decodeStr.front() = '"';
@@ -283,7 +319,7 @@ TEST(decode, string) {
         EXPECT_THROW(decode(R"("abc)", dummyComposer, nullptr), DecodeError);
         EXPECT_THROW(decode(R"([ "abc ])", dummyComposer, nullptr), DecodeError);
     }
-    { // Excaped newlines
+    { // Escaped newlines
         ExpectantComposer composer{};
         composer.expectString("abc");
         decode("\"a\\\nb\\\nc\"", composer, nullptr);
@@ -301,31 +337,31 @@ TEST(decode, string) {
 
 TEST(decode, signedInteger) {
     { // Zero
-        ExpectantComposer composer;
+        ExpectantComposer composer{};
         composer.expectSignedInteger(0);
         decode(R"(0)"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Normal
-        ExpectantComposer composer;
+        ExpectantComposer composer{};
         composer.expectSignedInteger(123);
         decode(R"(123)"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Min
-        ExpectantComposer composer;
+        ExpectantComposer composer{};
         composer.expectSignedInteger(std::numeric_limits<int64_t>::min());
         decode(R"(-9223372036854775808)"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Max
-        ExpectantComposer composer;
+        ExpectantComposer composer{};
         composer.expectSignedInteger(std::numeric_limits<int64_t>::max());
         decode(R"(9223372036854775807)"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Trailing zeroes
-        ExpectantComposer composer;
+        ExpectantComposer composer{};
         composer.expectSignedInteger(123);
         decode(R"(123.000)"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
@@ -346,19 +382,19 @@ TEST(decode, signedInteger) {
 
 TEST(decode, unsignedInteger) {
     { // Min unsigned
-        ExpectantComposer composer;
+        ExpectantComposer composer{};
         composer.expectUnsignedInteger(uint64_t(std::numeric_limits<int64_t>::max()) + 1u);
         decode(R"(9223372036854775808)"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Max unsigned
-        ExpectantComposer composer;
+        ExpectantComposer composer{};
         composer.expectUnsignedInteger(std::numeric_limits<uint64_t>::max());
         decode(R"(18446744073709551615)"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Trailing zeroes
-        ExpectantComposer composer;
+        ExpectantComposer composer{};
         composer.expectUnsignedInteger(10000000000000000000u);
         decode(R"(10000000000000000000.000)"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
@@ -379,73 +415,73 @@ TEST(decode, unsignedInteger) {
 
 TEST(decode, floater) {
     { // Fractional
-        ExpectantComposer composer;
+        ExpectantComposer composer{};
         composer.expectFloater(123.456);
         decode(R"(123.456)", composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Exponent lowercase
-        ExpectantComposer composer;
+        ExpectantComposer composer{};
         composer.expectFloater(123.456e17);
         decode(R"(123.456e17)", composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Exponent uppercase
-        ExpectantComposer composer;
+        ExpectantComposer composer{};
         composer.expectFloater(123.456e17);
         decode(R"(123.456E17)", composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Positive exponent
-        ExpectantComposer composer;
+        ExpectantComposer composer{};
         composer.expectFloater(123.456e17);
         decode(R"(123.456e+17)", composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Negative exponent
-        ExpectantComposer composer;
+        ExpectantComposer composer{};
         composer.expectFloater(-123.456e-17);
         decode(R"(-123.456e-17)", composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Exponent without fraction
-        ExpectantComposer composer;
+        ExpectantComposer composer{};
         composer.expectFloater(123.0e34);
         decode(R"(123e34)", composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Max integer
-        ExpectantComposer composer;
+        ExpectantComposer composer{};
         composer.expectFloater(9007199254740991.0);
         decode(R"(9007199254740991.0e0)", composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Oversized signed integer
-        ExpectantComposer composer;
+        ExpectantComposer composer{};
         composer.expectFloater(-9223372036854775809.0);
         decode(R"(-9223372036854775809)", composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Oversized unsigned integer
-        ExpectantComposer composer;
+        ExpectantComposer composer{};
         composer.expectFloater(18446744073709551616.0);
         decode(R"(18446744073709551616)", composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // infinity
-        ExpectantComposer composer;
+        ExpectantComposer composer{};
         composer.expectFloater(std::numeric_limits<double>::infinity());
         decode(R"(inf)", composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // -infinity
-        ExpectantComposer composer;
+        ExpectantComposer composer{};
         composer.expectFloater(-std::numeric_limits<double>::infinity());
         decode(R"(-inf)", composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // NaN
-        ExpectantComposer composer;
+        ExpectantComposer composer{};
         composer.expectFloater(std::numeric_limits<double>::quiet_NaN());
         decode(R"(nan)", composer, nullptr);
         EXPECT_TRUE(composer.isDone());
@@ -472,13 +508,13 @@ TEST(decode, floater) {
 
 TEST(decode, boolean) {
     { // True
-        ExpectantComposer composer;
+        ExpectantComposer composer{};
         composer.expectBoolean(true);
         decode(R"(true)"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // False
-        ExpectantComposer composer;
+        ExpectantComposer composer{};
         composer.expectBoolean(false);
         decode(R"(false)"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
@@ -486,21 +522,21 @@ TEST(decode, boolean) {
 }
 
 TEST(decode, null) {
-    ExpectantComposer composer;
+    ExpectantComposer composer{};
     composer.expectNull();
     decode(R"(null)"sv, composer, nullptr);
     EXPECT_TRUE(composer.isDone());
 }
 
 TEST(decode, noWhitespace) {
-    ExpectantComposer composer;
+    ExpectantComposer composer{};
     composer.expectObject().expectKey("a"sv).expectArray().expectString("abc"sv).expectSignedInteger(-123).expectFloater(-123.456e-78).expectBoolean(true).expectNull().expectEnd().expectEnd();
     decode(R"({"a":["abc",-123,-123.456e-78,true,null]})"sv, composer, nullptr);
     EXPECT_TRUE(composer.isDone());
 }
 
 TEST(decode, extraneousWhitespace) {
-    ExpectantComposer composer;
+    ExpectantComposer composer{};
     composer.expectObject().expectEnd();
     decode(" \t\n\r\v{} \t\n\r\v"sv, composer, nullptr);
     EXPECT_TRUE(composer.isDone());
@@ -508,7 +544,7 @@ TEST(decode, extraneousWhitespace) {
 
 TEST(decode, trailingComma) {
     { // Valid
-        ExpectantComposer composer;
+        ExpectantComposer composer{};
         composer.expectSignedInteger(0);
         decode(R"(0,)"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
@@ -538,6 +574,9 @@ TEST(decode, trailingComma) {
         EXPECT_TRUE(composer.isDone());
     }
     { // Invalid
+        EXPECT_THROW(decode(R"(,)"sv, dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"( ,)"sv, dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(, )"sv, dummyComposer, nullptr), DecodeError);
         EXPECT_THROW(decode(R"(0,,)"sv, dummyComposer, nullptr), DecodeError);
         EXPECT_THROW(decode(R"(0 ,,)"sv, dummyComposer, nullptr), DecodeError);
         EXPECT_THROW(decode(R"(0, ,)"sv, dummyComposer, nullptr), DecodeError);
@@ -553,6 +592,57 @@ TEST(decode, trailingComma) {
     }
 }
 
+TEST(decode, identifiers) {
+    { // Valid
+        ExpectantComposer composer{};
+        composer.expectObject().expectKey("a"sv).expectSignedInteger(0).expectEnd();
+        decode(R"({a:0})"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectObject().expectKey("0"sv).expectSignedInteger(0).expectEnd();
+        decode(R"({0:0})"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectObject().expectKey("_"sv).expectSignedInteger(0).expectEnd();
+        decode(R"({_:0})"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectObject().expectKey("_"sv).expectSignedInteger(0).expectEnd();
+        decode(R"({ _ : 0 })"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectObject().expectKey("___"sv).expectSignedInteger(0).expectEnd();
+        decode(R"({ ___ : 0 })"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+    }
+    { // Multiple elements
+        ExpectantComposer composer{};
+        composer.expectObject().expectKey("a"sv).expectSignedInteger(0).expectKey("b"sv).expectSignedInteger(1).expectEnd();
+        decode(R"({ a: 0, b: 1 })"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectObject().expectKey("a"sv).expectSignedInteger(0).expectKey("b"sv).expectSignedInteger(1).expectEnd();
+        decode(R"({ "a": 0, b: 1 })"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectObject().expectKey("a"sv).expectSignedInteger(0).expectKey("b"sv).expectSignedInteger(1).expectEnd();
+        decode(R"({ a: 0, "b": 1 })"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+    }
+    { // All valid characters
+        ExpectantComposer composer{};
+        composer.expectObject().expectKey("_0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"sv).expectSignedInteger(0).expectEnd();
+        decode(R"({_0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz:0})"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+    }
+    { // All invalid characters
+        for (int i{0}; i < 256; ++i) {
+            if (!std::isalnum(i) && i != '_') {
+                EXPECT_THROW(decode("{"s + char(i) + ":0}"s, dummyComposer, nullptr), DecodeError);
+            }
+        }
+    }
+    { // Invalid patterns
+        EXPECT_THROW(decode(R"({"a:0})"sv, dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"({a":0})"sv, dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"({a b:0})"sv, dummyComposer, nullptr), DecodeError);
+    }
+}
+
 TEST(decode, misc) {
     { // Empty
         EXPECT_THROW(decode(R"()"sv, dummyComposer, nullptr), DecodeError);
@@ -565,11 +655,12 @@ TEST(decode, misc) {
     }
     { // Multiple root values
         EXPECT_THROW(decode(R"(1 2)"sv, dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(1, 2)"sv, dummyComposer, nullptr), DecodeError);
     }
 }
 
 TEST(decode, general) {
-    ExpectantComposer composer;
+    ExpectantComposer composer{};
     composer.expectObject();
         composer.expectKey("Name"sv).expectString("Salt's Crust"sv);
         composer.expectKey("Founded"sv).expectSignedInteger(1964);
@@ -628,9 +719,9 @@ R"({
     "Name": "Salt's Crust",
     "Founded": 1964,
     "Employees": [
-        { "Name": "Ol' Joe Fisher", "Title": "Fisherman", "Age": 69 },
-        { "Name": "Mark Rower", "Title": "Cook", "Age": 41 },
-        { "Name": "Phineas", "Title": "Server Boy", "Age": 19 },
+        { Name: "Ol' Joe Fisher", Title: "Fisherman", Age: 69 },
+        { Name: "Mark Rower", Title: "Cook", Age: 41 },
+        { Name: "Phineas", Title: "Server Boy", Age: 19 },
     ],
     "Dishes": [
         {

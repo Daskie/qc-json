@@ -221,14 +221,12 @@ namespace qc::json
 
             if (!_tryConsumeChar('}')) {
                 while (true) {
-                    if (*_pos != '"') {
-                        throw DecodeError{"Expected key"s, size_t(_pos - _start)};
+                    // Parse key
+                    if (_pos >= _end) {
+                        throw DecodeError{"Expected key", size_t(_pos -_start)};
                     }
-                    const string_view key{_consumeString()};
-                    if (key.empty()) {
-                        throw DecodeError{"Key is empty"s, size_t(_pos - _start)};
-                    }
-                    _composer.key(string(key), innerState);
+                    const string_view key{*_pos == '"' ? _consumeString() : _consumeIdentifier()};
+                    _composer.key(string{key}, innerState);
                     _skipWhitespace();
 
                     _consumeChar(':');
@@ -374,6 +372,36 @@ namespace qc::json
             _pos += digits;
 
             return char(val);
+        }
+
+        string_view _consumeIdentifier()
+        {
+            _stringBuffer.clear();
+
+            // Ensure identifier is at least one character long
+            char c{*_pos};
+            if (std::isalnum(uchar(c)) || c == '_') {
+                _stringBuffer.push_back(c);
+                ++_pos;
+            }
+            else {
+                throw DecodeError{"Expected identifier", size_t(_pos - _start)};
+            }
+
+            while (true) {
+                if (_pos >= _end) {
+                    return _stringBuffer;
+                }
+
+                c = *_pos;
+                if (std::isalnum(uchar(c)) || c == '_') {
+                    _stringBuffer.push_back(c);
+                    ++_pos;
+                }
+                else {
+                    return _stringBuffer;
+                }
+            }
         }
 
         bool _isInteger() const
