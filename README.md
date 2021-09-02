@@ -167,6 +167,18 @@ TODO
 
 A string may only contain [printable](https://en.cppreference.com/w/cpp/string/byte/isprint) characters, with the exception of escaped newlines.
 
+A string may be surrounded in either single or double quotes. Any of the same quotes within a string must be escaped
+with a backslash.
+
+Example:
+
+```json5
+[
+    "This is valid", 'and so is this', "but not this mismatch',
+    'And don\'t forget to', "escape your \"quotes\""
+]
+```
+
 #### Escape Sequences
 
 The following escape sequences are replaced with their corresponding code point:
