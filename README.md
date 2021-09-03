@@ -1,4 +1,5 @@
 # QC JSON
+
 ###### Clean, quick, and simple JSON library for C++20
 
 ### Some JSON
@@ -112,7 +113,7 @@ qc::json::Encoder encoder{};
 encoder << object;
     encoder << "Name" << "18 Leg Bouquet";
     encoder << "Price" << 17.99;
-    encoder << "Ingredients" << array << uniline << "Crab" << "Octopus" << end;
+    encoder << "Ingredients" << array(uniline) << "Crab" << "Octopus" << end;
     encoder << "Gluten Free" << true;
     encoder << "Sold" << 69;
 encoder << end;
@@ -239,11 +240,11 @@ NaN can be represented as `nan`, `NaN`, `+nan`, `+NaN`, `-nan`, or `-NaN`
 
 Hexadecimal can be represented using the `0x` or `0X` prefix, e.g. `0x1A`.
 
-OctalToken can be represented using the `0o` or `0OX` prefix, e.g. `0o17`.
+Octal can be represented using the `0o` or `0OX` prefix, e.g. `0o17`.
 
-BinaryToken can be represented using the `0b` or `0B` prefix. `0b1101`.
+Binary can be represented using the `0b` or `0B` prefix. `0b1101`.
 
-Hexadecimal, OctalToken, and BinaryToken numbers must be positive and may not have a sign. 
+Hexadecimal, Octal, and Binary numbers must be positive and may not have a sign. 
 
 ### Null
 
