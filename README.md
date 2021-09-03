@@ -227,6 +227,10 @@ Valid: `1.` `.1` `1.e2` `.1e2`
 
 Invalid: `.` `.e2` `1e.2` `1e2.`
 
+Numbers may also have leading zeroes.
+
+Valid: `0123` `00` `00.0` `01e01` `00e00`
+
 Positive infinity can be represented as `inf`, `Infinity`, `+inf`, or `+Infinity`
 
 Negative infinity can be represented as `-inf` or `-Infinity`

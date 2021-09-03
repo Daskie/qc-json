@@ -399,6 +399,21 @@ TEST(decode, signedInteger) {
         decode(R"(123.000)"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
+    { // Leading zeroes
+        ExpectantComposer composer{};
+        composer.expectSignedInteger(123);
+        decode(R"(0123)"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectSignedInteger(0);
+        decode(R"(00)"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectSignedInteger(0);
+        decode(R"(+00)"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectSignedInteger(0);
+        decode(R"(-00)"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+    }
     { // Fractional zero
         ExpectantComposer composer{};
         composer.expectSignedInteger(0);
@@ -525,6 +540,27 @@ TEST(decode, floater) {
         ExpectantComposer composer{};
         composer.expectFloater(123);
         decode(R"(123.e0)", composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+    }
+    { // Leading zeroes
+        ExpectantComposer composer{};
+        composer.expectFloater(1.2);
+        decode(R"(01.2)", composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectFloater(0.2);
+        decode(R"(00.2)", composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectFloater(1e02);
+        decode(R"(1e02)", composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectFloater(1e+02);
+        decode(R"(1e+02)", composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectFloater(1e-02);
+        decode(R"(1e-02)", composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectFloater(1e00);
+        decode(R"(1e00)", composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Valid infinity
