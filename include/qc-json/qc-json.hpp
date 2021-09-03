@@ -1,7 +1,7 @@
 #pragma once
 
 ///
-/// QC JSON 1.4.5
+/// QC JSON 1.4.6
 /// Austin Quick
 /// 2019 - 2021
 /// https://github.com/Daskie/qc-json

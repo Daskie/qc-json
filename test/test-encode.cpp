@@ -302,6 +302,90 @@ TEST(encode, unsignedInteger) {
     }
 }
 
+TEST(encode, hex) {
+    { // Zero
+        Encoder encoder{};
+        encoder << hex << 0u;
+        EXPECT_EQ(R"(0x0)"s, encoder.finish());
+    }
+    { // Typical
+        Encoder encoder{};
+        encoder << hex << 26u;
+        EXPECT_EQ(R"(0x1A)"s, encoder.finish());
+    }
+    { // Max unsigned
+        Encoder encoder{};
+        encoder << hex << std::numeric_limits<uint64_t>::max();
+        EXPECT_EQ(R"(0xFFFFFFFFFFFFFFFF)"s, encoder.finish());
+    }
+    { // Min signed
+        Encoder encoder{};
+        encoder << hex << std::numeric_limits<int64_t>::min();
+        EXPECT_EQ(R"(0x8000000000000000)"s, encoder.finish());
+    }
+    { // -1
+        Encoder encoder{};
+        encoder << hex << -1;
+        EXPECT_EQ(R"(0xFFFFFFFFFFFFFFFF)"s, encoder.finish());
+    }
+}
+
+TEST(encode, octal) {
+    { // Zero
+        Encoder encoder{};
+        encoder << octal << 0u;
+        EXPECT_EQ(R"(0o0)"s, encoder.finish());
+    }
+    { // Typical
+        Encoder encoder{};
+        encoder << octal << 10u;
+        EXPECT_EQ(R"(0o12)"s, encoder.finish());
+    }
+    { // Max unsigned
+        Encoder encoder{};
+        encoder << octal << std::numeric_limits<uint64_t>::max();
+        EXPECT_EQ(R"(0o1777777777777777777777)"s, encoder.finish());
+    }
+    { // Min signed
+        Encoder encoder{};
+        encoder << octal << std::numeric_limits<int64_t>::min();
+        EXPECT_EQ(R"(0o1000000000000000000000)"s, encoder.finish());
+    }
+    { // -1
+        Encoder encoder{};
+        encoder << octal << -1;
+        EXPECT_EQ(R"(0o1777777777777777777777)"s, encoder.finish());
+    }
+}
+
+TEST(encode, binary) {
+    { // Zero
+        Encoder encoder{};
+        encoder << binary << 0u;
+        EXPECT_EQ(R"(0b0)"s, encoder.finish());
+    }
+    { // Typical
+        Encoder encoder{};
+        encoder << binary << 5u;
+        EXPECT_EQ(R"(0b101)"s, encoder.finish());
+    }
+    { // Max unsigned
+        Encoder encoder{};
+        encoder << binary << std::numeric_limits<uint64_t>::max();
+        EXPECT_EQ(R"(0b1111111111111111111111111111111111111111111111111111111111111111)"s, encoder.finish());
+    }
+    { // Min signed
+        Encoder encoder{};
+        encoder << binary << std::numeric_limits<int64_t>::min();
+        EXPECT_EQ(R"(0b1000000000000000000000000000000000000000000000000000000000000000)"s, encoder.finish());
+    }
+    { // -1
+        Encoder encoder{};
+        encoder << binary << -1;
+        EXPECT_EQ(R"(0b1111111111111111111111111111111111111111111111111111111111111111)"s, encoder.finish());
+    }
+}
+
 TEST(encode, floater) {
     { // Zero
         Encoder encoder{};
@@ -513,6 +597,34 @@ TEST(encode, identifiers) {
     }
 }
 
+TEST(encode, baseReset) {
+    Encoder encoder{uniline};
+    encoder << hex << 0;
+    EXPECT_EQ(R"(0x0)", encoder.finish());
+    encoder << 0;
+    EXPECT_EQ(R"(0)", encoder.finish());
+    encoder << hex << decimal << 0;
+    EXPECT_EQ(R"(0)", encoder.finish());
+    encoder << array << hex << 0 << 1 << end;
+    EXPECT_EQ(R"([ 0x0, 1 ])", encoder.finish());
+    encoder << array << hex << 1.2 << 0 << end;
+    EXPECT_EQ(R"([ 1.2, 0 ])", encoder.finish());
+    encoder << array << hex << nullptr << 0 << end;
+    EXPECT_EQ(R"([ null, 0 ])", encoder.finish());
+    encoder << array << hex << "ok" << 0 << end;
+    EXPECT_EQ(R"([ "ok", 0 ])", encoder.finish());
+    encoder << array << hex << array << end << 0 << end;
+    EXPECT_EQ(R"([ [], 0 ])", encoder.finish());
+    encoder << array << hex << object << end << 0 << end;
+    EXPECT_EQ(R"([ {}, 0 ])", encoder.finish());
+    encoder << object << "k" << hex << 0 << end;
+    EXPECT_EQ(R"({ "k": 0x0 })", encoder.finish());
+    encoder << object << hex << "k" << 0 << end;
+    EXPECT_EQ(R"({ "k": 0 })", encoder.finish());
+    encoder << array << array << hex << end << 0 << end;
+    EXPECT_EQ(R"([ [], 0 ])", encoder.finish());
+}
+
 TEST(encode, misc) {
     { // Extraneous content
         Encoder encoder{};
@@ -563,6 +675,7 @@ I do not like them anywhere
 I do not like green eggs and ham
 I do not like them Sam I am
 )";
+        encoder << "Magic Numbers"sv << array << uniline << hex << 777 << octal << 777u << binary << 777 << end;
     encoder << end;
 
     EXPECT_EQ(R"({
@@ -595,6 +708,7 @@ I do not like them Sam I am
     ],
     "Profit Margin": null,
     "Ha\x03r Name": "M\0\0n",
-    "Green Eggs and Ham": "I do not like them in a box\nI do not like them with a fox\nI do not like them in a house\nI do not like them with a mouse\nI do not like them here or there\nI do not like them anywhere\nI do not like green eggs and ham\nI do not like them Sam I am\n"
+    "Green Eggs and Ham": "I do not like them in a box\nI do not like them with a fox\nI do not like them in a house\nI do not like them with a mouse\nI do not like them here or there\nI do not like them anywhere\nI do not like green eggs and ham\nI do not like them Sam I am\n",
+    "Magic Numbers": [ 0x309, 0o1411, 0b1100001001 ]
 })"s, encoder.finish());
 }

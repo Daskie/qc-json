@@ -771,6 +771,11 @@ TEST(json, general) {
     "Founded": 1964,
     "Green Eggs and Ham": "I do not like them in a box\nI do not like them with a fox\nI do not like them in a house\nI do not like them with a mouse\nI do not like them here or there\nI do not like them anywhere\nI do not like green eggs and ham\nI do not like them Sam I am\n",
     "Ha\x03r Name": "M\0\0n",
+    "Magic Numbers": [
+        777,
+        777,
+        777
+    ],
     "Name": "Salt's Crust",
     "Profit Margin": null
 })"s);

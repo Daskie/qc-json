@@ -1,7 +1,7 @@
 #pragma once
 
 ///
-/// QC JSON 1.4.5
+/// QC JSON 1.4.6
 /// Austin Quick
 /// 2019 - 2021
 /// https://github.com/Daskie/qc-json
@@ -87,6 +87,17 @@ namespace qc::json
             uniline,   /// Elements are put on one line separated by spaces
             compact    /// No whitespace is used whatsoever
         };
+
+        ///
+        /// Stream this to specify the base the next number should be encoded in
+        ///
+        enum Base
+        {
+            binary = 2,
+            octal = 8,
+            decimal = 10,
+            hex = 16
+        };
     }
 
     ///
@@ -145,6 +156,18 @@ namespace qc::json
         Encoder & operator<<(Density density);
 
         ///
+        /// Set the numeric base of the next number to be encoded. If this is anything other than decimal, the number
+        /// will be represented in raw, unsigned, two's-compliment form. Negative numbers are encoded as if they were
+        /// positive. Floating point numbers are unaffected.
+        ///
+        /// This flag is defaulted back to decimal after ANY value is streamed.
+        ///
+        /// @param base the base for the next number
+        /// @return this
+        ///
+        Encoder & operator<<(Base base);
+
+        ///
         /// Encode a value into the JSON
         ///
         /// @param v the value to encode
@@ -193,6 +216,8 @@ namespace qc::json
         int _indentation{0};
         bool _isKey{false};
         bool _isComplete{false};
+        Base _base{decimal};
+        char _buffer[68]{};
 
         template <typename T> void _val(T v);
 
@@ -207,6 +232,7 @@ namespace qc::json
         void _encode(string_view val);
         void _encode(int64_t val);
         void _encode(uint64_t val);
+        void _encode(uint64_t val, Base base);
         void _encode(double val);
         void _encode(bool val);
         void _encode(std::nullptr_t);
@@ -245,7 +271,8 @@ namespace qc::json
         _state{std::move(other._state)},
         _indentation{std::exchange(other._indentation, 0)},
         _isKey{std::exchange(other._isKey, false)},
-        _isComplete{std::exchange(other._isComplete, false)}
+        _isComplete{std::exchange(other._isComplete, false)},
+        _base{std::exchange(other._base, decimal)}
     {}
 
     inline Encoder & Encoder::operator=(Encoder && other) noexcept
@@ -258,6 +285,7 @@ namespace qc::json
         _indentation = std::exchange(other._indentation, 0);
         _isKey = std::exchange(other._isKey, false);
         _isComplete = std::exchange(other._isComplete, false);
+        _base = std::exchange(other._base, decimal);
 
         return *this;
     }
@@ -275,6 +303,7 @@ namespace qc::json
         }
         _state.push_back(_State{false, false, density});
         _isKey = false;
+        _base = decimal;
 
         return *this;
     }
@@ -292,6 +321,7 @@ namespace qc::json
         }
         _state.push_back(_State{true, false, density});
         _isKey = false;
+        _base = decimal;
 
         return *this;
     }
@@ -327,6 +357,8 @@ namespace qc::json
             _isComplete = true;
         }
 
+        _base = decimal;
+
         return *this;
     }
 
@@ -345,6 +377,13 @@ namespace qc::json
         if (density > state.density) {
             state.density = density;
         }
+
+        return *this;
+    }
+
+    inline Encoder & Encoder::operator<<(const Base base)
+    {
+        _base = base;
 
         return *this;
     }
@@ -476,6 +515,7 @@ namespace qc::json
             _state.back().content = true;
         }
         _isKey = false;
+        _base = decimal;
     }
 
     inline void Encoder::_key(const string_view key)
@@ -507,6 +547,7 @@ namespace qc::json
         }
 
         _isKey = true;
+        _base = decimal;
     }
 
     template <bool unchecked>
@@ -581,23 +622,55 @@ namespace qc::json
 
     inline void Encoder::_encode(const int64_t v)
     {
-        char buffer[24];
-        const std::to_chars_result res{std::to_chars(buffer, buffer + sizeof(buffer), v)};
-        _oss << string_view{buffer, size_t(res.ptr - buffer)};
+        if (_base != decimal) {
+            _encode(uint64_t(v), _base);
+            return;
+        }
+
+        const std::to_chars_result res{std::to_chars(_buffer, _buffer + sizeof(_buffer), v)};
+        _oss << string_view{_buffer, size_t(res.ptr - _buffer)};
     }
 
     inline void Encoder::_encode(const uint64_t v)
     {
-        char buffer[24];
-        const std::to_chars_result res{std::to_chars(buffer, buffer + sizeof(buffer), v)};
-        _oss << string_view{buffer, size_t(res.ptr - buffer)};
+        if (_base != decimal) {
+            _encode(v, _base);
+            return;
+        }
+
+        const std::to_chars_result res{std::to_chars(_buffer, _buffer + sizeof(_buffer), v)};
+        _oss << string_view{_buffer, size_t(res.ptr - _buffer)};
+    }
+
+    inline void Encoder::_encode(const uint64_t v, const Base base)
+    {
+        switch (base) {
+            case binary: _oss << "0b"sv; break;
+            case octal: _oss << "0o"sv; break;
+            case hex: _oss << "0x"sv; break;
+            default:
+                throw EncodeError{"Invalid base"s};
+        }
+
+        const std::to_chars_result res{std::to_chars(_buffer, _buffer + sizeof(_buffer), v, base)};
+        const size_t length{size_t(res.ptr - _buffer)};
+
+        // Manually convert to uppercase hex because apparently `std::to_chars` doesn't have an option for that
+        if (base == hex) {
+            for (size_t i{0u}; i < length; ++i) {
+                if (_buffer[i] >= 'a') {
+                    _buffer[i] -= ('a' - 'A');
+                }
+            }
+        }
+
+        _oss << string_view{_buffer, length};
     }
 
     inline void Encoder::_encode(const double v)
     {
-        char buffer[32];
-        const std::to_chars_result res{std::to_chars(buffer, buffer + sizeof(buffer), v)};
-        _oss << string_view{buffer, size_t(res.ptr - buffer)};
+        const std::to_chars_result res{std::to_chars(_buffer, _buffer + sizeof(_buffer), v)};
+        _oss << string_view{_buffer, size_t(res.ptr - _buffer)};
     }
 
     inline void Encoder::_encode(const bool v)

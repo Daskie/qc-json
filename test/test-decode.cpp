@@ -469,6 +469,171 @@ TEST(decode, unsignedInteger) {
     }
 }
 
+TEST(decode, hex) {
+    { // Zero
+        ExpectantComposer composer{};
+        composer.expectUnsignedInteger(0u);
+        decode(R"(0x0)"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+    }
+    { // Lowercase
+        ExpectantComposer composer{};
+        composer.expectUnsignedInteger(26u);
+        decode(R"(0x1a)"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+    }
+    { // Uppercase
+        ExpectantComposer composer{};
+        composer.expectUnsignedInteger(26u);
+        decode(R"(0X1A)"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+    }
+    { // Max
+        ExpectantComposer composer{};
+        composer.expectUnsignedInteger(std::numeric_limits<uint64_t>::max());
+        decode(R"(0xFFFFFFFFFFFFFFFF)"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+    }
+    { // Leading zeroes
+        ExpectantComposer composer{};
+        composer.expectUnsignedInteger(26u);
+        decode(R"(0x001A)"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+    }
+    { // Max with leading zeroes
+        ExpectantComposer composer{};
+        composer.expectUnsignedInteger(std::numeric_limits<uint64_t>::max());
+        decode(R"(0x00000000FFFFFFFFFFFFFFFF)"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+    }
+    { // Invalid digit
+        EXPECT_THROW(decode(R"(0x1G)", dummyComposer, nullptr), DecodeError);
+    }
+    { // Signed
+        EXPECT_THROW(decode(R"(+0x1A)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(-0x1A)", dummyComposer, nullptr), DecodeError);
+    }
+    { // Prefix leading zero
+        EXPECT_THROW(decode(R"(00x1A)", dummyComposer, nullptr), DecodeError);
+    }
+    { // Decimal
+        EXPECT_THROW(decode(R"(0x1A.)", dummyComposer, nullptr), DecodeError);
+    }
+    { // Too big
+        EXPECT_THROW(decode(R"(0x10000000000000000)", dummyComposer, nullptr), DecodeError);
+    }
+}
+
+TEST(decode, octal) {
+    { // Zero
+        ExpectantComposer composer{};
+        composer.expectUnsignedInteger(0u);
+        decode(R"(0o0)"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+    }
+    { // Lowercase
+        ExpectantComposer composer{};
+        composer.expectUnsignedInteger(10u);
+        decode(R"(0o12)"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+    }
+    { // Uppercase
+        ExpectantComposer composer{};
+        composer.expectUnsignedInteger(10u);
+        decode(R"(0O12)"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+    }
+    { // Max
+        ExpectantComposer composer{};
+        composer.expectUnsignedInteger(std::numeric_limits<uint64_t>::max());
+        decode(R"(0o1777777777777777777777)"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+    }
+    { // Leading zeroes
+        ExpectantComposer composer{};
+        composer.expectUnsignedInteger(10u);
+        decode(R"(0o0012)"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+    }
+    { // Max with leading zeroes
+        ExpectantComposer composer{};
+        composer.expectUnsignedInteger(std::numeric_limits<uint64_t>::max());
+        decode(R"(0o000000001777777777777777777777)"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+    }
+    { // Invalid digit
+        EXPECT_THROW(decode(R"(0o18)", dummyComposer, nullptr), DecodeError);
+    }
+    { // Signed
+        EXPECT_THROW(decode(R"(+0o12)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(-0o12)", dummyComposer, nullptr), DecodeError);
+    }
+    { // Prefix leading zero
+        EXPECT_THROW(decode(R"(00o12)", dummyComposer, nullptr), DecodeError);
+    }
+    { // Decimal
+        EXPECT_THROW(decode(R"(0o12.)", dummyComposer, nullptr), DecodeError);
+    }
+    { // Too big
+        EXPECT_THROW(decode(R"(0o2000000000000000000000)", dummyComposer, nullptr), DecodeError);
+    }
+}
+
+TEST(decode, binary) {
+    { // Zero
+        ExpectantComposer composer{};
+        composer.expectUnsignedInteger(0u);
+        decode(R"(0b0)"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+    }
+    { // Lowercase
+        ExpectantComposer composer{};
+        composer.expectUnsignedInteger(5u);
+        decode(R"(0b101)"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+    }
+    { // Uppercase
+        ExpectantComposer composer{};
+        composer.expectUnsignedInteger(5u);
+        decode(R"(0B101)"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+    }
+    { // Max
+        ExpectantComposer composer{};
+        composer.expectUnsignedInteger(std::numeric_limits<uint64_t>::max());
+        decode(R"(0b1111111111111111111111111111111111111111111111111111111111111111)"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+    }
+    { // Leading zeroes
+        ExpectantComposer composer{};
+        composer.expectUnsignedInteger(5u);
+        decode(R"(0b00101)"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+    }
+    { // Max with leading zeroes
+        ExpectantComposer composer{};
+        composer.expectUnsignedInteger(std::numeric_limits<uint64_t>::max());
+        decode(R"(0b000000001111111111111111111111111111111111111111111111111111111111111111)"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+    }
+    { // Invalid digit
+        EXPECT_THROW(decode(R"(0b121)", dummyComposer, nullptr), DecodeError);
+    }
+    { // Signed
+        EXPECT_THROW(decode(R"(+0b101)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(-0b101)", dummyComposer, nullptr), DecodeError);
+    }
+    { // Prefix leading zero
+        EXPECT_THROW(decode(R"(00b101)", dummyComposer, nullptr), DecodeError);
+    }
+    { // Decimal
+        EXPECT_THROW(decode(R"(0b101.)", dummyComposer, nullptr), DecodeError);
+    }
+    { // Too big
+        EXPECT_THROW(decode(R"(0b10000000000000000000000000000000000000000000000000000000000000000)", dummyComposer, nullptr), DecodeError);
+    }
+}
+
 TEST(decode, floater) {
     { // Fractional
         ExpectantComposer composer{};
@@ -863,6 +1028,7 @@ I do not like them anywhere
 I do not like green eggs and ham
 I do not like them Sam I am
 )");
+        composer.expectKey("Magic Numbers"sv).expectArray().expectUnsignedInteger(777).expectUnsignedInteger(777).expectUnsignedInteger(777).expectEnd();
     composer.expectEnd();
     decode(
 R"({
@@ -906,6 +1072,7 @@ I do not like them anywhere\n\
 I do not like green eggs and ham\n\
 I do not like them Sam I am\n\
 ",
+    "Magic Numbers": [ 0x309, 0o1411, 0b1100001001 ]
 })"sv, composer, nullptr);
     EXPECT_TRUE(composer.isDone());
 }

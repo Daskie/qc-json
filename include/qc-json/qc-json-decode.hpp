@@ -1,7 +1,7 @@
 #pragma once
 
 ///
-/// QC JSON 1.4.5
+/// QC JSON 1.4.6
 /// Austin Quick
 /// 2019 - 2021
 /// https://github.com/Daskie/qc-json
@@ -194,9 +194,8 @@ namespace qc::json
 
             // Now determine whether there is a +/- sign to narrow it down to numbers or not
 
-            const bool positive{c == '+'};
-            const bool negative{c == '-'};
-            if (positive || negative) {
+            const int sign{(c == '+') - (c == '-')};
+            if (sign) {
                 // There was a sign, so we'll keep track of that and increment our position
                 ++_pos;
                 if (_pos >= _end) {
@@ -223,7 +222,7 @@ namespace qc::json
             // At this point, we know it is a number (or invalid)
 
             if (std::isdigit(uchar(c)) || (c == '.' && _pos + 1 < _end && std::isdigit(_pos[1]))) {
-                _ingestNumber(state, negative);
+                _ingestNumber(state, sign);
                 return;
             }
             else if (_tryConsumeChars("nan"sv) || _tryConsumeChars("NaN"sv)) {
@@ -231,7 +230,7 @@ namespace qc::json
                 return;
             }
             else if (_tryConsumeChars("inf"sv) || _tryConsumeChars("Infinity"sv)){
-                _composer.val(negative ? -std::numeric_limits<double>::infinity() : std::numeric_limits<double>::infinity(), state);
+                _composer.val(sign < 0 ? -std::numeric_limits<double>::infinity() : std::numeric_limits<double>::infinity(), state);
                 return;
             }
 
@@ -466,11 +465,30 @@ namespace qc::json
             }
         }
 
-        void _ingestNumber(State & state, const bool negative)
+        void _ingestNumber(State & state, const int sign)
         {
+            // Check if hex/octal/binary
+            if (*_pos == '0' && _pos + 1 < _end) {
+                int base{0};
+                switch (_pos[1]) {
+                    case 'x': case 'X': base = 16; break;
+                    case 'o': case 'O': base = 8; break;
+                    case 'b': case 'B': base = 2; break;
+                }
+
+                if (base) {
+                    if (sign) {
+                        throw DecodeError{"Hex, octal, and binary numbers must not be signed"s, size_t(_pos - _start)};
+                    }
+                    _pos += 2;
+                    _ingestHexOctalBinary(state, base);
+                    return;
+                }
+            }
+
             // Determine if integer or floater
             if (size_t length{_isInteger()}; length) {
-                if (negative) {
+                if (sign < 0) {
                     _ingestInteger<true>(state, length);
                 }
                 else {
@@ -478,8 +496,23 @@ namespace qc::json
                 }
             }
             else {
-                _ingestFloater(state, negative);
+                _ingestFloater(state, sign < 0);
             }
+        }
+
+        void _ingestHexOctalBinary(State & state, const int base)
+        {
+            uint64_t val;
+            const std::from_chars_result res{std::from_chars(_pos, _end, val, base)};
+
+            // There was an issue parsing
+            if (res.ec != std::errc{}) {
+                throw DecodeError{base == 2 ? "Invalid binary"s : base == 8 ? "Invalid octal"s : "Invalid hex"s, size_t(_pos - _start)};
+            }
+
+            _pos = res.ptr;
+
+            _composer.val(val, state);
         }
 
         template <bool negative>
@@ -501,7 +534,7 @@ namespace qc::json
                         _ingestFloater(state, negative);
                         return;
                     }
-                        // Some other issue
+                    // Some other issue
                     else {
                         throw DecodeError{"Invalid integer"s, size_t(_pos - _start)};
                     }

@@ -237,6 +237,14 @@ Negative infinity can be represented as `-inf` or `-Infinity`
 
 NaN can be represented as `nan`, `NaN`, `+nan`, `+NaN`, `-nan`, or `-NaN`
 
+Hexadecimal can be represented using the `0x` or `0X` prefix, e.g. `0x1A`.
+
+Octal can be represented using the `0o` or `0OX` prefix, e.g. `0o17`.
+
+Binary can be represented using the `0b` or `0B` prefix. `0b1101`.
+
+Hexadecimal, octal, and binary numbers must be positive and may not have a sign. 
+
 ### Null
 
 TODO
