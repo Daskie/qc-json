@@ -1,7 +1,7 @@
 #pragma once
 
 ///
-/// QC JSON 1.4.4
+/// QC JSON 1.4.5
 /// Austin Quick
 /// 2019 - 2021
 /// https://github.com/Daskie/qc-json
@@ -156,64 +156,87 @@ namespace qc::json
             }
         }
 
+        void _consumeChars(const string_view str)
+        {
+            if (!_tryConsumeChars(str)) {
+                throw DecodeError{"Expected `"s.append(str).append("`"sv), size_t(_pos - _start)};
+            }
+        }
+
         void _ingestValue(State & state)
         {
             if (_pos >= _end) {
                 throw DecodeError{"Expected value"s, size_t(_pos - _start)};
             }
 
-            switch (*_pos) {
+            char c{*_pos};
+
+            // First check for typical easy values
+
+            switch (c) {
                 case '{': {
                     _ingestObject(state);
-                    break;
+                    return;
                 }
                 case '[': {
                     _ingestArray(state);
-                    break;
+                    return;
                 }
                 case '"': {
                     _ingestString(state, '"');
-                    break;
+                    return;
                 }
                 case '\'': {
                     _ingestString(state, '\'');
-                    break;
+                    return;
                 }
-                case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': case '9': {
-                    _ingestNumber(state);
-                    break;
-                }
-                case '-': {
-                    if (_end - _pos > 1 && std::isdigit(uchar(_pos[1]))) {
-                        _ingestNumber(state);
-                        break;
-                    }
-                    else if (_tryConsumeChars("-inf"sv)) {
-                        _composer.val(-std::numeric_limits<double>::infinity(), state);
-                        break;
-                    }
-                    [[fallthrough]];
-                }
-                default:
-                    if (_tryConsumeChars("true"sv)) {
-                        _composer.val(true, state);
-                    }
-                    else if (_tryConsumeChars("false"sv)) {
-                        _composer.val(false, state);
-                    }
-                    else if (_tryConsumeChars("null"sv)) {
-                        _composer.val(nullptr, state);
-                    }
-                    else if (_tryConsumeChars("inf"sv)) {
-                        _composer.val(std::numeric_limits<double>::infinity(), state);
-                    }
-                    else if (_tryConsumeChars("nan"sv)) {
-                        _composer.val(std::numeric_limits<double>::quiet_NaN(), state);
-                    }
-                    else {
-                        throw DecodeError{"Unknown value"s, size_t(_pos - _start)};
-                    }
             }
+
+            // Now determine whether there is a +/- sign to narrow it down to numbers or not
+
+            const bool positive{c == '+'};
+            const bool negative{c == '-'};
+            if (positive || negative) {
+                // There was a sign, so we'll keep track of that and increment our position
+                ++_pos;
+                if (_pos >= _end) {
+                    throw DecodeError{"Expected number"s, size_t(_pos - _start)};
+                }
+                c = *_pos;
+            }
+            else {
+                // There was no sign, so we can check the non-number keywords
+                if (_tryConsumeChars("true"sv)) {
+                    _composer.val(true, state);
+                    return;
+                }
+                else if (_tryConsumeChars("false"sv)) {
+                    _composer.val(false, state);
+                    return;
+                }
+                else if (_tryConsumeChars("null"sv)) {
+                    _composer.val(nullptr, state);
+                    return;
+                }
+            }
+
+            // At this point, we know it is a number (or invalid)
+
+            if (std::isdigit(uchar(c)) || (c == '.' && _pos + 1 < _end && std::isdigit(_pos[1]))) {
+                _ingestNumber(state, negative);
+                return;
+            }
+            else if (_tryConsumeChars("nan"sv) || _tryConsumeChars("NaN"sv)) {
+                _composer.val(std::numeric_limits<double>::quiet_NaN(), state);
+                return;
+            }
+            else if (_tryConsumeChars("inf"sv) || _tryConsumeChars("Infinity"sv)){
+                _composer.val(negative ? -std::numeric_limits<double>::infinity() : std::numeric_limits<double>::infinity(), state);
+                return;
+            }
+
+            // Nothing matched, throw an error
+            throw DecodeError{"Unknown value"s, size_t(_pos - _start)};
         }
 
         void _ingestObject(State & outerState)
@@ -409,15 +432,15 @@ namespace qc::json
             }
         }
 
-        bool _isInteger() const
+        // Returns the string length of the number, including trailing decimal point & zeroes, or `0` if it's not an integer
+        size_t _isInteger() const
         {
-            // A precondition is that we know that the first character is either a digit or `-`
-            const char * pos{_pos + 1};
-            // Skip all remaining leading digits
+            const char * pos{_pos};
+            // Skip all leading digits
             while (pos < _end && std::isdigit(uchar(*pos))) ++pos;
             // If that's it, we're an integer
             if (pos >= _end) {
-                return true;
+                return pos - _pos;
             }
             // If instead there is a decimal point...
             else if (*pos == '.') {
@@ -426,78 +449,69 @@ namespace qc::json
                 while (pos < _end && *pos == '0') ++pos;
                 // If there's a digit or an exponent, we must be a floater
                 if (pos < _end && (std::isdigit(uchar(*pos)) || *pos == 'e' || *pos == 'E')) {
-                    return false;
+                    return 0;
                 }
                 // Otherwise, we're an integer
                 else {
-                    return true;
+                    return pos - _pos;
                 }
             }
             // If instead there is an exponent, we must be a floater
             else if (*pos == 'e' || *pos == 'E') {
-                return false;
+                return 0;
             }
             // Otherwise, that's the end of the number, and we're an integer
             else {
-                return true;
+                return pos - _pos;
             }
         }
 
-        void _ingestNumber(State & state)
+        void _ingestNumber(State & state, const bool negative)
         {
             // Determine if integer or floater
-            if (_isInteger()) {
-                // Determine if signed
-                if (*_pos == '-') {
-                    _ingestInteger<true>(state);
+            if (size_t length{_isInteger()}; length) {
+                if (negative) {
+                    _ingestInteger<true>(state, length);
                 }
                 else {
-                    _ingestInteger<false>(state);
+                    _ingestInteger<false>(state, length);
                 }
             }
             else {
-                _ingestFloater(state);
+                _ingestFloater(state, negative);
             }
         }
 
-        template <bool isSigned>
-        void _ingestInteger(State & state)
+        template <bool negative>
+        void _ingestInteger(State & state, const size_t length)
         {
-            std::conditional_t<isSigned, int64_t, uint64_t> val;
-            const std::from_chars_result res{std::from_chars(_pos, _end, val)};
+            std::conditional_t<negative, int64_t, uint64_t> val;
 
-            // There was an issue parsing
-            if (res.ec != std::errc{}) {
-                // If too large, parse as a floater instead
-                if (res.ec == std::errc::result_out_of_range) {
-                    _ingestFloater(state);
-                    return;
-                }
-                // Some other issue
-                else {
-                    throw DecodeError{"Invalid integer"s, size_t(_pos - _start)};
+            // Edge case that `.0` should evaluate to the integer `0`
+            if (*_pos == '.') {
+                val = 0;
+            }
+            else {
+                const std::from_chars_result res{std::from_chars(_pos - negative, _end, val)};
+
+                // There was an issue parsing
+                if (res.ec != std::errc{}) {
+                    // If too large, parse as a floater instead
+                    if (res.ec == std::errc::result_out_of_range) {
+                        _ingestFloater(state, negative);
+                        return;
+                    }
+                        // Some other issue
+                    else {
+                        throw DecodeError{"Invalid integer"s, size_t(_pos - _start)};
+                    }
                 }
             }
 
-            _pos = res.ptr;
-
-            // Skip trailing decimal zeroes
-            if (_pos < _end && *_pos == '.') {
-                ++_pos;
-
-                // Check for dangling decimal point
-                if (_pos >= _end || *_pos != '0') {
-                    throw DecodeError{"Dangling decimal point"s, size_t(_pos - _start)};
-                }
-                ++_pos;
-
-                while (_pos < _end && *_pos == '0') {
-                    ++_pos;
-                }
-            }
+            _pos += length;
 
             // If unsigned and the most significant bit is not set, we default to reporting it as signed
-            if constexpr (!isSigned) {
+            if constexpr (!negative) {
                 if (!(val & 0x8000000000000000u)) {
                     _composer.val(int64_t(val), state);
                     return;
@@ -507,13 +521,13 @@ namespace qc::json
             _composer.val(val, state);
         }
 
-        void _ingestFloater(State & state)
+        void _ingestFloater(State & state, const bool negative)
         {
             double val;
-            const std::from_chars_result res{std::from_chars(_pos, _end, val)};
+            const std::from_chars_result res{std::from_chars(_pos - negative, _end, val)};
 
-            // There was an issue parsing, or a trailing decimal point
-            if (res.ec != std::errc{} || res.ptr[-1] == '.') {
+            // There was an issue parsing
+            if (res.ec != std::errc{}) {
                 throw DecodeError{"Invalid floater"s, size_t(_pos - _start)};
             }
 

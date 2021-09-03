@@ -363,6 +363,18 @@ TEST(decode, signedInteger) {
         decode(R"(123)"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
+    { // Positive
+        ExpectantComposer composer{};
+        composer.expectSignedInteger(123);
+        decode(R"(+123)"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+    }
+    { // Negative
+        ExpectantComposer composer{};
+        composer.expectSignedInteger(-123);
+        decode(R"(-123)"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+    }
     { // Min
         ExpectantComposer composer{};
         composer.expectSignedInteger(std::numeric_limits<int64_t>::min());
@@ -375,23 +387,37 @@ TEST(decode, signedInteger) {
         decode(R"(9223372036854775807)"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
+    { // Trailing decimal
+        ExpectantComposer composer{};
+        composer.expectSignedInteger(123);
+        decode(R"(123.)"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+    }
     { // Trailing zeroes
         ExpectantComposer composer{};
         composer.expectSignedInteger(123);
         decode(R"(123.000)"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
+    { // Fractional zero
+        ExpectantComposer composer{};
+        composer.expectSignedInteger(0);
+        decode(R"(.0)"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectSignedInteger(0);
+        decode(R"(+.0)"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectSignedInteger(0);
+        decode(R"(-.0)"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+    }
     { // Invalid minus sign
         EXPECT_THROW(decode(R"(-)", dummyComposer, nullptr), DecodeError);
         EXPECT_THROW(decode(R"([ - ])", dummyComposer, nullptr), DecodeError);
     }
-    { // Plus sign
+    { // Invalid plus sign
         EXPECT_THROW(decode(R"(+)", dummyComposer, nullptr), DecodeError);
-        EXPECT_THROW(decode(R"(+123)", dummyComposer, nullptr), DecodeError);
-    }
-    { // Dangling decimal point
-        EXPECT_THROW(decode(R"(123.)", dummyComposer, nullptr), DecodeError);
-        EXPECT_THROW(decode(R"([ 123. ])", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"([ + ])", dummyComposer, nullptr), DecodeError);
     }
 }
 
@@ -408,23 +434,23 @@ TEST(decode, unsignedInteger) {
         decode(R"(18446744073709551615)"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
+    { // Trailing decimal
+        ExpectantComposer composer{};
+        composer.expectUnsignedInteger(10000000000000000000u);
+        decode(R"(10000000000000000000.)"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+    }
     { // Trailing zeroes
         ExpectantComposer composer{};
         composer.expectUnsignedInteger(10000000000000000000u);
         decode(R"(10000000000000000000.000)"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
-    { // Invalid minus sign
-        EXPECT_THROW(decode(R"(-)", dummyComposer, nullptr), DecodeError);
-        EXPECT_THROW(decode(R"([ - ])", dummyComposer, nullptr), DecodeError);
-    }
-    { // Plus sign
-        EXPECT_THROW(decode(R"(+)", dummyComposer, nullptr), DecodeError);
-        EXPECT_THROW(decode(R"(+123)", dummyComposer, nullptr), DecodeError);
-    }
-    { // Dangling decimal point
-        EXPECT_THROW(decode(R"(10000000000000000000.)", dummyComposer, nullptr), DecodeError);
-        EXPECT_THROW(decode(R"([ 10000000000000000000. ])", dummyComposer, nullptr), DecodeError);
+    { // Positive
+        ExpectantComposer composer{};
+        composer.expectUnsignedInteger(10000000000000000000u);
+        decode(R"(+10000000000000000000)"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
     }
 }
 
@@ -483,35 +509,105 @@ TEST(decode, floater) {
         decode(R"(18446744073709551616)", composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
-    { // infinity
+    { // Leading decimal
+        ExpectantComposer composer{};
+        composer.expectFloater(0.456);
+        decode(R"(.456)", composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectFloater(0.456);
+        decode(R"(+.456)", composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectFloater(-0.456);
+        decode(R"(-.456)", composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+    }
+    { // Trailing decimal
+        ExpectantComposer composer{};
+        composer.expectFloater(123);
+        decode(R"(123.e0)", composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+    }
+    { // Valid infinity
         ExpectantComposer composer{};
         composer.expectFloater(std::numeric_limits<double>::infinity());
         decode(R"(inf)", composer, nullptr);
         EXPECT_TRUE(composer.isDone());
-    }
-    { // -infinity
-        ExpectantComposer composer{};
         composer.expectFloater(-std::numeric_limits<double>::infinity());
         decode(R"(-inf)", composer, nullptr);
         EXPECT_TRUE(composer.isDone());
+        composer.expectFloater(std::numeric_limits<double>::infinity());
+        decode(R"(+inf)", composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectFloater(std::numeric_limits<double>::infinity());
+        decode(R"(Infinity)", composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectFloater(-std::numeric_limits<double>::infinity());
+        decode(R"(-Infinity)", composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectFloater(std::numeric_limits<double>::infinity());
+        decode(R"(+Infinity)", composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
     }
-    { // NaN
+    { // Invalid infinity
+        EXPECT_THROW(decode(R"(Inf)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(iNf)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(inF)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(INF)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(infi)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(infin)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(infini)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(infinit)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(infinity)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(iNfinity)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(inFinity)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(infInity)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(infiNity)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(infinIty)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(infiniTy)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(infinitY)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(Infi)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(Infin)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(Infini)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(Infinit)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(INfinity)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(InFinity)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(InfInity)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(InfiNity)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(InfinIty)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(InfiniTy)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(InfinitY)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(INFINITY)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(infstuff)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(Infinitystuff)", dummyComposer, nullptr), DecodeError);
+    }
+    { // Valid NaN
         ExpectantComposer composer{};
         composer.expectFloater(std::numeric_limits<double>::quiet_NaN());
         decode(R"(nan)", composer, nullptr);
         EXPECT_TRUE(composer.isDone());
+        composer.expectFloater(std::numeric_limits<double>::quiet_NaN());
+        decode(R"(NaN)", composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
     }
-    { // Dangling decimal point
-        EXPECT_THROW(decode(R"(0.)", dummyComposer, nullptr), DecodeError);
-        EXPECT_THROW(decode(R"([ 0. ])", dummyComposer, nullptr), DecodeError);
+    { // Invalid NaN
+        EXPECT_THROW(decode(R"(Nan)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(nAn)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(naN)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(NAN)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(nanstuff)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(NaNstuff)", dummyComposer, nullptr), DecodeError);
+    }
+    { // Exponent decimal point
+        EXPECT_THROW(decode(R"(1.0e1.0)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(1.0e1.)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(1e1.0)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(1e1.)", dummyComposer, nullptr), DecodeError);
+        EXPECT_THROW(decode(R"(1e.1)", dummyComposer, nullptr), DecodeError);
     }
     { // Dangling exponent
         EXPECT_THROW(decode(R"(0e)", dummyComposer, nullptr), DecodeError);
-        EXPECT_THROW(decode(R"([ 0e ])", dummyComposer, nullptr), DecodeError);
         EXPECT_THROW(decode(R"(0e+)", dummyComposer, nullptr), DecodeError);
-        EXPECT_THROW(decode(R"([ 0e+ ])", dummyComposer, nullptr), DecodeError);
         EXPECT_THROW(decode(R"(0e-)", dummyComposer, nullptr), DecodeError);
-        EXPECT_THROW(decode(R"([ 0e- ])", dummyComposer, nullptr), DecodeError);
     }
     { // Magnitude too large
         EXPECT_THROW(decode(R"(1e1000)", dummyComposer, nullptr), DecodeError);
@@ -672,6 +768,9 @@ TEST(decode, misc) {
         EXPECT_THROW(decode(R"(1 2)"sv, dummyComposer, nullptr), DecodeError);
         EXPECT_THROW(decode(R"(1, 2)"sv, dummyComposer, nullptr), DecodeError);
     }
+    { // Lone decimal
+        EXPECT_THROW(decode(R"(.)"sv, dummyComposer, nullptr), DecodeError);
+    }
 }
 
 TEST(decode, general) {
@@ -705,13 +804,13 @@ TEST(decode, general) {
             composer.expectEnd();
             composer.expectObject();
                 composer.expectKey("Name"sv).expectString("Two Tuna"sv);
-                composer.expectKey("Price"sv).expectFloater(14.99);
+                composer.expectKey("Price"sv).expectFloater(-std::numeric_limits<double>::infinity());
                 composer.expectKey("Ingredients"sv).expectArray().expectString("Tuna"sv).expectEnd();
                 composer.expectKey("Gluten Free"sv).expectBoolean(true);
             composer.expectEnd();
             composer.expectObject();
                 composer.expectKey("Name"sv).expectString("18 Leg Bouquet"sv);
-                composer.expectKey("Price"sv).expectFloater(18.18);
+                composer.expectKey("Price"sv).expectFloater(std::numeric_limits<double>::quiet_NaN());
                 composer.expectKey("Ingredients"sv).expectArray().expectString("\"Salt\""sv).expectString("Octopus"sv).expectString("Crab"sv).expectEnd();
                 composer.expectKey("Gluten Free"sv).expectBoolean(false);
             composer.expectEnd();
@@ -735,8 +834,8 @@ R"({
     "Founded": 1964,
     "Employees": [
         { Name: "Ol' Joe Fisher", Title: "Fisherman", Age: 69 },
-        { Name: "Mark Rower", Title: "Cook", Age: 41 },
-        { Name: "Phineas", Title: "Server Boy", Age: 19 },
+        { Name: "Mark Rower", Title: "Cook", Age: 41. },
+        { Name: "Phineas", Title: "Server Boy", Age: 19.0 },
     ],
     "Dishes": [
         {
@@ -747,13 +846,13 @@ R"({
         },
         {
             "Name": "Two Tuna",
-            "Price": 14.99,
+            "Price": -inf,
             "Ingredients": [ "Tuna" ],
             "Gluten Free": true
         },
         {
             "Name": "18 Leg Bouquet",
-            "Price": 18.18,
+            "Price": +nan,
             "Ingredients": [ "\"Salt\"", "Octopus", "Crab", ],
             "Gluten Free": false
         }

@@ -540,13 +540,13 @@ TEST(encode, general) {
             encoder << end;
             encoder << object;
                 encoder << "Name"sv << "Two Tuna"sv;
-                encoder << "Price"sv << 14.99;
+                encoder << "Price"sv << -std::numeric_limits<double>::infinity();
                 encoder << "Ingredients"sv << array << uniline << "Tuna"sv << end;
                 encoder << "Gluten Free"sv << true;
             encoder << end;
             encoder << object;
                 encoder << "Name"sv << "18 Leg Bouquet"sv;
-                encoder << "Price"sv << 18.18;
+                encoder << "Price"sv << std::numeric_limits<double>::quiet_NaN();
                 encoder << "Ingredients"sv << array << uniline << "\"Salt\""sv << "Octopus"sv << "Crab"sv << end;
                 encoder << "Gluten Free"sv << false;
             encoder << end;
@@ -582,13 +582,13 @@ I do not like them Sam I am
         },
         {
             "Name": "Two Tuna",
-            "Price": 14.99,
+            "Price": -inf,
             "Ingredients": [ "Tuna" ],
             "Gluten Free": true
         },
         {
             "Name": "18 Leg Bouquet",
-            "Price": 18.18,
+            "Price": nan,
             "Ingredients": [ "\"Salt\"", "Octopus", "Crab" ],
             "Gluten Free": false
         }

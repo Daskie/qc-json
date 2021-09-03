@@ -221,6 +221,18 @@ Examples:
 
 TODO
 
+Numbers may have leading or trailing decimal points in the coefficient.
+
+Valid: `1.` `.1` `1.e2` `.1e2`
+
+Invalid: `.` `.e2` `1e.2` `1e2.`
+
+Positive infinity can be represented as `inf`, `Infinity`, `+inf`, or `+Infinity`
+
+Negative infinity can be represented as `-inf` or `-Infinity`
+
+NaN can be represented as `nan`, `NaN`, `+nan`, `+NaN`, `-nan`, or `-NaN`
+
 ### Null
 
 TODO

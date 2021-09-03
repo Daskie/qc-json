@@ -738,7 +738,7 @@ TEST(json, general) {
                 "Tuna"
             ],
             "Name": "Two Tuna",
-            "Price": 14.99
+            "Price": -inf
         },
         {
             "Gluten Free": false,
@@ -748,7 +748,7 @@ TEST(json, general) {
                 "Crab"
             ],
             "Name": "18 Leg Bouquet",
-            "Price": 18.18
+            "Price": nan
         }
     ],
     "Employees": [
