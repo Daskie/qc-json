@@ -93,13 +93,13 @@ namespace qc::json
 
         void operator()(State & initialState)
         {
-            _skipWhitespace();
+            _skipSpaceAndComments();
             _ingestValue(initialState);
-            _skipWhitespace();
+            _skipSpaceAndComments();
 
             // Allow trailing comma
             if (_tryConsumeChar(',')) {
-                _skipWhitespace();
+                _skipSpaceAndComments();
             }
 
             if (_pos != _end) {
@@ -117,9 +117,33 @@ namespace qc::json
         Composer & _composer;
         string _stringBuffer{};
 
-        void _skipWhitespace()
+        void _skipSpaceAndComments()
         {
-            while (_pos < _end && std::isspace(uchar(*_pos))) ++_pos;
+            while (true) {
+                // Skip whitespace
+                while (_pos < _end && std::isspace(uchar(*_pos))) ++_pos;
+
+                if (_pos + 1 < _end && _pos[0] == '/') {
+                    // Skip line comment
+                    if (_pos[1] == '/') {
+                        _pos += 2;
+                        while (_pos < _end && *_pos != '\n') ++_pos;
+                        if (_pos < _end) ++_pos;
+                        continue;
+                    }
+                    // Skip block comment
+                    else if (_pos[1] == '*') {
+                        const char * startOfComment{_pos};
+                        _pos += 2;
+                        while (_pos + 1 < _end && !(_pos[0] == '*' && _pos[1] == '/')) ++_pos;
+                        if (_pos + 1 < _end) _pos += 2;
+                        else throw DecodeError{"Block comment is unterminated"s, size_t(startOfComment - _start)};
+                        continue;
+                    }
+                }
+
+                break;
+            }
         }
 
         bool _tryConsumeChar(const char c)
@@ -243,7 +267,7 @@ namespace qc::json
             State innerState{_composer.object(outerState)};
 
             ++_pos; // We already know we have `{`
-            _skipWhitespace();
+            _skipSpaceAndComments();
 
             if (!_tryConsumeChar('}')) {
                 while (true) {
@@ -254,20 +278,20 @@ namespace qc::json
                     const char c{*_pos};
                     const string_view key{(c == '"' || c == '\'') ? _consumeString(c) : _consumeIdentifier()};
                     _composer.key(string{key}, innerState);
-                    _skipWhitespace();
+                    _skipSpaceAndComments();
 
                     _consumeChar(':');
-                    _skipWhitespace();
+                    _skipSpaceAndComments();
 
                     _ingestValue(innerState);
-                    _skipWhitespace();
+                    _skipSpaceAndComments();
 
                     if (_tryConsumeChar('}')) {
                         break;
                     }
                     else {
                         _consumeChar(',');
-                        _skipWhitespace();
+                        _skipSpaceAndComments();
 
                         // Allow trailing comma
                         if (_tryConsumeChar('}')) {
@@ -285,19 +309,19 @@ namespace qc::json
             State innerState{_composer.array(outerState)};
 
             ++_pos; // We already know we have `[`
-            _skipWhitespace();
+            _skipSpaceAndComments();
 
             if (!_tryConsumeChar(']')) {
                 while (true) {
                     _ingestValue(innerState);
-                    _skipWhitespace();
+                    _skipSpaceAndComments();
 
                     if (_tryConsumeChar(']')) {
                         break;
                     }
                     else {
                         _consumeChar(',');
-                        _skipWhitespace();
+                        _skipSpaceAndComments();
 
                         // Allow trailing comma
                         if (_tryConsumeChar(']')) {

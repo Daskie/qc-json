@@ -955,6 +955,96 @@ TEST(decode, identifiers) {
     }
 }
 
+TEST(decode, comments) {
+    { // Line comment
+        ExpectantComposer composer{};
+        composer.expectSignedInteger(0);
+        decode(R"(0 // AAAAA)"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectSignedInteger(0);
+        decode(R"(0 // AAAAA // BBBBB 1)"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+    }
+    { // Block comment
+        ExpectantComposer composer{};
+        composer.expectSignedInteger(0);
+        decode(R"(/* AAAAA */ 0)"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectSignedInteger(0);
+        decode("/* AAAAA \n BBBBB \r\n CCCCC */ 0"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+    }
+    { // Comment in string
+        ExpectantComposer composer{};
+        composer.expectString("// AAAAA"sv);
+        decode(R"("// AAAAA")"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectString("/* AAAAA */"sv);
+        decode(R"("/* AAAAA */")"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+    }
+    { // Comments in array
+        ExpectantComposer composer{};
+        composer.expectArray().expectSignedInteger(0).expectSignedInteger(1).expectEnd();
+        decode(R"(/* AAAAA */ [ /* BBBBB */ 0 /* CCCCC */ , /* DDDDD */ 1 /* EEEEE */ ] /* FFFFF */ // GGGGG)"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectArray().expectSignedInteger(0).expectSignedInteger(1).expectEnd();
+        decode(R"(/* AAAAA */[/* BBBBB */0/* CCCCC */,/* DDDDD */1/* EEEEE */]/* FFFFF */// GGGGG)"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectArray().expectSignedInteger(0).expectSignedInteger(1).expectEnd();
+        decode(
+R"([ // AAAAA
+    0, // BBBBB
+    1 // CCCCC
+] // DDDDD)"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+    }
+    { // Comments in object
+        ExpectantComposer composer{};
+        composer.expectObject().expectKey("0"sv).expectSignedInteger(0).expectKey("1"sv).expectSignedInteger(1).expectEnd();
+        decode(R"(/* AAAAA */ { /* BBBBB */ 0 /* CCCCC */ : /* DDDDD */ 0 /* EEEEE */ , /* FFFFF */ 1 /* GGGGG */ : /* HHHHH */ 1 /* IIIII */ } /* JJJJJ */ // KKKKK)"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectObject().expectKey("0"sv).expectSignedInteger(0).expectKey("1"sv).expectSignedInteger(1).expectEnd();
+        decode(R"(/* AAAAA */{/* BBBBB */0/* CCCCC */:/* DDDDD */0/* EEEEE */,/* FFFFF */1/* GGGGG */:/* HHHHH */1/* IIIII */}/* JJJJJ */// KKKKK)"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectObject().expectKey("0"sv).expectSignedInteger(0).expectKey("1"sv).expectSignedInteger(1).expectEnd();
+        decode(
+R"({ // AAAAA
+    0: 0, // BBBBB
+    1: 1 // CCCCC
+} // DDDDD)"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+    }
+    { // CRLF
+        ExpectantComposer composer{};
+        composer.expectArray().expectSignedInteger(0).expectSignedInteger(1).expectEnd();
+        decode("[ // AAAAA\r\n    0, // BBBBB\n    1 // CCCCC\r\n] // DDDDD \n"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectArray().expectSignedInteger(1).expectEnd();
+        decode("[ // AAAAA\r 0, // BBBBB\n    1 // CCCCC\r\n] // DDDDD \n"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+    }
+    { // Block weirdness
+        ExpectantComposer composer{};
+        EXPECT_THROW(decode(R"(/*/ 0)"sv, dummyComposer, nullptr), DecodeError);
+        composer.expectSignedInteger(0);
+        decode(R"(/**/ 0)"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectSignedInteger(0);
+        decode(R"(/*/*/ 0)"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectSignedInteger(0);
+        decode(R"(/*///*** /* //** ** /*/ 0)"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+    }
+    { // Nothing but comments
+        EXPECT_THROW(decode("// AAAAA\n/* BBBBB */ // CCCCC\n"sv, dummyComposer, nullptr), DecodeError);
+    }
+    { // Block comment that doesn't terminate
+        EXPECT_THROW(decode("{ /* AAAAA\nBBBBB    CCCCC\n"sv, dummyComposer, nullptr), DecodeError);
+    }
+}
+
 TEST(decode, misc) {
     { // Empty
         EXPECT_THROW(decode(R"()"sv, dummyComposer, nullptr), DecodeError);
@@ -1031,7 +1121,11 @@ I do not like them Sam I am
         composer.expectKey("Magic Numbers"sv).expectArray().expectUnsignedInteger(777).expectUnsignedInteger(777).expectUnsignedInteger(777).expectEnd();
     composer.expectEnd();
     decode(
-R"({
+R"(/**
+ * Restraunt report
+ * October 2021
+ */
+{
     "Name": "Salt's Crust",
     "Founded": 1964,
     "Employees": [
@@ -1059,7 +1153,7 @@ R"({
             "Gluten Free": false
         }
     ],
-    "Profit Margin": null,
+    "Profit Margin": /* Pay no heed */ null,
     "Ha\x03r Name": "M\u0000\0n",
     "Green Eggs and Ham":
 "\
@@ -1072,7 +1166,7 @@ I do not like them anywhere\n\
 I do not like green eggs and ham\n\
 I do not like them Sam I am\n\
 ",
-    "Magic Numbers": [ 0x309, 0o1411, 0b1100001001 ]
+    "Magic Numbers": [ 0x309, 0o1411, 0b1100001001 ] // What could they mean?!
 })"sv, composer, nullptr);
     EXPECT_TRUE(composer.isDone());
 }
