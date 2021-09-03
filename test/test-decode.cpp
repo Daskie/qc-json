@@ -14,9 +14,9 @@ using namespace std::string_view_literals;
 using qc::json::decode;
 using qc::json::DecodeError;
 
-class DummyComposer {
-
-  public: //--------------------------------------------------------------------
+class DummyComposer
+{
+    public: //------------------------------------------------------------------
 
     std::nullptr_t object(std::nullptr_t) { return nullptr; }
     std::nullptr_t array(std::nullptr_t) { return nullptr; }
@@ -28,12 +28,11 @@ class DummyComposer {
     void val(double, std::nullptr_t) {}
     void val(bool, std::nullptr_t) {}
     void val(std::nullptr_t, std::nullptr_t) {}
-
 } dummyComposer;
 
-class ExpectantComposer {
-
-  public: //--------------------------------------------------------------------
+class ExpectantComposer
+{
+    public: //------------------------------------------------------------------
 
     struct Object {};
     struct Array {};
@@ -83,7 +82,7 @@ class ExpectantComposer {
 
     bool isDone() const { return m_sequence.empty(); }
 
-  private: //-------------------------------------------------------------------
+    private: //-----------------------------------------------------------------
 
     std::deque<Element> m_sequence;
 
@@ -91,7 +90,6 @@ class ExpectantComposer {
         EXPECT_EQ(m_sequence.front(), e);
         m_sequence.pop_front();
     }
-
 };
 
 std::ostream & operator<<(std::ostream & os, const ExpectantComposer::Element & v)
@@ -109,7 +107,8 @@ std::ostream & operator<<(std::ostream & os, const ExpectantComposer::Element & 
     return os << "Unknown Element";
 }
 
-TEST(decode, object) {
+TEST(decode, object)
+{
     { // Empty
         ExpectantComposer composer{};
         composer.expectObject().expectEnd();
@@ -186,7 +185,8 @@ TEST(decode, object) {
     }
 }
 
-TEST(decode, array) {
+TEST(decode, array)
+{
     { // Empty
         ExpectantComposer composer{};
         composer.expectArray().expectEnd();
@@ -235,7 +235,8 @@ TEST(decode, array) {
     }
 }
 
-TEST(decode, string) {
+TEST(decode, string)
+{
     { // Empty string
         ExpectantComposer composer{};
         composer.expectString(""sv);
@@ -350,7 +351,8 @@ TEST(decode, string) {
     }
 }
 
-TEST(decode, signedInteger) {
+TEST(decode, signedInteger)
+{
     { // Zero
         ExpectantComposer composer{};
         composer.expectSignedInteger(0);
@@ -436,7 +438,8 @@ TEST(decode, signedInteger) {
     }
 }
 
-TEST(decode, unsignedInteger) {
+TEST(decode, unsignedInteger)
+{
     { // Min unsigned
         ExpectantComposer composer{};
         composer.expectUnsignedInteger(uint64_t(std::numeric_limits<int64_t>::max()) + 1u);
@@ -469,7 +472,8 @@ TEST(decode, unsignedInteger) {
     }
 }
 
-TEST(decode, hex) {
+TEST(decode, hex)
+{
     { // Zero
         ExpectantComposer composer{};
         composer.expectUnsignedInteger(0u);
@@ -524,7 +528,8 @@ TEST(decode, hex) {
     }
 }
 
-TEST(decode, octal) {
+TEST(decode, octal)
+{
     { // Zero
         ExpectantComposer composer{};
         composer.expectUnsignedInteger(0u);
@@ -579,7 +584,8 @@ TEST(decode, octal) {
     }
 }
 
-TEST(decode, binary) {
+TEST(decode, binary)
+{
     { // Zero
         ExpectantComposer composer{};
         composer.expectUnsignedInteger(0u);
@@ -634,7 +640,8 @@ TEST(decode, binary) {
     }
 }
 
-TEST(decode, floater) {
+TEST(decode, floater)
+{
     { // Fractional
         ExpectantComposer composer{};
         composer.expectFloater(123.456);
@@ -818,7 +825,8 @@ TEST(decode, floater) {
     }
 }
 
-TEST(decode, boolean) {
+TEST(decode, boolean)
+{
     { // True
         ExpectantComposer composer{};
         composer.expectBoolean(true);
@@ -833,28 +841,32 @@ TEST(decode, boolean) {
     }
 }
 
-TEST(decode, null) {
+TEST(decode, null)
+{
     ExpectantComposer composer{};
     composer.expectNull();
     decode(R"(null)"sv, composer, nullptr);
     EXPECT_TRUE(composer.isDone());
 }
 
-TEST(decode, noWhitespace) {
+TEST(decode, noWhitespace)
+{
     ExpectantComposer composer{};
     composer.expectObject().expectKey("a"sv).expectArray().expectString("abc"sv).expectSignedInteger(-123).expectFloater(-123.456e-78).expectBoolean(true).expectNull().expectEnd().expectEnd();
     decode(R"({"a":["abc",-123,-123.456e-78,true,null]})"sv, composer, nullptr);
     EXPECT_TRUE(composer.isDone());
 }
 
-TEST(decode, extraneousWhitespace) {
+TEST(decode, extraneousWhitespace)
+{
     ExpectantComposer composer{};
     composer.expectObject().expectEnd();
     decode(" \t\n\r\v{} \t\n\r\v"sv, composer, nullptr);
     EXPECT_TRUE(composer.isDone());
 }
 
-TEST(decode, trailingComma) {
+TEST(decode, trailingComma)
+{
     { // Valid
         ExpectantComposer composer{};
         composer.expectSignedInteger(0);
@@ -904,7 +916,8 @@ TEST(decode, trailingComma) {
     }
 }
 
-TEST(decode, identifiers) {
+TEST(decode, identifiers)
+{
     { // Valid
         ExpectantComposer composer{};
         composer.expectObject().expectKey("a"sv).expectSignedInteger(0).expectEnd();
@@ -955,7 +968,8 @@ TEST(decode, identifiers) {
     }
 }
 
-TEST(decode, comments) {
+TEST(decode, comments)
+{
     { // Line comment
         ExpectantComposer composer{};
         composer.expectSignedInteger(0);
@@ -1045,7 +1059,8 @@ R"({ // AAAAA
     }
 }
 
-TEST(decode, misc) {
+TEST(decode, misc)
+{
     { // Empty
         EXPECT_THROW(decode(R"()"sv, dummyComposer, nullptr), DecodeError);
     }
@@ -1064,7 +1079,8 @@ TEST(decode, misc) {
     }
 }
 
-TEST(decode, general) {
+TEST(decode, general)
+{
     ExpectantComposer composer{};
     composer.expectObject();
         composer.expectKey("Name"sv).expectString("Salt's Crust"sv);

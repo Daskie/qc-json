@@ -18,7 +18,8 @@ Encoder & operator<<(Encoder & encoder, const CustomVal & v)
     return encoder << array(uniline) << v.x << v.y << end;
 }
 
-TEST(encode, object) {
+TEST(encode, object)
+{
     { // Empty
         Encoder encoder{};
         encoder << object(multiline) << end;
@@ -98,7 +99,8 @@ TEST(encode, object) {
     }
 }
 
-TEST(encode, array) {
+TEST(encode, array)
+{
     { // Empty
         Encoder encoder{};
         encoder << array(multiline) << end;
@@ -123,7 +125,8 @@ TEST(encode, array) {
     }
 }
 
-TEST(encode, string) {
+TEST(encode, string)
+{
     { // Empty
         Encoder encoder{};
         encoder << "";
@@ -216,7 +219,8 @@ TEST(encode, string) {
     }
 }
 
-TEST(encode, signedInteger) {
+TEST(encode, signedInteger)
+{
     { // Zero
         Encoder encoder{};
         encoder << int64_t(0);
@@ -269,7 +273,8 @@ TEST(encode, signedInteger) {
     }
 }
 
-TEST(encode, unsignedInteger) {
+TEST(encode, unsignedInteger)
+{
     { // Zero
         Encoder encoder{};
         encoder << 0u;
@@ -302,7 +307,8 @@ TEST(encode, unsignedInteger) {
     }
 }
 
-TEST(encode, hex) {
+TEST(encode, hex)
+{
     { // Zero
         Encoder encoder{};
         encoder << hex(0u);
@@ -331,7 +337,8 @@ TEST(encode, hex) {
     }
 }
 
-TEST(encode, octal) {
+TEST(encode, octal)
+{
     { // Zero
         Encoder encoder{};
         encoder << octal(0u);
@@ -360,7 +367,8 @@ TEST(encode, octal) {
     }
 }
 
-TEST(encode, binary) {
+TEST(encode, binary)
+{
     { // Zero
         Encoder encoder{};
         encoder << binary(0u);
@@ -389,7 +397,8 @@ TEST(encode, binary) {
     }
 }
 
-TEST(encode, floater) {
+TEST(encode, floater)
+{
     { // Zero
         Encoder encoder{};
         encoder << 0.0;
@@ -465,7 +474,8 @@ TEST(encode, floater) {
     }
 }
 
-TEST(encode, boolean) {
+TEST(encode, boolean)
+{
     { // True
         Encoder encoder{};
         encoder << true;
@@ -478,19 +488,22 @@ TEST(encode, boolean) {
     }
 }
 
-TEST(encode, null) {
+TEST(encode, null)
+{
     Encoder encoder{};
     encoder << nullptr;
     EXPECT_EQ(R"(null)"s, encoder.finish());
 }
 
-TEST(encode, custom) {
+TEST(encode, custom)
+{
     Encoder encoder{};
     encoder << CustomVal{1, 2};
     EXPECT_EQ(R"([ 1, 2 ])"s, encoder.finish());
 }
 
-TEST(encode, finish) {
+TEST(encode, finish)
+{
     { // Encoder left in clean state after finish
         Encoder encoder{uniline};
         encoder << object << "val" << 123 << end;
@@ -514,7 +527,8 @@ TEST(encode, finish) {
     }
 }
 
-TEST(encode, density) {
+TEST(encode, density)
+{
     { // Top level multiline
         Encoder encoder{multiline};
         encoder << object << "k1" << array << "v1" << "v2" << end << "k2" << "v3" << end;
@@ -588,7 +602,13 @@ TEST(encode, identifiers) {
     }
 }
 
-TEST(encode, misc) {
+TEST(encode, comments)
+{
+
+}
+
+TEST(encode, misc)
+{
     { // Extraneous content
         Encoder encoder{};
         encoder << "a";
@@ -596,7 +616,8 @@ TEST(encode, misc) {
     }
 }
 
-TEST(encode, general) {
+TEST(encode, general)
+{
     Encoder encoder{};
     encoder << object;
         encoder << "Name"sv << "Salt's Crust"sv;

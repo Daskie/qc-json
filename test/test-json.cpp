@@ -21,26 +21,32 @@ using qc::json::Safety::unsafe;
 
 struct CustomVal { int x, y; };
 
-bool operator==(const CustomVal & cv1, const CustomVal & cv2) {
+bool operator==(const CustomVal & cv1, const CustomVal & cv2)
+{
     return cv1.x == cv2.x && cv1.y == cv2.y;
 }
 
 template <qc::json::Safety isSafe>
-struct qc::json::valueTo<CustomVal, isSafe> {
-    CustomVal operator()(const Value & val) const {
+struct qc::json::valueTo<CustomVal, isSafe>
+{
+    CustomVal operator()(const Value & val) const
+    {
         const Array & arr(val.asArray<isSafe>());
         return {arr.at(0).as<int, isSafe>(), arr.at(1).as<int, isSafe>()};
     }
 };
 
 template <>
-struct qc::json::valueFrom<CustomVal> {
-    Value operator()(const CustomVal & v) const {
+struct qc::json::valueFrom<CustomVal>
+{
+    Value operator()(const CustomVal & v) const
+    {
         return Array(v.x, v.y);
     }
 };
 
-TEST(json, encodeDecodeString) {
+TEST(json, encodeDecodeString)
+{
     { // Empty
         std::string_view val{""sv};
         EXPECT_EQ(val, decode(encode(val)).asString());
@@ -63,7 +69,8 @@ TEST(json, encodeDecodeString) {
     }
 }
 
-TEST(json, encodeDecodeSignedInteger) {
+TEST(json, encodeDecodeSignedInteger)
+{
     { // Zero
         int val{0};
         EXPECT_EQ(val, decode(encode(val)).as<int>());
@@ -106,7 +113,8 @@ TEST(json, encodeDecodeSignedInteger) {
     }
 }
 
-TEST(json, encodeDecodeUnsignedInteger) {
+TEST(json, encodeDecodeUnsignedInteger)
+{
     { // Zero
         unsigned int val{0u};
         EXPECT_EQ(val, decode(encode(val)).as<unsigned int>());
@@ -133,7 +141,8 @@ TEST(json, encodeDecodeUnsignedInteger) {
     }
 }
 
-TEST(json, encodeDecodeFloater) {
+TEST(json, encodeDecodeFloater)
+{
     uint64_t val64;
     uint32_t val32;
 
@@ -190,23 +199,27 @@ TEST(json, encodeDecodeFloater) {
     }
 }
 
-TEST(json, encodeDecodeBoolean) {
+TEST(json, encodeDecodeBoolean)
+{
     // true
     EXPECT_EQ(true, decode(encode(true)).asBoolean());
     // false
     EXPECT_EQ(false, decode(encode(false)).asBoolean());
 }
 
-TEST(json, encodeDecodeNull) {
+TEST(json, encodeDecodeNull)
+{
     EXPECT_TRUE(decode(encode(nullptr)).isNull());
 }
 
-TEST(json, encodeDecodeCustom) {
+TEST(json, encodeDecodeCustom)
+{
     CustomVal val{1, 2};
     EXPECT_EQ(val, decode(encode(val)).as<CustomVal>());
 }
 
-TEST(json, valueConstruction) {
+TEST(json, valueConstruction)
+{
     // Default
     EXPECT_EQ(Type::null, Value().type());
     // Object
@@ -236,7 +249,8 @@ TEST(json, valueConstruction) {
     EXPECT_EQ(Type::null, Value(nullptr).type());
 }
 
-TEST(json, valueMove) {
+TEST(json, valueMove)
+{
     Value v1("abc"sv);
     EXPECT_EQ(Type::string, v1.type());
     EXPECT_EQ("abc"sv, v1.asString());
@@ -252,7 +266,8 @@ TEST(json, valueMove) {
     EXPECT_EQ(Type::null, v2.type());
 }
 
-TEST(json, valueTypes) {
+TEST(json, valueTypes)
+{
     { // Object
         Value v(Object{});
         EXPECT_EQ(Type::object, v.type());
@@ -345,7 +360,8 @@ void testNumber(T v, bool isS64, bool isS32, bool isS16, bool isS08, bool isU64,
     if (isF32) EXPECT_EQ(   float(v), val.as<   float>()); else EXPECT_THROW(val.as<   float>(), TypeError);
 }
 
-TEST(json, valueNumbers) {
+TEST(json, valueNumbers)
+{
     // Zero, given as signed integer
     testNumber(0, true, true, true, true, true, true, true, true, true, true);
     // Zero, given as unsigned integer
@@ -422,7 +438,8 @@ TEST(json, valueNumbers) {
     testNumber(123.4, false, false, false, false, false, false, false, false, true, true);
 }
 
-TEST(json, valueAs) {
+TEST(json, valueAs)
+{
     // Safe
     EXPECT_THROW((Value().asObject<safe>()), TypeError);
     EXPECT_THROW((Value().asArray<safe>()), TypeError);
@@ -462,7 +479,8 @@ TEST(json, valueAs) {
     Value().as<bool, unsafe>();
 }
 
-TEST(json, object) {
+TEST(json, object)
+{
     Object obj;
     { // Initial state
         EXPECT_EQ(0u, obj.size());
@@ -569,7 +587,8 @@ TEST(json, object) {
     }
 }
 
-TEST(json, array) {
+TEST(json, array)
+{
     Array arr;
     { // Initial state
         EXPECT_EQ(0u, arr.size());
@@ -680,7 +699,8 @@ TEST(json, array) {
     }
 }
 
-TEST(json, string) {
+TEST(json, string)
+{
     { // Standard
         String str("abc"sv);
         EXPECT_EQ(3u, str.size());
@@ -710,7 +730,8 @@ TEST(json, string) {
     }
 }
 
-TEST(json, density) {
+TEST(json, density)
+{
     EXPECT_EQ(R"([
     1,
     2,
@@ -720,7 +741,8 @@ TEST(json, density) {
     EXPECT_EQ("[1,2,3]"s, encode(Array{1, 2, 3}, compact));
 }
 
-TEST(json, general) {
+TEST(json, general)
+{
     std::string json(R"({
     "Dishes": [
         {
