@@ -1,9 +1,10 @@
 #pragma once
 
 ///
-/// QC JSON 1.4.6
-/// Austin Quick
-/// 2019 - 2021
+/// QC JSON 1.4.7
+///
+/// Austin Quick : 2019 - 2021
+///
 /// https://github.com/Daskie/qc-json
 ///
 /// Decodes data from a JSON string and sends it to the provided `Composer`
@@ -62,6 +63,7 @@ namespace qc::json
     /// Decodes the JSON string
     ///
     /// A note on numbers:
+    ///
     /// A number will be parsed and sent to the composer as either a `int64_t`, a `uint64_t`, or a `double`
     /// - `int64_t` if the number is an integer (a fractional component of zero is okay) and can fit in a `int64_t`
     /// - `uint64_t` if the number is a positive integer, can fit in a `uint64_t`, but cannot fit in a `int64_t`

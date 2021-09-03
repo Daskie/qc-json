@@ -1,13 +1,14 @@
 #pragma once
 
 ///
-/// QC JSON 1.4.6
-/// Austin Quick
-/// 2019 - 2021
+/// QC JSON 1.4.7
+///
+/// Austin Quick : 2019 - 2021
+///
 /// https://github.com/Daskie/qc-json
 ///
 /// Provides an interface for decoding a JSON strings to JSON objects, creating/manipulating JSON objects, and encoding
-/// JSON objects to a JSON string
+///   JSON objects to a JSON string
 ///
 /// Uses `qc-json-encode.hpp` to do the encoding and `qc-json-decode.hpp` to do the decoding
 ///
@@ -107,7 +108,7 @@ namespace qc::json
 
         ///
         /// Attempts to construct a value from a custom type `T` using a specialized `qc::json::valueFrom` function,
-        /// details of which can be found below
+        ///   details of which can be found below
         ///
         /// @tparam T the custom type
         /// @param val the custom type value
@@ -159,7 +160,7 @@ namespace qc::json
 
         ///
         /// Determines if the value type is compatible with `T`, which is to say calling `as<T>()` would be valid. See
-        /// the `as` method docs below for more details
+        ///   the `as` method docs below for more details
         ///
         /// @tparam T the type in question, e.g. `int` or `std::string_view`
         /// @return whether the value type is compatible with type `T`
@@ -209,26 +210,26 @@ namespace qc::json
         /// If the actual type does not match the requested type and `isSafe` is true, a `TypeError` is thrown
         ///
         /// If `T` is `std::string_view`, this call is equivalent to `asString`. `std::string` and `char *` are
-        /// incompatible and may not be used
+        ///   incompatible and may not be used
         ///
         /// If `T` is `bool`, this call is equivalent to `asBoolean`
         ///
         /// If `T` is `char`, a single character string will try to be fetched. Note that in c++ `char`,
         /// `signed char`, and `unsigned char` are distinct types. Asking for a `signed char` or `unsigned char` will
-        /// instead try to fetch a number as type `int8_t` or `uint8_t` respectively
+        ///   instead try to fetch a number as type `int8_t` or `uint8_t` respectively
         ///
         /// If `T` is a numeric type...
-        /// ...and the value is a positive integer, it may be accessed as:
-        ///   - any floater type (`double`, `float`)
-        ///   - any signed integer type (`int64_t`, `int32_t`, `int16_t`, `int8_t`), but only if it can fit
-        ///   - any unsigned integer type (`uint64_t`, `uint32_t`, `uint16_t`, `uint8_t`), but only if it can fit
-        /// ...and the value is a negative integer, it may be accessed as:
-        ///   - any floater type (`double`, `float`)
-        ///   - any signed integer type (`int64_t`, `int32_t`, `int16_t`, `int8_t`), but only if it can fit
-        /// ...and the value is not an integer, it may only be accessed as a floater (`double`, `float`)
+        ///   ...and the value is a positive integer, it may be accessed as:
+        ///     - any floater type (`double`, `float`)
+        ///     - any signed integer type (`int64_t`, `int32_t`, `int16_t`, `int8_t`), but only if it can fit
+        ///     - any unsigned integer type (`uint64_t`, `uint32_t`, `uint16_t`, `uint8_t`), but only if it can fit
+        ///   ...and the value is a negative integer, it may be accessed as:
+        ///     - any floater type (`double`, `float`)
+        ///     - any signed integer type (`int64_t`, `int32_t`, `int16_t`, `int8_t`), but only if it can fit
+        ///   ...and the value is not an integer, it may only be accessed as a floater (`double`, `float`)
         ///
         /// If `T` is an unrecognized type, then we attempt to use the specialized `qc::json::valueTo` struct, details
-        /// of which can be found below
+        ///   of which can be found below
         ///
         template <typename T, Safety isSafe = safe> T as() const;
 
@@ -371,7 +372,7 @@ namespace qc::json
 
         ///
         /// Constructs an array from the given arguments, which may be differnt types. Memory is allocated to match the
-        /// number of elements.
+        ///   number of elements
         ///
         /// @tparam T the type of the first value
         /// @tparam Ts the remaining value types, if any

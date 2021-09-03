@@ -1,9 +1,10 @@
 #pragma once
 
 ///
-/// QC JSON 1.4.6
-/// Austin Quick
-/// 2019 - 2021
+/// QC JSON 1.4.7
+///
+/// Austin Quick : 2019 - 2021
+///
 /// https://github.com/Daskie/qc-json
 ///
 /// Encodes data into a JSON string
@@ -59,45 +60,53 @@ namespace qc::json
 
     ///
     /// Namespace provided to allow the user to `using namespace qc::json::tokens` to avoid the verbosity of fully
-    /// qualifying the tokens' namespace
+    ///   qualifying the tokens namespace
     ///
     inline namespace tokens
     {
-        ///
-        /// Stream this to start a new object
-        ///
-        enum ObjectToken { object };
 
         ///
-        /// Stream this to start a new array
+        /// Pass with an object or array to specify its density
         ///
-        enum ArrayToken { array };
+        /// TODO: Change this to enum class and add a `using enum Density` after once intellisense supports it. This is
+        ///   to prevent `Density` from being implicitly cast to an integer, which can lead to issues
+        ///
+        enum Density
+        {
+            unspecified, /// Use that of the root or parent element
+            multiline,   /// Elements are put on new lines
+            uniline,     /// Elements are put on one line separated by spaces
+            compact      /// No whitespace is used whatsoever
+        };
+
+        ///
+        /// Stream this `object` variable to start a new object. Optionally specify a density
+        ///
+        /// This weird struct/operator()/variable setup allows for both ` << object ` and ` << object(density) `
+        ///
+        constexpr struct ObjectToken { Density density{unspecified}; constexpr ObjectToken operator()(const Density density_) const noexcept { return ObjectToken{density_}; } } object{};
+
+        ///
+        /// Stream this `array` variable to start a new array. Optionally specify a density
+        ///
+        /// This weird struct/operator()/variable setup allows for both ` << array ` and ` << array(density) `
+        ///
+        constexpr struct ArrayToken { Density density{unspecified}; constexpr ArrayToken operator()(const Density density_) const noexcept { return ArrayToken{density_}; } } array{};
 
         ///
         /// Stream this to end the current object or array
         ///
-        enum EndToken { end };
+        constexpr struct EndToken {} end;
 
         ///
-        /// Stream this to specify the density of the current object or array
+        /// Stream ` << binary(val) `, ` << octal(val) `, or ` << hex(val) ` to encode an unsigned integer in that base
         ///
-        enum Density
-        {
-            multiline, /// Elements are put on new lines
-            uniline,   /// Elements are put on one line separated by spaces
-            compact    /// No whitespace is used whatsoever
-        };
-
-        ///
-        /// Stream this to specify the base the next number should be encoded in
-        ///
-        enum Base
-        {
-            binary = 2,
-            octal = 8,
-            decimal = 10,
-            hex = 16
-        };
+        struct BinaryToken { uint64_t val{}; };
+        struct  OctalToken { uint64_t val{}; };
+        struct    HexToken { uint64_t val{}; };
+        constexpr struct { constexpr BinaryToken operator()(const uint64_t v) const noexcept { return BinaryToken{v}; } } binary;
+        constexpr struct { constexpr  OctalToken operator()(const uint64_t v) const noexcept { return  OctalToken{v}; } }  octal;
+        constexpr struct { constexpr    HexToken operator()(const uint64_t v) const noexcept { return    HexToken{v}; } }    hex;
     }
 
     ///
@@ -114,7 +123,7 @@ namespace qc::json
         /// @param singleQuotes whether to use `'` instead of `"` for strings
         /// @param identifiers whether to encode all eligible keys as identifiers instead of strings
         ///
-        Encoder(Density density = multiline, bool singleQuotes = false, bool identifiers = false);
+        Encoder(Density density = unspecified, bool singleQuotes = false, bool identifiers = false);
 
         Encoder(const Encoder & other) = delete;
         Encoder(Encoder && other) noexcept;
@@ -129,14 +138,14 @@ namespace qc::json
         ///
         /// @return this
         ///
-        Encoder & operator<<(ObjectToken);
+        Encoder & operator<<(ObjectToken v);
 
         ///
         /// Start a new array
         ///
         /// @return this
         ///
-        Encoder & operator<<(ArrayToken);
+        Encoder & operator<<(ArrayToken v);
 
         ///
         /// End the current object or array
@@ -146,26 +155,25 @@ namespace qc::json
         Encoder & operator<<(EndToken);
 
         ///
-        /// Set the density of the current object or array. Must be passed before any keys or elements
-        ///
-        /// Density can only go up, therefore specifying a lower density than is currently present will have no effect
-        ///
-        /// @param density the density to set the current object or array to
-        /// @return this
-        ///
-        Encoder & operator<<(Density density);
-
-        ///
         /// Set the numeric base of the next number to be encoded. If this is anything other than decimal, the number
-        /// will be represented in raw, unsigned, two's-compliment form. Negative numbers are encoded as if they were
-        /// positive. Floating point numbers are unaffected.
+        ///   will be represented in raw, unsigned, two's-compliment form. Negative numbers are encoded as if they were
+        /// positive. Floating point numbers are unaffected
         ///
-        /// This flag is defaulted back to decimal after ANY value is streamed.
+        /// This flag is defaulted back to decimal after ANY value is streamed
         ///
         /// @param base the base for the next number
         /// @return this
         ///
-        Encoder & operator<<(Base base);
+        Encoder & operator<<(BinaryToken v);
+        Encoder & operator<<(OctalToken v);
+        Encoder & operator<<(HexToken v);
+
+        ///
+        /// Prevent the easy mistake of streaming the density directly
+        //
+        /// TODO: Remove once intellisense supports `using enum`, see above
+        ///
+        void operator<<(Density) = delete;
 
         ///
         /// Encode a value into the JSON
@@ -193,7 +201,7 @@ namespace qc::json
 
         ///
         /// Collapses the internal string stream into the encoded JSON string. This function resets the internal state
-        /// of the encoder to a "clean slate" such that it can be safely reused
+        ///   of the encoder to a "clean slate" such that it can be safely reused
         ///
         /// @return the encoded JSON string
         ///
@@ -208,7 +216,7 @@ namespace qc::json
             Density density;
         };
 
-        Density _baseDensity{multiline};
+        Density _baseDensity{unspecified};
         char _quote{'"'};
         bool _identifiers{false};
         std::ostringstream _oss{};
@@ -216,7 +224,6 @@ namespace qc::json
         int _indentation{0};
         bool _isKey{false};
         bool _isComplete{false};
-        Base _base{decimal};
         char _buffer[68]{};
 
         template <typename T> void _val(T v);
@@ -232,7 +239,9 @@ namespace qc::json
         void _encode(string_view val);
         void _encode(int64_t val);
         void _encode(uint64_t val);
-        void _encode(uint64_t val, Base base);
+        void _encode(BinaryToken v);
+        void _encode(OctalToken v);
+        void _encode(HexToken v);
         void _encode(double val);
         void _encode(bool val);
         void _encode(std::nullptr_t);
@@ -264,20 +273,19 @@ namespace qc::json
     {}
 
     inline Encoder::Encoder(Encoder && other) noexcept :
-        _baseDensity{std::exchange(other._baseDensity, multiline)},
+        _baseDensity{std::exchange(other._baseDensity, unspecified)},
         _quote{std::exchange(other._quote, '"')},
         _identifiers{std::exchange(other._identifiers, false)},
         _oss{std::move(other._oss)},
         _state{std::move(other._state)},
         _indentation{std::exchange(other._indentation, 0)},
         _isKey{std::exchange(other._isKey, false)},
-        _isComplete{std::exchange(other._isComplete, false)},
-        _base{std::exchange(other._base, decimal)}
+        _isComplete{std::exchange(other._isComplete, false)}
     {}
 
     inline Encoder & Encoder::operator=(Encoder && other) noexcept
     {
-        _baseDensity = std::exchange(other._baseDensity, multiline);
+        _baseDensity = std::exchange(other._baseDensity, unspecified);
         _quote = std::exchange(other._quote, '"');
         _identifiers = std::exchange(other._identifiers, false);
         _oss = std::move(other._oss);
@@ -285,43 +293,42 @@ namespace qc::json
         _indentation = std::exchange(other._indentation, 0);
         _isKey = std::exchange(other._isKey, false);
         _isComplete = std::exchange(other._isComplete, false);
-        _base = std::exchange(other._base, decimal);
 
         return *this;
     }
 
-    inline Encoder & Encoder::operator<<(const ObjectToken)
+    inline Encoder & Encoder::operator<<(const ObjectToken v)
     {
         _checkPre();
         _prefix();
         _oss << '{';
 
-        Density density{_baseDensity};
+        Density density{std::max(_baseDensity, v.density)};
         if (!_state.empty()) {
-            _state.back().content = true;
-            density = _state.back().density;
+            _State & parentState{_state.back()};
+            parentState.content = true;
+            if (parentState.density > density) density = parentState.density;
         }
         _state.push_back(_State{false, false, density});
         _isKey = false;
-        _base = decimal;
 
         return *this;
     }
 
-    inline Encoder & Encoder::operator<<(const ArrayToken)
+    inline Encoder & Encoder::operator<<(const ArrayToken v)
     {
         _checkPre();
         _prefix();
         _oss << '[';
 
-        Density density{_baseDensity};
+        Density density{std::max(_baseDensity, v.density)};
         if (!_state.empty()) {
-            _state.back().content = true;
-            density = _state.back().density;
+            _State & parentState{_state.back()};
+            parentState.content = true;
+            if (parentState.density > density) density = parentState.density;
         }
         _state.push_back(_State{true, false, density});
         _isKey = false;
-        _base = decimal;
 
         return *this;
     }
@@ -338,6 +345,7 @@ namespace qc::json
         const _State & state{_state.back()};
         if (state.content) {
             switch (state.density) {
+                case unspecified: [[fallthrough]];
                 case multiline:
                     _oss << '\n';
                     --_indentation;
@@ -357,34 +365,24 @@ namespace qc::json
             _isComplete = true;
         }
 
-        _base = decimal;
-
         return *this;
     }
 
-    inline Encoder & Encoder::operator<<(const Density density)
+    inline Encoder & Encoder::operator<<(const BinaryToken v)
     {
-        if (_state.empty()) {
-            throw EncodeError{"Density must be given within an object or array"};
-        }
-
-        _State & state{_state.back()};
-
-        if (_isKey || state.content) {
-            throw EncodeError{"Density must be given at the start of the object or array"};
-        }
-
-        if (density > state.density) {
-            state.density = density;
-        }
-
+        _val(v);
         return *this;
     }
 
-    inline Encoder & Encoder::operator<<(const Base base)
+    inline Encoder & Encoder::operator<<(const OctalToken v)
     {
-        _base = base;
+        _val(v);
+        return *this;
+    }
 
+    inline Encoder & Encoder::operator<<(const HexToken v)
+    {
+        _val(v);
         return *this;
     }
 
@@ -515,7 +513,6 @@ namespace qc::json
             _state.back().content = true;
         }
         _isKey = false;
-        _base = decimal;
     }
 
     inline void Encoder::_key(const string_view key)
@@ -547,7 +544,6 @@ namespace qc::json
         }
 
         _isKey = true;
-        _base = decimal;
     }
 
     template <bool unchecked>
@@ -560,6 +556,7 @@ namespace qc::json
                 _oss << ',';
             }
             switch (state.density) {
+                case unspecified: [[fallthrough]];
                 case multiline:
                     _oss << '\n';
                     _indentation += !state.content;
@@ -622,49 +619,41 @@ namespace qc::json
 
     inline void Encoder::_encode(const int64_t v)
     {
-        if (_base != decimal) {
-            _encode(uint64_t(v), _base);
-            return;
-        }
-
         const std::to_chars_result res{std::to_chars(_buffer, _buffer + sizeof(_buffer), v)};
         _oss << string_view{_buffer, size_t(res.ptr - _buffer)};
     }
 
     inline void Encoder::_encode(const uint64_t v)
     {
-        if (_base != decimal) {
-            _encode(v, _base);
-            return;
-        }
-
         const std::to_chars_result res{std::to_chars(_buffer, _buffer + sizeof(_buffer), v)};
         _oss << string_view{_buffer, size_t(res.ptr - _buffer)};
     }
 
-    inline void Encoder::_encode(const uint64_t v, const Base base)
+    inline void Encoder::_encode(const BinaryToken v)
     {
-        switch (base) {
-            case binary: _oss << "0b"sv; break;
-            case octal: _oss << "0o"sv; break;
-            case hex: _oss << "0x"sv; break;
-            default:
-                throw EncodeError{"Invalid base"s};
-        }
+        const std::to_chars_result res{std::to_chars(_buffer, _buffer + sizeof(_buffer), v.val, 2)};
+        _oss << "0b"sv << string_view{_buffer, size_t(res.ptr - _buffer)};
+    }
 
-        const std::to_chars_result res{std::to_chars(_buffer, _buffer + sizeof(_buffer), v, base)};
+    inline void Encoder::_encode(const OctalToken v)
+    {
+        const std::to_chars_result res{std::to_chars(_buffer, _buffer + sizeof(_buffer), v.val, 8)};
+        _oss << "0o"sv << string_view{_buffer, size_t(res.ptr - _buffer)};
+    }
+
+    inline void Encoder::_encode(const HexToken v)
+    {
+        const std::to_chars_result res{std::to_chars(_buffer, _buffer + sizeof(_buffer), v.val, 16)};
         const size_t length{size_t(res.ptr - _buffer)};
 
         // Manually convert to uppercase hex because apparently `std::to_chars` doesn't have an option for that
-        if (base == hex) {
-            for (size_t i{0u}; i < length; ++i) {
-                if (_buffer[i] >= 'a') {
-                    _buffer[i] -= ('a' - 'A');
-                }
+        for (size_t i{0u}; i < length; ++i) {
+            if (_buffer[i] >= 'a') {
+                _buffer[i] -= ('a' - 'A');
             }
         }
 
-        _oss << string_view{_buffer, length};
+        _oss << "0x"sv << string_view{_buffer, length};
     }
 
     inline void Encoder::_encode(const double v)

@@ -15,30 +15,30 @@ struct CustomVal { int x, y; };
 
 Encoder & operator<<(Encoder & encoder, const CustomVal & v)
 {
-    return encoder << array << uniline << v.x << v.y << end;
+    return encoder << array(uniline) << v.x << v.y << end;
 }
 
 TEST(encode, object) {
     { // Empty
         Encoder encoder{};
-        encoder << object << multiline << end;
+        encoder << object(multiline) << end;
         EXPECT_EQ(R"({})"s, encoder.finish());
-        encoder << object << uniline << end;
+        encoder << object(uniline) << end;
         EXPECT_EQ(R"({})"s, encoder.finish());
-        encoder << object << compact << end;
+        encoder << object(compact) << end;
         EXPECT_EQ(R"({})"s, encoder.finish());
     }
     { // Non-empty
         Encoder encoder{};
-        encoder << object << multiline << "k1" << "abc" << "k2" << 123 << "k3" << true << end;
+        encoder << object(multiline) << "k1" << "abc" << "k2" << 123 << "k3" << true << end;
         EXPECT_EQ(R"({
     "k1": "abc",
     "k2": 123,
     "k3": true
 })"s, encoder.finish());
-        encoder << object << uniline << "k1" << "abc" << "k2" << 123 << "k3" << true << end;
+        encoder << object(uniline) << "k1" << "abc" << "k2" << 123 << "k3" << true << end;
         EXPECT_EQ(R"({ "k1": "abc", "k2": 123, "k3": true })"s, encoder.finish());
-        encoder << object << compact << "k1" << "abc" << "k2" << 123 << "k3" << true << end;
+        encoder << object(compact) << "k1" << "abc" << "k2" << 123 << "k3" << true << end;
         EXPECT_EQ(R"({"k1":"abc","k2":123,"k3":true})"s, encoder.finish());
     }
     { // String view key
@@ -101,24 +101,24 @@ TEST(encode, object) {
 TEST(encode, array) {
     { // Empty
         Encoder encoder{};
-        encoder << array << multiline << end;
+        encoder << array(multiline) << end;
         EXPECT_EQ(R"([])"s, encoder.finish());
-        encoder << array << uniline << end;
+        encoder << array(uniline) << end;
         EXPECT_EQ(R"([])"s, encoder.finish());
-        encoder << array << compact << end;
+        encoder << array(compact) << end;
         EXPECT_EQ(R"([])"s, encoder.finish());
     }
     { // Non-empty
         Encoder encoder{};
-        encoder << array << multiline << "abc" << 123 << true << end;
+        encoder << array(multiline) << "abc" << 123 << true << end;
         EXPECT_EQ(R"([
     "abc",
     123,
     true
 ])"s, encoder.finish());
-        encoder << array << uniline << "abc" << 123 << true << end;
+        encoder << array(uniline) << "abc" << 123 << true << end;
         EXPECT_EQ(R"([ "abc", 123, true ])"s, encoder.finish());
-        encoder << array << compact << "abc" << 123 << true << end;
+        encoder << array(compact) << "abc" << 123 << true << end;
         EXPECT_EQ(R"(["abc",123,true])"s, encoder.finish());
     }
 }
@@ -305,27 +305,28 @@ TEST(encode, unsignedInteger) {
 TEST(encode, hex) {
     { // Zero
         Encoder encoder{};
-        encoder << hex << 0u;
+        encoder << hex(0u);
         EXPECT_EQ(R"(0x0)"s, encoder.finish());
     }
     { // Typical
         Encoder encoder{};
-        encoder << hex << 26u;
+        encoder << hex(26u);
         EXPECT_EQ(R"(0x1A)"s, encoder.finish());
     }
     { // Max unsigned
         Encoder encoder{};
-        encoder << hex << std::numeric_limits<uint64_t>::max();
+        encoder << hex(std::numeric_limits<uint64_t>::max());
         EXPECT_EQ(R"(0xFFFFFFFFFFFFFFFF)"s, encoder.finish());
     }
     { // Min signed
         Encoder encoder{};
-        encoder << hex << std::numeric_limits<int64_t>::min();
+        encoder << hex(std::numeric_limits<int64_t>::min());
         EXPECT_EQ(R"(0x8000000000000000)"s, encoder.finish());
     }
     { // -1
         Encoder encoder{};
-        encoder << hex << -1;
+        #pragma warning(suppress: 4245)
+        encoder << hex(-1);
         EXPECT_EQ(R"(0xFFFFFFFFFFFFFFFF)"s, encoder.finish());
     }
 }
@@ -333,27 +334,28 @@ TEST(encode, hex) {
 TEST(encode, octal) {
     { // Zero
         Encoder encoder{};
-        encoder << octal << 0u;
+        encoder << octal(0u);
         EXPECT_EQ(R"(0o0)"s, encoder.finish());
     }
     { // Typical
         Encoder encoder{};
-        encoder << octal << 10u;
+        encoder << octal(10u);
         EXPECT_EQ(R"(0o12)"s, encoder.finish());
     }
     { // Max unsigned
         Encoder encoder{};
-        encoder << octal << std::numeric_limits<uint64_t>::max();
+        encoder << octal(std::numeric_limits<uint64_t>::max());
         EXPECT_EQ(R"(0o1777777777777777777777)"s, encoder.finish());
     }
     { // Min signed
         Encoder encoder{};
-        encoder << octal << std::numeric_limits<int64_t>::min();
+        encoder << octal(std::numeric_limits<int64_t>::min());
         EXPECT_EQ(R"(0o1000000000000000000000)"s, encoder.finish());
     }
     { // -1
         Encoder encoder{};
-        encoder << octal << -1;
+        #pragma warning(suppress: 4245)
+        encoder << octal(-1);
         EXPECT_EQ(R"(0o1777777777777777777777)"s, encoder.finish());
     }
 }
@@ -361,27 +363,28 @@ TEST(encode, octal) {
 TEST(encode, binary) {
     { // Zero
         Encoder encoder{};
-        encoder << binary << 0u;
+        encoder << binary(0u);
         EXPECT_EQ(R"(0b0)"s, encoder.finish());
     }
     { // Typical
         Encoder encoder{};
-        encoder << binary << 5u;
+        encoder << binary(5u);
         EXPECT_EQ(R"(0b101)"s, encoder.finish());
     }
     { // Max unsigned
         Encoder encoder{};
-        encoder << binary << std::numeric_limits<uint64_t>::max();
+        encoder << binary(std::numeric_limits<uint64_t>::max());
         EXPECT_EQ(R"(0b1111111111111111111111111111111111111111111111111111111111111111)"s, encoder.finish());
     }
     { // Min signed
         Encoder encoder{};
-        encoder << binary << std::numeric_limits<int64_t>::min();
+        encoder << binary(std::numeric_limits<int64_t>::min());
         EXPECT_EQ(R"(0b1000000000000000000000000000000000000000000000000000000000000000)"s, encoder.finish());
     }
     { // -1
         Encoder encoder{};
-        encoder << binary << -1;
+        #pragma warning(suppress: 4245)
+        encoder << binary(-1);
         EXPECT_EQ(R"(0b1111111111111111111111111111111111111111111111111111111111111111)"s, encoder.finish());
     }
 }
@@ -536,8 +539,8 @@ TEST(encode, density) {
     { // Inner density
         Encoder encoder{};
         encoder << object;
-            encoder << "k1" << array << uniline << "v1" << array << compact << "v2" << "v3" << end << end;
-            encoder << "k2" << object << uniline << "k3" << "v4" << "k4" << object << compact << "k5" << "v5" << "k6" << "v6" << end << end;
+            encoder << "k1" << array(uniline) << "v1" << array(compact) << "v2" << "v3" << end << end;
+            encoder << "k2" << object(uniline) << "k3" << "v4" << "k4" << object(compact) << "k5" << "v5" << "k6" << "v6" << end << end;
         encoder << end;
         EXPECT_EQ(R"({
     "k1": [ "v1", ["v2","v3"] ],
@@ -546,26 +549,14 @@ TEST(encode, density) {
     }
     { // Density priority
         Encoder encoder{};
-        encoder << object << uniline << "k" << array << multiline << "v" << end << end;
+        encoder << object(uniline) << "k" << array(multiline) << "v" << end << end;
         EXPECT_EQ(R"({ "k": [ "v" ] })"s, encoder.finish());
-        encoder << array << uniline << object << multiline << "k" << "v" << end << end;
+        encoder << array(uniline) << object(multiline) << "k" << "v" << end << end;
         EXPECT_EQ(R"([ { "k": "v" } ])"s, encoder.finish());
-        encoder << object << compact << "k" << array << uniline << "v" << end << end;
+        encoder << object(compact) << "k" << array(uniline) << "v" << end << end;
         EXPECT_EQ(R"({"k":["v"]})"s, encoder.finish());
-        encoder << array << compact << object << uniline << "k" << "v" << end << end;
+        encoder << array(compact) << object(uniline) << "k" << "v" << end << end;
         EXPECT_EQ(R"([{"k":"v"}])"s, encoder.finish());
-    }
-    { // Missplaced density
-        Encoder encoder{};
-        EXPECT_THROW(encoder << multiline, EncodeError);
-        encoder << object << "k";
-        EXPECT_THROW(encoder << uniline, EncodeError);
-        encoder << "v";
-        EXPECT_THROW(encoder << compact, EncodeError);
-        encoder << "arr" << array << 123;
-        EXPECT_THROW(encoder << multiline, EncodeError);
-        encoder << end << end;
-        EXPECT_THROW(encoder << uniline, EncodeError);
     }
 }
 
@@ -597,34 +588,6 @@ TEST(encode, identifiers) {
     }
 }
 
-TEST(encode, baseReset) {
-    Encoder encoder{uniline};
-    encoder << hex << 0;
-    EXPECT_EQ(R"(0x0)", encoder.finish());
-    encoder << 0;
-    EXPECT_EQ(R"(0)", encoder.finish());
-    encoder << hex << decimal << 0;
-    EXPECT_EQ(R"(0)", encoder.finish());
-    encoder << array << hex << 0 << 1 << end;
-    EXPECT_EQ(R"([ 0x0, 1 ])", encoder.finish());
-    encoder << array << hex << 1.2 << 0 << end;
-    EXPECT_EQ(R"([ 1.2, 0 ])", encoder.finish());
-    encoder << array << hex << nullptr << 0 << end;
-    EXPECT_EQ(R"([ null, 0 ])", encoder.finish());
-    encoder << array << hex << "ok" << 0 << end;
-    EXPECT_EQ(R"([ "ok", 0 ])", encoder.finish());
-    encoder << array << hex << array << end << 0 << end;
-    EXPECT_EQ(R"([ [], 0 ])", encoder.finish());
-    encoder << array << hex << object << end << 0 << end;
-    EXPECT_EQ(R"([ {}, 0 ])", encoder.finish());
-    encoder << object << "k" << hex << 0 << end;
-    EXPECT_EQ(R"({ "k": 0x0 })", encoder.finish());
-    encoder << object << hex << "k" << 0 << end;
-    EXPECT_EQ(R"({ "k": 0 })", encoder.finish());
-    encoder << array << array << hex << end << 0 << end;
-    EXPECT_EQ(R"([ [], 0 ])", encoder.finish());
-}
-
 TEST(encode, misc) {
     { // Extraneous content
         Encoder encoder{};
@@ -639,27 +602,27 @@ TEST(encode, general) {
         encoder << "Name"sv << "Salt's Crust"sv;
         encoder << "Founded"sv << 1964;
         encoder << "Employees"sv << array;
-            encoder << object << uniline << "Name"sv << "Ol' Joe Fisher"sv << "Title"sv << "Fisherman"sv << "Age"sv << 69 << end;
-            encoder << object << uniline << "Name"sv << "Mark Rower"sv << "Title"sv << "Cook"sv << "Age"sv << 41 << end;
-            encoder << object << uniline << "Name"sv << "Phineas"sv << "Title"sv << "Server Boy"sv << "Age"sv << 19 << end;
+            encoder << object(uniline) << "Name"sv << "Ol' Joe Fisher"sv << "Title"sv << "Fisherman"sv << "Age"sv << 69 << end;
+            encoder << object(uniline) << "Name"sv << "Mark Rower"sv << "Title"sv << "Cook"sv << "Age"sv << 41 << end;
+            encoder << object(uniline) << "Name"sv << "Phineas"sv << "Title"sv << "Server Boy"sv << "Age"sv << 19 << end;
         encoder << end;
         encoder << "Dishes"sv << array;
             encoder << object;
                 encoder << "Name"sv << "Basket o' Barnacles"sv;
                 encoder << "Price"sv << 5.45;
-                encoder << "Ingredients"sv << array << uniline << "\"Salt\""sv << "Barnacles"sv << end;
+                encoder << "Ingredients"sv << array(uniline) << "\"Salt\""sv << "Barnacles"sv << end;
                 encoder << "Gluten Free"sv << false;
             encoder << end;
             encoder << object;
                 encoder << "Name"sv << "Two Tuna"sv;
                 encoder << "Price"sv << -std::numeric_limits<double>::infinity();
-                encoder << "Ingredients"sv << array << uniline << "Tuna"sv << end;
+                encoder << "Ingredients"sv << array(uniline) << "Tuna"sv << end;
                 encoder << "Gluten Free"sv << true;
             encoder << end;
             encoder << object;
                 encoder << "Name"sv << "18 Leg Bouquet"sv;
                 encoder << "Price"sv << std::numeric_limits<double>::quiet_NaN();
-                encoder << "Ingredients"sv << array << uniline << "\"Salt\""sv << "Octopus"sv << "Crab"sv << end;
+                encoder << "Ingredients"sv << array(uniline) << "\"Salt\""sv << "Octopus"sv << "Crab"sv << end;
                 encoder << "Gluten Free"sv << false;
             encoder << end;
         encoder << end;
@@ -675,7 +638,7 @@ I do not like them anywhere
 I do not like green eggs and ham
 I do not like them Sam I am
 )";
-        encoder << "Magic Numbers"sv << array << uniline << hex << 777 << octal << 777u << binary << 777 << end;
+        encoder << "Magic Numbers"sv << array(uniline) << hex(777) << octal(777u) << binary(777) << end;
     encoder << end;
 
     EXPECT_EQ(R"({

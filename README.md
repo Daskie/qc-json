@@ -193,7 +193,7 @@ The following escape sequences are replaced with their corresponding code point:
 | `\f` | Form Feed | `U+000C` |
 | `\r` | Carriage Return | `U+000D` |
 
-In addition, a specific code point can be specified with `\x` followed by two hex digits, or `\u` followed by four hex digits.
+In addition, a specific code point can be specified with `\x` followed by two HexToken digits, or `\u` followed by four HexToken digits.
 Currently, only extended ASCII is supported, i.e.`U+0000` through `U+00FF`. 
 
 Examples:
@@ -239,11 +239,11 @@ NaN can be represented as `nan`, `NaN`, `+nan`, `+NaN`, `-nan`, or `-NaN`
 
 Hexadecimal can be represented using the `0x` or `0X` prefix, e.g. `0x1A`.
 
-Octal can be represented using the `0o` or `0OX` prefix, e.g. `0o17`.
+OctalToken can be represented using the `0o` or `0OX` prefix, e.g. `0o17`.
 
-Binary can be represented using the `0b` or `0B` prefix. `0b1101`.
+BinaryToken can be represented using the `0b` or `0B` prefix. `0b1101`.
 
-Hexadecimal, octal, and binary numbers must be positive and may not have a sign. 
+Hexadecimal, OctalToken, and BinaryToken numbers must be positive and may not have a sign. 
 
 ### Null
 
