@@ -1,7 +1,7 @@
 #pragma once
 
 ///
-/// QC JSON 1.4.7
+/// QC JSON 1.4.8
 ///
 /// Austin Quick : 2019 - 2021
 ///
@@ -40,8 +40,8 @@ namespace qc::json
     ///
     struct Error : std::runtime_error
     {
-        explicit Error(const string & msg = {}) noexcept :
-            std::runtime_error{msg}
+        explicit Error(const string_view msg = {}) noexcept :
+            std::runtime_error{msg.data()}
         {}
     };
 }
@@ -55,7 +55,7 @@ namespace qc::json
     ///
     struct EncodeError : Error
     {
-        explicit EncodeError(const string & msg) noexcept;
+        explicit EncodeError(const string_view msg) noexcept;
     };
 
     ///
@@ -84,14 +84,14 @@ namespace qc::json
         ///
         /// This weird struct/operator()/variable setup allows for both ` << object ` and ` << object(density) `
         ///
-        constexpr struct ObjectToken { Density density{unspecified}; constexpr ObjectToken operator()(const Density density_) const noexcept { return ObjectToken{density_}; } } object{};
+        constexpr struct ObjectToken { Density density{unspecified}; constexpr ObjectToken operator()(Density density_) const noexcept { return ObjectToken{density_}; } } object{};
 
         ///
         /// Stream this `array` variable to start a new array. Optionally specify a density
         ///
         /// This weird struct/operator()/variable setup allows for both ` << array ` and ` << array(density) `
         ///
-        constexpr struct ArrayToken { Density density{unspecified}; constexpr ArrayToken operator()(const Density density_) const noexcept { return ArrayToken{density_}; } } array{};
+        constexpr struct ArrayToken { Density density{unspecified}; constexpr ArrayToken operator()(Density density_) const noexcept { return ArrayToken{density_}; } } array{};
 
         ///
         /// Stream this to end the current object or array
@@ -104,9 +104,15 @@ namespace qc::json
         struct BinaryToken { uint64_t val{}; };
         struct  OctalToken { uint64_t val{}; };
         struct    HexToken { uint64_t val{}; };
-        constexpr struct { constexpr BinaryToken operator()(const uint64_t v) const noexcept { return BinaryToken{v}; } } binary;
-        constexpr struct { constexpr  OctalToken operator()(const uint64_t v) const noexcept { return  OctalToken{v}; } }  octal;
-        constexpr struct { constexpr    HexToken operator()(const uint64_t v) const noexcept { return    HexToken{v}; } }    hex;
+        constexpr struct { constexpr BinaryToken operator()(uint64_t v) const noexcept { return BinaryToken{v}; } } binary;
+        constexpr struct { constexpr  OctalToken operator()(uint64_t v) const noexcept { return  OctalToken{v}; } }  octal;
+        constexpr struct { constexpr    HexToken operator()(uint64_t v) const noexcept { return    HexToken{v}; } }    hex;
+
+        ///
+        /// Stream ` << comment(str) ` to encode a comment
+        ///
+        struct CommentToken { string_view comment{}; };
+        constexpr struct { constexpr CommentToken operator()(string_view str) const noexcept { return CommentToken{str}; } } comment;
     }
 
     ///
@@ -157,7 +163,7 @@ namespace qc::json
         ///
         /// Set the numeric base of the next number to be encoded. If this is anything other than decimal, the number
         ///   will be represented in raw, unsigned, two's-compliment form. Negative numbers are encoded as if they were
-        /// positive. Floating point numbers are unaffected
+        ///   positive. Floating point numbers are unaffected
         ///
         /// This flag is defaulted back to decimal after ANY value is streamed
         ///
@@ -167,6 +173,16 @@ namespace qc::json
         Encoder & operator<<(BinaryToken v);
         Encoder & operator<<(OctalToken v);
         Encoder & operator<<(HexToken v);
+
+        ///
+        /// Insert a comment. Comments always logically precede a value. Comments will be in line form (`// ...`) in
+        ///   multiline contexts, block form (`/* ... */`) in uniline contexts, and compact block form (`/*...*/`) in
+        ///   compact contexts
+        ///
+        /// @param v the comment
+        /// @return this
+        ///
+        Encoder & operator<<(CommentToken v);
 
         ///
         /// Prevent the easy mistake of streaming the density directly
@@ -216,21 +232,20 @@ namespace qc::json
             Density density;
         };
 
-        Density _baseDensity{unspecified};
         char _quote{'"'};
         bool _identifiers{false};
         std::ostringstream _oss{};
         std::vector<_State> _state{};
         int _indentation{0};
         bool _isKey{false};
-        bool _isComplete{false};
+        bool _isComment{false};
         char _buffer[68]{};
 
         template <typename T> void _val(T v);
 
         void _key(string_view key);
 
-        template <bool unchecked = false> void _prefix();
+        void _prefix(bool putComma = true);
 
         void _indent();
 
@@ -262,37 +277,36 @@ namespace qc::json
 
 namespace qc::json
 {
-    inline EncodeError::EncodeError(const string & msg) noexcept :
+    inline EncodeError::EncodeError(const string_view msg) noexcept :
         Error{msg}
     {}
 
     inline Encoder::Encoder(const Density density, bool singleQuotes, bool preferIdentifiers) :
-        _baseDensity{density},
         _quote{singleQuotes ? '\'' : '"'},
         _identifiers{preferIdentifiers}
-    {}
+    {
+        _state.push_back(_State{false, false, density});
+    }
 
     inline Encoder::Encoder(Encoder && other) noexcept :
-        _baseDensity{std::exchange(other._baseDensity, unspecified)},
         _quote{std::exchange(other._quote, '"')},
         _identifiers{std::exchange(other._identifiers, false)},
         _oss{std::move(other._oss)},
         _state{std::move(other._state)},
         _indentation{std::exchange(other._indentation, 0)},
         _isKey{std::exchange(other._isKey, false)},
-        _isComplete{std::exchange(other._isComplete, false)}
+        _isComment{std::exchange(other._isComment, false)}
     {}
 
     inline Encoder & Encoder::operator=(Encoder && other) noexcept
     {
-        _baseDensity = std::exchange(other._baseDensity, unspecified);
         _quote = std::exchange(other._quote, '"');
         _identifiers = std::exchange(other._identifiers, false);
         _oss = std::move(other._oss);
         _state = std::move(other._state);
         _indentation = std::exchange(other._indentation, 0);
         _isKey = std::exchange(other._isKey, false);
-        _isComplete = std::exchange(other._isComplete, false);
+        _isComment = std::exchange(other._isComment, false);
 
         return *this;
     }
@@ -303,13 +317,10 @@ namespace qc::json
         _prefix();
         _oss << '{';
 
-        Density density{std::max(_baseDensity, v.density)};
-        if (!_state.empty()) {
-            _State & parentState{_state.back()};
-            parentState.content = true;
-            if (parentState.density > density) density = parentState.density;
-        }
-        _state.push_back(_State{false, false, density});
+        _State & parentState{_state.back()};
+        parentState.content = true;
+        _state.push_back(_State{false, false, std::max(v.density, parentState.density)});
+        ++_indentation;
         _isKey = false;
 
         return *this;
@@ -321,13 +332,10 @@ namespace qc::json
         _prefix();
         _oss << '[';
 
-        Density density{std::max(_baseDensity, v.density)};
-        if (!_state.empty()) {
-            _State & parentState{_state.back()};
-            parentState.content = true;
-            if (parentState.density > density) density = parentState.density;
-        }
-        _state.push_back(_State{true, false, density});
+        _State & parentState{_state.back()};
+        parentState.content = true;
+        _state.push_back(_State{true, false, std::max(v.density, parentState.density)});
+        ++_indentation;
         _isKey = false;
 
         return *this;
@@ -335,35 +343,17 @@ namespace qc::json
 
     inline Encoder & Encoder::operator<<(const EndToken)
     {
-        if (_state.empty()) {
-            throw EncodeError{"No object or array to end"s};
+        if (_state.size() <= 1u) {
+            throw EncodeError{"No object or array to end"sv};
         }
         if (_isKey) {
-            throw EncodeError{"Cannot end object with a dangling key"s};
+            throw EncodeError{"Cannot end object with a dangling key"sv};
         }
 
-        const _State & state{_state.back()};
-        if (state.content) {
-            switch (state.density) {
-                case unspecified: [[fallthrough]];
-                case multiline:
-                    _oss << '\n';
-                    --_indentation;
-                    _indent();
-                    break;
-                case uniline:
-                    _oss << ' ';
-                    break;
-                case compact:
-                    break;
-            }
-        }
-        _oss << (state.array ? ']' : '}');
+        --_indentation;
+        _prefix(false);
+        _oss << (_state.back().array ? ']' : '}');
         _state.pop_back();
-
-        if (_state.empty()) {
-            _isComplete = true;
-        }
 
         return *this;
     }
@@ -386,9 +376,64 @@ namespace qc::json
         return *this;
     }
 
+    inline Encoder & Encoder::operator<<(const CommentToken v)
+    {
+        // Ensure comment does not come after key
+        if (_isKey) {
+            throw EncodeError{"Comment can not come between key and value"sv};
+        }
+
+        const _State & state{_state.back()};
+        size_t lineLength{v.comment.size()};
+
+        // Check for invalid characters and determine first line length
+        for (size_t i{0u}; i < v.comment.size(); ++i) {
+            const char c{v.comment[i]};
+            if (!std::isprint(uchar(c))) {
+                if (c == '\n' && state.density <= multiline) {
+                    lineLength = i;
+                    break;
+                }
+                else {
+                    throw EncodeError{("Comment has invalid character `\\x"s += std::to_string(int(uchar(c)))) += '`'};
+                }
+            }
+        }
+
+        _prefix();
+
+        // Line comment
+        if (state.density <= multiline) {
+            _oss << "// "sv << v.comment.substr(0u, lineLength);
+        }
+        // Block comment
+        else {
+            // Ensure block comment does not contain `*/`
+            if (v.comment.find("*/"sv) != string_view::npos) {
+                throw EncodeError{"Block comment must not contain `*/`"sv};
+            }
+
+            if (state.density == uniline) {
+                _oss << "/* "sv << v.comment << " */"sv;
+            }
+            else {
+                _oss << "/*"sv << v.comment << "*/"sv;
+            }
+        }
+
+        _isComment = true;
+
+        // Simply recurse to handle the remaining lines
+        if (lineLength < v.comment.size()) {
+            operator<<(CommentToken{v.comment.substr(lineLength + 1)});
+        }
+
+        return *this;
+    }
+
     inline Encoder & Encoder::operator<<(const string_view v)
     {
-        if (!_state.empty() && !_state.back().array && !_isKey) {
+        if (_state.size() > 1 && !_state.back().array && !_isKey) {
             _key(v);
         }
         else {
@@ -485,16 +530,27 @@ namespace qc::json
 
     inline string Encoder::finish()
     {
-        if (!_isComplete) {
-            throw EncodeError{"Cannot finish, JSON is not yet complete"s};
+        if (_state.size() > 1 || !_state.front().content) {
+            throw EncodeError{"Cannot finish, JSON is not yet complete"sv};
         }
 
-        const string str{_oss.str()};
+        //
+        // This is a relatively efficient method of dropping the first character from the the result
+        //
+        // The extra character is either a space, or a newline, and is the result of the current prefix logic
+        //
+        // Testing with heap profiling, `_oss.view()` does not make any allocations. This means the view really is just
+        // pointing to the underlying buffer, which is presumably a string or char vector. Therefore, manually making a
+        // copy from this view is equivalent to just calling `_oss.str()`
+        //
+        // TODO: Find a way to avoid a copy altogether, which will likely mean not using a string stream
+        //
+        const string str{_oss.view().substr(_state.front().density < compact)};
 
         // Reset state
         _oss.str(""s);
         _oss.clear();
-        _isComplete = false;
+        _state.front().content = false;
 
         return str;
     }
@@ -505,31 +561,25 @@ namespace qc::json
         _checkPre();
         _prefix();
         _encode(v);
-
-        if (_state.empty()) {
-            _isComplete = true;
-        }
-        else {
-            _state.back().content = true;
-        }
+        _state.back().content = true;
         _isKey = false;
     }
 
     inline void Encoder::_key(const string_view key)
     {
-        if (key.empty()) {
-            throw EncodeError{"Key must not be empty"s};
-        }
-
         bool identifier{false};
         if (_identifiers) {
+            if (key.empty()) {
+                throw EncodeError{"Identifier must not be empty"sv};
+            }
+
             // Ensure the key has only alphanumeric and underscore characters
             if (std::find_if(key.cbegin(), key.cend(), [](const char c) { return !std::isalnum(uchar(c)) && c != '_'; }) == key.cend()) {
                 identifier = true;
             }
         }
 
-        _prefix<true>();
+        _prefix();
 
         if (identifier) {
             _oss << key;
@@ -539,27 +589,28 @@ namespace qc::json
         }
 
         _oss << ':';
-        if (_state.back().density < compact) {
-            _oss << ' ';
-        }
 
         _isKey = true;
     }
 
-    template <bool unchecked>
-    inline void Encoder::_prefix()
+    inline void Encoder::_prefix(const bool putComma)
     {
-        #pragma warning(suppress: 4127) // Condition intentionally constant when `unchecked` is true
-        if (unchecked || !_isKey && !_state.empty()) {
-            const _State & state{_state.back()};
-            if (state.content) {
+        const _State & state{_state.back()};
+
+        if (_isKey) {
+            if (state.density < compact) {
+                _oss << ' ';
+            }
+        }
+        else if (putComma || state.content || _isComment) {
+            if (putComma && state.content && !_isComment) {
                 _oss << ',';
             }
+
             switch (state.density) {
                 case unspecified: [[fallthrough]];
                 case multiline:
                     _oss << '\n';
-                    _indentation += !state.content;
                     _indent();
                     break;
                 case uniline:
@@ -569,6 +620,8 @@ namespace qc::json
                     break;
             }
         }
+
+        _isComment = false;
     }
 
     inline void Encoder::_indent()
@@ -580,11 +633,11 @@ namespace qc::json
 
     inline void Encoder::_checkPre() const
     {
-        if (_isComplete) {
-            throw EncodeError{"Cannot add value to complete JSON"s};
+        if (_state.size() == 1u && _state.front().content) {
+            throw EncodeError{"Cannot add value to complete JSON"sv};
         }
-        if (!_isKey && !(_state.empty() || _state.back().array)) {
-            throw EncodeError{"Cannot add value to object without first providing a key"s};
+        if (!_isKey && !(_state.size() == 1u || _state.back().array)) {
+            throw EncodeError{"Cannot add value to object without first providing a key"sv};
         }
     }
 

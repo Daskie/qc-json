@@ -1,7 +1,7 @@
 #pragma once
 
 ///
-/// QC JSON 1.4.7
+/// QC JSON 1.4.8
 ///
 /// Austin Quick : 2019 - 2021
 ///

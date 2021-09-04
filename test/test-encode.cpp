@@ -68,9 +68,9 @@ TEST(encode, object)
         EXPECT_EQ(R"({ "k": "v" })"s, encoder.finish());
     }
     { // Empty key
-        Encoder encoder{};
-        encoder << object;
-        EXPECT_THROW(encoder << "", EncodeError);
+        Encoder encoder{uniline};
+        encoder << object << "" << "" << end;
+        EXPECT_EQ(R"({ "": "" })"s, encoder.finish());
     }
     { // Integer key
         Encoder encoder{};
@@ -596,15 +596,160 @@ TEST(encode, identifiers) {
         EXPECT_EQ(R"({ "w o a": "v" })"s, encoder.finish());
     }
     { // Preference off
-        Encoder encoder{uniline, false, false};
+        Encoder encoder{uniline};
         encoder << object << "k" << "v" << end;
         EXPECT_EQ(R"({ "k": "v" })"s, encoder.finish());
+    }
+    { // Empty key
+        Encoder encoder{uniline, false, true};
+        encoder << object;
+        EXPECT_THROW(encoder << "", EncodeError);
     }
 }
 
 TEST(encode, comments)
 {
-
+    { // Simple one-line comments
+        Encoder encoder{multiline};
+        const std::string_view str{"A comment"};
+        encoder << comment(str) << comment(str) << 0 << comment(str) << comment(str);
+        EXPECT_EQ(
+R"(// A comment
+// A comment
+0,
+// A comment
+// A comment)"s, encoder.finish());
+    }
+    { // Simple multi-line comments
+        Encoder encoder{multiline};
+        const std::string_view str{"A comment\nand some more"};
+        encoder << comment(str) << comment(str) << 0 << comment(str) << comment(str);
+        EXPECT_EQ(
+R"(// A comment
+// and some more
+// A comment
+// and some more
+0,
+// A comment
+// and some more
+// A comment
+// and some more)"s, encoder.finish());
+    }
+    { // Complex
+        Encoder encoder{multiline};
+        const std::string_view single{"A comment"};
+        const std::string_view multi{"A comment\nand some more"};
+        encoder << comment(single);
+        encoder << array;
+            encoder << comment(multi);
+            encoder << comment(single);
+            encoder << 0;
+            encoder << comment(multi);
+            encoder << 1;
+            encoder << object;
+                encoder << comment(single);
+                encoder << "a" << 0;
+                encoder << comment(multi);
+                encoder << "b" << 1;
+                encoder << comment(multi);
+                encoder << comment(multi);
+                encoder << "c" << 2;
+                encoder << "d" << array(uniline) << comment(single) << 0 << comment(single) << comment(single) << array << comment(single) << end << comment(single) << end;
+                encoder << "e" << array;
+                    encoder << comment(single);
+                encoder << end;
+                encoder << "f" << array;
+                    encoder << comment(multi);
+                encoder << end;
+                encoder << comment(single);
+                encoder << comment(multi);
+            encoder << end;
+        encoder << comment(single);
+        encoder << end;
+    encoder << comment(multi);
+        EXPECT_EQ(
+R"(// A comment
+[
+    // A comment
+    // and some more
+    // A comment
+    0,
+    // A comment
+    // and some more
+    1,
+    {
+        // A comment
+        "a": 0,
+        // A comment
+        // and some more
+        "b": 1,
+        // A comment
+        // and some more
+        // A comment
+        // and some more
+        "c": 2,
+        "d": [ /* A comment */ 0, /* A comment */ /* A comment */ [ /* A comment */ ], /* A comment */ ],
+        "e": [
+            // A comment
+        ],
+        "f": [
+            // A comment
+            // and some more
+        ],
+        // A comment
+        // A comment
+        // and some more
+    },
+    // A comment
+],
+// A comment
+// and some more)"s, encoder.finish());
+    }
+    { // Comment between key and value
+        Encoder encoder{};
+        encoder << object << "k";
+        EXPECT_THROW(encoder << comment("nope"), EncodeError);
+    }
+    { // Escape sequence in block comment
+        Encoder encoder{uniline};
+        encoder << comment("A comment /* and some more") << nullptr;
+        EXPECT_EQ(R"(/* A comment /* and some more */ null)", encoder.finish());
+        EXPECT_THROW(encoder << comment("A comment */ and some more"), EncodeError);
+    }
+    { // Escape sequence in line comment
+        Encoder encoder{multiline};
+        encoder << comment("A comment /* and some more") << nullptr;
+        EXPECT_EQ(
+R"(// A comment /* and some more
+null)", encoder.finish());
+        encoder << comment("A comment */ and some more") << nullptr;
+        EXPECT_EQ(
+R"(// A comment */ and some more
+null)", encoder.finish());
+    }
+    { // Invalid characters
+        Encoder encoder{uniline};
+        EXPECT_THROW(encoder << comment("A\ncomment"sv), EncodeError);
+        EXPECT_THROW(encoder << comment("A\rcomment"sv), EncodeError);
+        EXPECT_THROW(encoder << comment("A\tcomment"sv), EncodeError);
+        EXPECT_THROW(encoder << comment("A\0comment"sv), EncodeError);
+    }
+    { // Compact
+        Encoder encoder{compact};
+        encoder << comment("A comment") << array << comment("A comment") << comment("A comment") << 0 << comment("A comment") << end << comment("A comment");
+        EXPECT_EQ("/*A comment*/[/*A comment*//*A comment*/0,/*A comment*/],/*A comment*/", encoder.finish());
+    }
+    { // Weird
+        Encoder encoder{multiline};
+        encoder << comment("") << nullptr;
+        EXPECT_EQ("// \nnull", encoder.finish());
+        encoder << comment("\n") << nullptr;
+        EXPECT_EQ("// \n// \nnull", encoder.finish());
+        encoder << comment("a\nb\nc") << nullptr;
+        EXPECT_EQ("// a\n// b\n// c\nnull", encoder.finish());
+        encoder << comment("\n\n\n") << nullptr;
+        EXPECT_EQ("// \n// \n// \n// \nnull", encoder.finish());
+    }
 }
 
 TEST(encode, misc)
@@ -619,10 +764,11 @@ TEST(encode, misc)
 TEST(encode, general)
 {
     Encoder encoder{};
+    encoder << comment("Third quarter summary document\nProtected information, do not propagate!"sv);
     encoder << object;
         encoder << "Name"sv << "Salt's Crust"sv;
         encoder << "Founded"sv << 1964;
-        encoder << "Employees"sv << array;
+        encoder << comment("Not necessarily up to date"sv) << "Employees"sv << array;
             encoder << object(uniline) << "Name"sv << "Ol' Joe Fisher"sv << "Title"sv << "Fisherman"sv << "Age"sv << 69 << end;
             encoder << object(uniline) << "Name"sv << "Mark Rower"sv << "Title"sv << "Cook"sv << "Age"sv << 41 << end;
             encoder << object(uniline) << "Name"sv << "Phineas"sv << "Title"sv << "Server Boy"sv << "Age"sv << 19 << end;
@@ -637,7 +783,7 @@ TEST(encode, general)
             encoder << object;
                 encoder << "Name"sv << "Two Tuna"sv;
                 encoder << "Price"sv << -std::numeric_limits<double>::infinity();
-                encoder << "Ingredients"sv << array(uniline) << "Tuna"sv << end;
+                encoder << "Ingredients"sv << array(uniline) << "Tuna"sv << comment("It's actually cod lmao") << end;
                 encoder << "Gluten Free"sv << true;
             encoder << end;
             encoder << object;
@@ -662,9 +808,12 @@ I do not like them Sam I am
         encoder << "Magic Numbers"sv << array(uniline) << hex(777) << octal(777u) << binary(777) << end;
     encoder << end;
 
-    EXPECT_EQ(R"({
+    EXPECT_EQ(R"(// Third quarter summary document
+// Protected information, do not propagate!
+{
     "Name": "Salt's Crust",
     "Founded": 1964,
+    // Not necessarily up to date
     "Employees": [
         { "Name": "Ol' Joe Fisher", "Title": "Fisherman", "Age": 69 },
         { "Name": "Mark Rower", "Title": "Cook", "Age": 41 },
@@ -680,7 +829,7 @@ I do not like them Sam I am
         {
             "Name": "Two Tuna",
             "Price": -inf,
-            "Ingredients": [ "Tuna" ],
+            "Ingredients": [ "Tuna", /* It's actually cod lmao */ ],
             "Gluten Free": true
         },
         {

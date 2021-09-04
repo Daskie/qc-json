@@ -1,7 +1,7 @@
 #pragma once
 
 ///
-/// QC JSON 1.4.7
+/// QC JSON 1.4.8
 ///
 /// Austin Quick : 2019 - 2021
 ///
@@ -39,8 +39,8 @@ namespace qc::json
     ///
     struct Error : std::runtime_error
     {
-        explicit Error(const string & msg = {}) noexcept :
-            std::runtime_error(msg)
+        explicit Error(const string_view msg = {}) noexcept :
+            std::runtime_error(msg.data())
         {}
     };
 }
@@ -56,7 +56,7 @@ namespace qc::json
     {
         size_t position; /// The index into the string where the error occurred
 
-        DecodeError(const string & msg, size_t position) noexcept;
+        DecodeError(const string_view msg, size_t position) noexcept;
     };
 
     ///
@@ -105,7 +105,7 @@ namespace qc::json
             }
 
             if (_pos != _end) {
-                throw DecodeError{"Extraneous content"s, size_t(_pos - _start)};
+                throw DecodeError{"Extraneous content"sv, size_t(_pos - _start)};
             }
         }
 
@@ -139,7 +139,7 @@ namespace qc::json
                         _pos += 2;
                         while (_pos + 1 < _end && !(_pos[0] == '*' && _pos[1] == '/')) ++_pos;
                         if (_pos + 1 < _end) _pos += 2;
-                        else throw DecodeError{"Block comment is unterminated"s, size_t(startOfComment - _start)};
+                        else throw DecodeError{"Block comment is unterminated"sv, size_t(startOfComment - _start)};
                         continue;
                     }
                 }
@@ -162,7 +162,7 @@ namespace qc::json
         void _consumeChar(const char c)
         {
             if (!_tryConsumeChar(c)) {
-                throw DecodeError{"Expected `"s + c + "`"s, size_t(_pos - _start)};
+                throw DecodeError{("Expected `"s += c) += '`', size_t(_pos - _start)};
             }
         }
 
@@ -185,14 +185,14 @@ namespace qc::json
         void _consumeChars(const string_view str)
         {
             if (!_tryConsumeChars(str)) {
-                throw DecodeError{"Expected `"s.append(str).append("`"sv), size_t(_pos - _start)};
+                throw DecodeError{("Expected `"s += str) += '`', size_t(_pos - _start)};
             }
         }
 
         void _ingestValue(State & state)
         {
             if (_pos >= _end) {
-                throw DecodeError{"Expected value"s, size_t(_pos - _start)};
+                throw DecodeError{"Expected value"sv, size_t(_pos - _start)};
             }
 
             char c{*_pos};
@@ -225,7 +225,7 @@ namespace qc::json
                 // There was a sign, so we'll keep track of that and increment our position
                 ++_pos;
                 if (_pos >= _end) {
-                    throw DecodeError{"Expected number"s, size_t(_pos - _start)};
+                    throw DecodeError{"Expected number"sv, size_t(_pos - _start)};
                 }
                 c = *_pos;
             }
@@ -261,7 +261,7 @@ namespace qc::json
             }
 
             // Nothing matched, throw an error
-            throw DecodeError{"Unknown value"s, size_t(_pos - _start)};
+            throw DecodeError{"Unknown value"sv, size_t(_pos - _start)};
         }
 
         void _ingestObject(State & outerState)
@@ -275,7 +275,7 @@ namespace qc::json
                 while (true) {
                     // Parse key
                     if (_pos >= _end) {
-                        throw DecodeError{"Expected key", size_t(_pos -_start)};
+                        throw DecodeError{"Expected key"sv, size_t(_pos -_start)};
                     }
                     const char c{*_pos};
                     const string_view key{(c == '"' || c == '\'') ? _consumeString(c) : _consumeIdentifier()};
@@ -349,7 +349,7 @@ namespace qc::json
 
             while (true) {
                 if (_pos >= _end) {
-                    throw DecodeError{"Expected end quote"s, size_t(_pos - _start)};
+                    throw DecodeError{"Expected end quote"sv, size_t(_pos - _start)};
                 }
 
                 const char c{*_pos};
@@ -376,7 +376,7 @@ namespace qc::json
                     ++_pos;
                 }
                 else {
-                    throw DecodeError{"Invalid string content"s, size_t(_pos - _start)};
+                    throw DecodeError{"Invalid string content"sv, size_t(_pos - _start)};
                 }
             }
         }
@@ -384,7 +384,7 @@ namespace qc::json
         char _consumeEscaped()
         {
             if (_pos >= _end) {
-                throw DecodeError{"Expected escape sequence"s, size_t(_pos - _start)};
+                throw DecodeError{"Expected escape sequence"sv, size_t(_pos - _start)};
             }
 
             const char c{*_pos};
@@ -405,7 +405,7 @@ namespace qc::json
                         return c;
                     }
                     else {
-                        throw DecodeError{"Invalid escape sequence"s, size_t(_pos - _start - 1)};
+                        throw DecodeError{"Invalid escape sequence"sv, size_t(_pos - _start - 1)};
                     }
             }
         }
@@ -413,13 +413,13 @@ namespace qc::json
         char _consumeCodePoint(const int digits)
         {
             if (_end - _pos < digits) {
-                throw DecodeError{"Expected "s + std::to_string(digits) + " code point digits"s, size_t(_pos - _start)};
+                throw DecodeError{("Expected "s += std::to_string(digits)) += " code point digits"sv, size_t(_pos - _start)};
             }
 
             uint32_t val;
             const std::from_chars_result res{std::from_chars(_pos, _pos + digits, val, 16)};
             if (res.ec != std::errc{}) {
-                throw DecodeError{"Invalid code point"s, size_t(_pos - _start)};
+                throw DecodeError{"Invalid code point"sv, size_t(_pos - _start)};
             }
 
             _pos += digits;
@@ -438,7 +438,7 @@ namespace qc::json
                 ++_pos;
             }
             else {
-                throw DecodeError{"Expected identifier", size_t(_pos - _start)};
+                throw DecodeError{"Expected identifier"sv, size_t(_pos - _start)};
             }
 
             while (true) {
@@ -504,7 +504,7 @@ namespace qc::json
 
                 if (base) {
                     if (sign) {
-                        throw DecodeError{"Hex, octal, and binary numbers must not be signed"s, size_t(_pos - _start)};
+                        throw DecodeError{"Hex, octal, and binary numbers must not be signed"sv, size_t(_pos - _start)};
                     }
                     _pos += 2;
                     _ingestHexOctalBinary(state, base);
@@ -533,7 +533,7 @@ namespace qc::json
 
             // There was an issue parsing
             if (res.ec != std::errc{}) {
-                throw DecodeError{base == 2 ? "Invalid binary"s : base == 8 ? "Invalid octal"s : "Invalid hex"s, size_t(_pos - _start)};
+                throw DecodeError{base == 2 ? "Invalid binary"sv : base == 8 ? "Invalid octal"sv : "Invalid hex"sv, size_t(_pos - _start)};
             }
 
             _pos = res.ptr;
@@ -562,7 +562,7 @@ namespace qc::json
                     }
                     // Some other issue
                     else {
-                        throw DecodeError{"Invalid integer"s, size_t(_pos - _start)};
+                        throw DecodeError{"Invalid integer"sv, size_t(_pos - _start)};
                     }
                 }
             }
@@ -587,7 +587,7 @@ namespace qc::json
 
             // There was an issue parsing
             if (res.ec != std::errc{}) {
-                throw DecodeError{"Invalid floater"s, size_t(_pos - _start)};
+                throw DecodeError{"Invalid floater"sv, size_t(_pos - _start)};
             }
 
             _pos = res.ptr;
@@ -595,7 +595,7 @@ namespace qc::json
         }
     };
 
-    inline DecodeError::DecodeError(const string & msg, const size_t position) noexcept :
+    inline DecodeError::DecodeError(const string_view msg, const size_t position) noexcept :
         Error{msg},
         position{position}
     {}
