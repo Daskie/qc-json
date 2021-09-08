@@ -15,8 +15,7 @@ qc_setup_general()
 
 qc_setup_target(
     qc-json
-    LIBRARY
-    INTERFACE
+    INTERFACE_LIBRARY
     INSTALLABLE
 )
 
