@@ -130,10 +130,24 @@ namespace qc::json
         ///
         Encoder(Density density = unspecified, bool singleQuotes = false, bool identifiers = false);
 
-        Encoder(const Encoder & other) = delete;
+        Encoder(const Encoder &) = delete;
+
+        ///
+        /// Move constructor
+        ///
+        /// @param other is not valid after moved
+        /// @return this
+        ///
         Encoder(Encoder && other) noexcept;
 
-        Encoder & operator=(const Encoder & other) = delete;
+        Encoder & operator=(const Encoder &) = delete;
+
+        ///
+        /// Move assignment operator
+        ///
+        /// @param other is not valid after moved
+        /// @return this
+        ///
         Encoder & operator=(Encoder && other) noexcept;
 
         ~Encoder() noexcept = default;
@@ -231,6 +245,8 @@ namespace qc::json
             Density density;
         };
 
+        inline static size_t _startingStateCapactiy{8u};
+
         char _quote{'"'};
         bool _identifiers{false};
         std::string _str{};
@@ -283,28 +299,29 @@ namespace qc::json
         _quote{singleQuotes ? '\'' : '"'},
         _identifiers{preferIdentifiers}
     {
+        _state.reserve(_startingStateCapactiy);
         _state.push_back(_State{false, false, density});
     }
 
     inline Encoder::Encoder(Encoder && other) noexcept :
-        _quote{std::exchange(other._quote, '"')},
-        _identifiers{std::exchange(other._identifiers, false)},
+        _quote{other._quote},
+        _identifiers{other._identifiers},
         _str{std::move(other._str)},
         _state{std::move(other._state)},
-        _indentation{std::exchange(other._indentation, 0)},
-        _isKey{std::exchange(other._isKey, false)},
-        _isComment{std::exchange(other._isComment, false)}
+        _indentation{other._indentation},
+        _isKey{other._isKey},
+        _isComment{other._isComment}
     {}
 
     inline Encoder & Encoder::operator=(Encoder && other) noexcept
     {
-        _quote = std::exchange(other._quote, '"');
-        _identifiers = std::exchange(other._identifiers, false);
+        _quote = other._quote;
+        _identifiers = other._identifiers;
         _str = std::move(other._str);
         _state = std::move(other._state);
-        _indentation = std::exchange(other._indentation, 0);
-        _isKey = std::exchange(other._isKey, false);
-        _isComment = std::exchange(other._isComment, false);
+        _indentation = other._indentation;
+        _isKey = other._isKey;
+        _isComment = other._isComment;
 
         return *this;
     }
