@@ -15,7 +15,6 @@
 #include <cctype>
 #include <cstddef>
 
-#include <algorithm>
 #include <charconv>
 #include <stdexcept>
 #include <string>
@@ -70,7 +69,7 @@ namespace qc::json
         /// TODO: Change this to enum class and add a `using enum Density` after once intellisense supports it. This is
         ///   to prevent `Density` from being implicitly cast to an integer, which can lead to issues
         ///
-        enum Density
+        enum Density : int
         {
             unspecified, /// Use that of the root or parent element
             multiline,   /// Elements are put on new lines
@@ -238,22 +237,26 @@ namespace qc::json
 
         private: //-------------------------------------------------------------
 
-        struct _State
-        {
-            bool array;
-            Density density;
-        };
+        enum class _Container : int { none, object, array };
 
-        inline static size_t _startingStateCapactiy{8u};
+        struct _ScopeDelta
+        {
+            int containerDelta;
+            int densityDelta;
+        };
 
         char _quote{'"'};
         bool _identifiers{false};
         std::string _str{};
-        std::vector<_State> _state{};
+        std::vector<_ScopeDelta> _scopeDeltas{};
+        _Container _container{_Container::none};
+        Density _density{unspecified};
         int _indentation{0};
         bool _isContent{false};
         bool _isKey{false};
         bool _isComment{false};
+
+        void _start(_Container container, Density density);
 
         template <typename T> void _val(T v);
 
@@ -297,17 +300,17 @@ namespace qc::json
 
     inline Encoder::Encoder(const Density density, bool singleQuotes, bool preferIdentifiers) :
         _quote{singleQuotes ? '\'' : '"'},
-        _identifiers{preferIdentifiers}
-    {
-        _state.reserve(_startingStateCapactiy);
-        _state.push_back(_State{false, density});
-    }
+        _identifiers{preferIdentifiers},
+        _density{density}
+    {}
 
     inline Encoder::Encoder(Encoder && other) noexcept :
         _quote{other._quote},
         _identifiers{other._identifiers},
         _str{std::move(other._str)},
-        _state{std::move(other._state)},
+        _scopeDeltas{std::move(other._scopeDeltas)},
+        _container{other._container},
+        _density{other._density},
         _indentation{other._indentation},
         _isContent{other._isContent},
         _isKey{other._isKey},
@@ -319,7 +322,9 @@ namespace qc::json
         _quote = other._quote;
         _identifiers = other._identifiers;
         _str = std::move(other._str);
-        _state = std::move(other._state);
+        _scopeDeltas = std::move(other._scopeDeltas);
+        _container = other._container;
+        _density = other._density;
         _indentation = other._indentation;
         _isContent = other._isContent;
         _isKey = other._isKey;
@@ -330,37 +335,19 @@ namespace qc::json
 
     inline Encoder & Encoder::operator<<(const ObjectToken v)
     {
-        _checkPre();
-        _prefix();
-        _str += '{';
-
-        _State & parentState{_state.back()};
-        _state.push_back(_State{false, std::max(v.density, parentState.density)});
-        ++_indentation;
-        _isContent = false;
-        _isKey = false;
-
+        _start(_Container::object, v.density);
         return *this;
     }
 
     inline Encoder & Encoder::operator<<(const ArrayToken v)
     {
-        _checkPre();
-        _prefix();
-        _str += '[';
-
-        _State & parentState{_state.back()};
-        _state.push_back(_State{true, std::max(v.density, parentState.density)});
-        ++_indentation;
-        _isContent = false;
-        _isKey = false;
-
+        _start(_Container::array, v.density);
         return *this;
     }
 
     inline Encoder & Encoder::operator<<(const EndToken)
     {
-        if (_state.size() <= 1u) {
+        if (_container == _Container::none) {
             throw EncodeError{"No object or array to end"sv};
         }
         if (_isKey) {
@@ -369,8 +356,10 @@ namespace qc::json
 
         --_indentation;
         _prefix(false);
-        _str += (_state.back().array ? ']' : '}');
-        _state.pop_back();
+        _str += (_container == _Container::object ? '}' : ']');
+        _container = _Container(int(_container) - _scopeDeltas.back().containerDelta);
+        _density = Density(_density - _scopeDeltas.back().densityDelta);
+        _scopeDeltas.pop_back();
         _isContent = true;
 
         return *this;
@@ -401,14 +390,13 @@ namespace qc::json
             throw EncodeError{"Comment can not come between key and value"sv};
         }
 
-        const _State & state{_state.back()};
         size_t lineLength{v.comment.size()};
 
         // Check for invalid characters and determine first line length
         for (size_t i{0u}; i < v.comment.size(); ++i) {
             const char c{v.comment[i]};
             if (!std::isprint(uchar(c))) {
-                if (c == '\n' && state.density <= multiline) {
+                if (c == '\n' && _density <= multiline) {
                     lineLength = i;
                     break;
                 }
@@ -421,7 +409,7 @@ namespace qc::json
         _prefix();
 
         // Line comment
-        if (state.density <= multiline) {
+        if (_density <= multiline) {
             _str += "// "sv;
             _str += v.comment.substr(0u, lineLength);
         }
@@ -432,7 +420,7 @@ namespace qc::json
                 throw EncodeError{"Block comment must not contain `*/`"sv};
             }
 
-            if (state.density == uniline) {
+            if (_density == uniline) {
                 _str += "/* "sv;
                 _str += v.comment;
                 _str += " */"sv;
@@ -456,7 +444,7 @@ namespace qc::json
 
     inline Encoder & Encoder::operator<<(const string_view v)
     {
-        if (_state.size() > 1 && !_state.back().array && !_isKey) {
+        if (_container == _Container::object && !_isKey) {
             _key(v);
         }
         else {
@@ -553,7 +541,7 @@ namespace qc::json
 
     inline string Encoder::finish()
     {
-        if (_state.size() > 1 || !_isContent) {
+        if (_container != _Container::none || !_isContent) {
             throw EncodeError{"Cannot finish, JSON is not yet complete"sv};
         }
 
@@ -564,6 +552,23 @@ namespace qc::json
         _isContent = false;
 
         return str;
+    }
+
+    inline void Encoder::_start(const _Container container, const Density density)
+    {
+        _checkPre();
+        _prefix();
+        _str += container == _Container::object ? '{' : '[';
+
+        const int containerDelta{int(container) - int(_container)};
+        const Density newDensity{density > _density ? density : _density};
+        const int densityDelta{newDensity - _density};
+        _scopeDeltas.push_back(_ScopeDelta{containerDelta, densityDelta});
+        _container = container;
+        _density = newDensity;
+        ++_indentation;
+        _isContent = false;
+        _isKey = false;
     }
 
     template <typename T>
@@ -585,8 +590,12 @@ namespace qc::json
             }
 
             // Ensure the key has only alphanumeric and underscore characters
-            if (std::find_if(key.cbegin(), key.cend(), [](const char c) { return !std::isalnum(uchar(c)) && c != '_'; }) == key.cend()) {
-                identifier = true;
+            identifier = true;
+            for (const char c : key) {
+                if (!std::isalnum(uchar(c)) && c != '_') {
+                    identifier = false;
+                    break;
+                }
             }
         }
 
@@ -606,10 +615,8 @@ namespace qc::json
 
     inline void Encoder::_prefix(const bool putComma)
     {
-        const _State & state{_state.back()};
-
         if (_isKey) {
-            if (state.density < compact) {
+            if (_density < compact) {
                 _str += ' ';
             }
         }
@@ -618,7 +625,7 @@ namespace qc::json
                 _str += ',';
             }
 
-            switch (state.density) {
+            switch (_density) {
                 case unspecified: [[fallthrough]];
                 case multiline:
                     _str += '\n';
@@ -644,10 +651,10 @@ namespace qc::json
 
     inline void Encoder::_checkPre() const
     {
-        if (_state.size() == 1u && _isContent) {
+        if (_container == _Container::none && _isContent) {
             throw EncodeError{"Cannot add value to complete JSON"sv};
         }
-        if (!_isKey && !(_state.size() == 1u || _state.back().array)) {
+        if (!_isKey && _container == _Container::object) {
             throw EncodeError{"Cannot add value to object without first providing a key"sv};
         }
     }
