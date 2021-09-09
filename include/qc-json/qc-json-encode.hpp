@@ -241,7 +241,6 @@ namespace qc::json
         struct _State
         {
             bool array;
-            bool content;
             Density density;
         };
 
@@ -252,6 +251,7 @@ namespace qc::json
         std::string _str{};
         std::vector<_State> _state{};
         int _indentation{0};
+        bool _isContent{false};
         bool _isKey{false};
         bool _isComment{false};
 
@@ -300,7 +300,7 @@ namespace qc::json
         _identifiers{preferIdentifiers}
     {
         _state.reserve(_startingStateCapactiy);
-        _state.push_back(_State{false, false, density});
+        _state.push_back(_State{false, density});
     }
 
     inline Encoder::Encoder(Encoder && other) noexcept :
@@ -309,6 +309,7 @@ namespace qc::json
         _str{std::move(other._str)},
         _state{std::move(other._state)},
         _indentation{other._indentation},
+        _isContent{other._isContent},
         _isKey{other._isKey},
         _isComment{other._isComment}
     {}
@@ -320,6 +321,7 @@ namespace qc::json
         _str = std::move(other._str);
         _state = std::move(other._state);
         _indentation = other._indentation;
+        _isContent = other._isContent;
         _isKey = other._isKey;
         _isComment = other._isComment;
 
@@ -333,9 +335,9 @@ namespace qc::json
         _str += '{';
 
         _State & parentState{_state.back()};
-        parentState.content = true;
-        _state.push_back(_State{false, false, std::max(v.density, parentState.density)});
+        _state.push_back(_State{false, std::max(v.density, parentState.density)});
         ++_indentation;
+        _isContent = false;
         _isKey = false;
 
         return *this;
@@ -348,9 +350,9 @@ namespace qc::json
         _str += '[';
 
         _State & parentState{_state.back()};
-        parentState.content = true;
-        _state.push_back(_State{true, false, std::max(v.density, parentState.density)});
+        _state.push_back(_State{true, std::max(v.density, parentState.density)});
         ++_indentation;
+        _isContent = false;
         _isKey = false;
 
         return *this;
@@ -369,6 +371,7 @@ namespace qc::json
         _prefix(false);
         _str += (_state.back().array ? ']' : '}');
         _state.pop_back();
+        _isContent = true;
 
         return *this;
     }
@@ -550,7 +553,7 @@ namespace qc::json
 
     inline string Encoder::finish()
     {
-        if (_state.size() > 1 || !_state.front().content) {
+        if (_state.size() > 1 || !_isContent) {
             throw EncodeError{"Cannot finish, JSON is not yet complete"sv};
         }
 
@@ -558,7 +561,7 @@ namespace qc::json
 
         // Reset state
         _str.clear();
-        _state.front().content = false;
+        _isContent = false;
 
         return str;
     }
@@ -569,7 +572,7 @@ namespace qc::json
         _checkPre();
         _prefix();
         _encode(v);
-        _state.back().content = true;
+        _isContent = true;
         _isKey = false;
     }
 
@@ -610,8 +613,8 @@ namespace qc::json
                 _str += ' ';
             }
         }
-        else if ((putComma || state.content || _isComment) && !_str.empty()) {
-            if (putComma && state.content && !_isComment) {
+        else if ((putComma || _isContent || _isComment) && !_str.empty()) {
+            if (putComma && _isContent && !_isComment) {
                 _str += ',';
             }
 
@@ -641,7 +644,7 @@ namespace qc::json
 
     inline void Encoder::_checkPre() const
     {
-        if (_state.size() == 1u && _state.front().content) {
+        if (_state.size() == 1u && _isContent) {
             throw EncodeError{"Cannot add value to complete JSON"sv};
         }
         if (!_isKey && !(_state.size() == 1u || _state.back().array)) {
