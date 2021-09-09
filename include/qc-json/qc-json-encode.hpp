@@ -17,7 +17,6 @@
 
 #include <algorithm>
 #include <charconv>
-#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -234,12 +233,11 @@ namespace qc::json
 
         char _quote{'"'};
         bool _identifiers{false};
-        std::ostringstream _oss{};
+        std::string _str{};
         std::vector<_State> _state{};
         int _indentation{0};
         bool _isKey{false};
         bool _isComment{false};
-        char _buffer[68]{};
 
         template <typename T> void _val(T v);
 
@@ -291,7 +289,7 @@ namespace qc::json
     inline Encoder::Encoder(Encoder && other) noexcept :
         _quote{std::exchange(other._quote, '"')},
         _identifiers{std::exchange(other._identifiers, false)},
-        _oss{std::move(other._oss)},
+        _str{std::move(other._str)},
         _state{std::move(other._state)},
         _indentation{std::exchange(other._indentation, 0)},
         _isKey{std::exchange(other._isKey, false)},
@@ -302,7 +300,7 @@ namespace qc::json
     {
         _quote = std::exchange(other._quote, '"');
         _identifiers = std::exchange(other._identifiers, false);
-        _oss = std::move(other._oss);
+        _str = std::move(other._str);
         _state = std::move(other._state);
         _indentation = std::exchange(other._indentation, 0);
         _isKey = std::exchange(other._isKey, false);
@@ -315,7 +313,7 @@ namespace qc::json
     {
         _checkPre();
         _prefix();
-        _oss << '{';
+        _str += '{';
 
         _State & parentState{_state.back()};
         parentState.content = true;
@@ -330,7 +328,7 @@ namespace qc::json
     {
         _checkPre();
         _prefix();
-        _oss << '[';
+        _str += '[';
 
         _State & parentState{_state.back()};
         parentState.content = true;
@@ -352,7 +350,7 @@ namespace qc::json
 
         --_indentation;
         _prefix(false);
-        _oss << (_state.back().array ? ']' : '}');
+        _str += (_state.back().array ? ']' : '}');
         _state.pop_back();
 
         return *this;
@@ -404,7 +402,8 @@ namespace qc::json
 
         // Line comment
         if (state.density <= multiline) {
-            _oss << "// "sv << v.comment.substr(0u, lineLength);
+            _str += "// "sv;
+            _str += v.comment.substr(0u, lineLength);
         }
         // Block comment
         else {
@@ -414,10 +413,14 @@ namespace qc::json
             }
 
             if (state.density == uniline) {
-                _oss << "/* "sv << v.comment << " */"sv;
+                _str += "/* "sv;
+                _str += v.comment;
+                _str += " */"sv;
             }
             else {
-                _oss << "/*"sv << v.comment << "*/"sv;
+                _str += "/*"sv;
+                _str += v.comment;
+                _str += "*/"sv;
             }
         }
 
@@ -534,22 +537,10 @@ namespace qc::json
             throw EncodeError{"Cannot finish, JSON is not yet complete"sv};
         }
 
-        //
-        // This is a relatively efficient method of dropping the first character from the the result
-        //
-        // The extra character is either a space, or a newline, and is the result of the current prefix logic
-        //
-        // Testing with heap profiling, `_oss.view()` does not make any allocations. This means the view really is just
-        // pointing to the underlying buffer, which is presumably a string or char vector. Therefore, manually making a
-        // copy from this view is equivalent to just calling `_oss.str()`
-        //
-        // TODO: Find a way to avoid a copy altogether, which will likely mean not using a string stream
-        //
-        const string str{_oss.view().substr(_state.front().density < compact)};
+        const string str{std::move(_str)};
 
         // Reset state
-        _oss.str(""s);
-        _oss.clear();
+        _str.clear();
         _state.front().content = false;
 
         return str;
@@ -582,13 +573,13 @@ namespace qc::json
         _prefix();
 
         if (identifier) {
-            _oss << key;
+            _str += key;
         }
         else {
             _encode(key);
         }
 
-        _oss << ':';
+        _str += ':';
 
         _isKey = true;
     }
@@ -599,22 +590,22 @@ namespace qc::json
 
         if (_isKey) {
             if (state.density < compact) {
-                _oss << ' ';
+                _str += ' ';
             }
         }
-        else if (putComma || state.content || _isComment) {
+        else if ((putComma || state.content || _isComment) && !_str.empty()) {
             if (putComma && state.content && !_isComment) {
-                _oss << ',';
+                _str += ',';
             }
 
             switch (state.density) {
                 case unspecified: [[fallthrough]];
                 case multiline:
-                    _oss << '\n';
+                    _str += '\n';
                     _indent();
                     break;
                 case uniline:
-                    _oss << ' ';
+                    _str += ' ';
                     break;
                 case compact:
                     break;
@@ -627,7 +618,7 @@ namespace qc::json
     inline void Encoder::_indent()
     {
         for (int i{0}; i < _indentation; ++i) {
-            _oss << "    "sv;
+            _str += "    "sv;
         }
     }
 
@@ -645,83 +636,94 @@ namespace qc::json
     {
         static constexpr char hexChars[16]{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
 
-        _oss << _quote;
+        _str += _quote;
 
         for (const char c : v) {
             if (std::isprint(uchar(c))) {
-                if (c == _quote || c == '\\') _oss << '\\';
-                _oss << c;
+                if (c == _quote || c == '\\') _str += '\\';
+                _str += c;
             }
             else {
                 switch (c) {
-                    case '\0': _oss << R"(\0)"; break;
-                    case '\b': _oss << R"(\b)"; break;
-                    case '\t': _oss << R"(\t)"; break;
-                    case '\n': _oss << R"(\n)"; break;
-                    case '\v': _oss << R"(\v)"; break;
-                    case '\f': _oss << R"(\f)"; break;
-                    case '\r': _oss << R"(\r)"; break;
+                    case '\0': _str += R"(\0)"; break;
+                    case '\b': _str += R"(\b)"; break;
+                    case '\t': _str += R"(\t)"; break;
+                    case '\n': _str += R"(\n)"; break;
+                    case '\v': _str += R"(\v)"; break;
+                    case '\f': _str += R"(\f)"; break;
+                    case '\r': _str += R"(\r)"; break;
                     default:
-                        _oss << "\\x"sv << hexChars[(uchar(c) >> 4) & 0xF] << hexChars[uchar(c) & 0xF];
+                        _str += "\\x"sv;
+                        _str += hexChars[(uchar(c) >> 4) & 0xF];
+                        _str += hexChars[uchar(c) & 0xF];
                 }
             }
         }
 
-        _oss << _quote;
+        _str += _quote;
     }
 
     inline void Encoder::_encode(const int64_t v)
     {
-        const std::to_chars_result res{std::to_chars(_buffer, _buffer + sizeof(_buffer), v)};
-        _oss << string_view{_buffer, size_t(res.ptr - _buffer)};
+        char buffer[24];
+        const std::to_chars_result res{std::to_chars(buffer, buffer + sizeof(buffer), v)};
+        _str.append(buffer, size_t(res.ptr - buffer));
     }
 
     inline void Encoder::_encode(const uint64_t v)
     {
-        const std::to_chars_result res{std::to_chars(_buffer, _buffer + sizeof(_buffer), v)};
-        _oss << string_view{_buffer, size_t(res.ptr - _buffer)};
+        char buffer[24];
+        const std::to_chars_result res{std::to_chars(buffer, buffer + sizeof(buffer), v)};
+        _str.append(buffer, size_t(res.ptr - buffer));
     }
 
     inline void Encoder::_encode(const BinaryToken v)
     {
-        const std::to_chars_result res{std::to_chars(_buffer, _buffer + sizeof(_buffer), v.val, 2)};
-        _oss << "0b"sv << string_view{_buffer, size_t(res.ptr - _buffer)};
+        char buffer[64];
+        const std::to_chars_result res{std::to_chars(buffer, buffer + sizeof(buffer), v.val, 2)};
+        _str += "0b"sv;
+        _str.append(buffer, size_t(res.ptr - buffer));
     }
 
     inline void Encoder::_encode(const OctalToken v)
     {
-        const std::to_chars_result res{std::to_chars(_buffer, _buffer + sizeof(_buffer), v.val, 8)};
-        _oss << "0o"sv << string_view{_buffer, size_t(res.ptr - _buffer)};
+        char buffer[24];
+        const std::to_chars_result res{std::to_chars(buffer, buffer + sizeof(buffer), v.val, 8)};
+        _str += "0o"sv;
+        _str.append(buffer, size_t(res.ptr - buffer));
     }
 
     inline void Encoder::_encode(const HexToken v)
     {
-        const std::to_chars_result res{std::to_chars(_buffer, _buffer + sizeof(_buffer), v.val, 16)};
-        const size_t length{size_t(res.ptr - _buffer)};
+        char buffer[16];
+        const std::to_chars_result res{std::to_chars(buffer, buffer + sizeof(buffer), v.val, 16)};
+        const size_t length{size_t(res.ptr - buffer)};
 
         // Manually convert to uppercase hex because apparently `std::to_chars` doesn't have an option for that
         for (size_t i{0u}; i < length; ++i) {
-            if (_buffer[i] >= 'a') {
-                _buffer[i] -= ('a' - 'A');
+            if (buffer[i] >= 'a') {
+                buffer[i] -= ('a' - 'A');
             }
         }
 
-        _oss << "0x"sv << string_view{_buffer, length};
+        _str += "0x"sv;
+        _str.append(buffer, length);
     }
 
     inline void Encoder::_encode(const double v)
     {
-        const std::to_chars_result res{std::to_chars(_buffer, _buffer + sizeof(_buffer), v)};
-        _oss << string_view{_buffer, size_t(res.ptr - _buffer)};
+        char buffer[24];
+        const std::to_chars_result res{std::to_chars(buffer, buffer + sizeof(buffer), v)};
+        _str.append(buffer, size_t(res.ptr - buffer));
     }
 
     inline void Encoder::_encode(const bool v)
     {
-        _oss << (v ? "true"sv : "false"sv);
+        _str += v ? "true"sv : "false"sv;
     }
 
     inline void Encoder::_encode(std::nullptr_t)
     {
-        _oss << "null"sv;
+        _str += "null"sv;
     }
 }
