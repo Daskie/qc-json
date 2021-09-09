@@ -9,7 +9,7 @@
 ///
 /// Decodes data from a JSON string and sends it to the provided `Composer`
 ///
-/// See the GitHub link above for more info and examples
+/// See the README for more info and examples
 ///
 
 #include <cctype>

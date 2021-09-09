@@ -12,7 +12,7 @@
 ///
 /// Uses `qc-json-encode.hpp` to do the encoding and `qc-json-decode.hpp` to do the decoding
 ///
-/// See the GitHub link above for more info and examples
+/// See the README for more info and examples
 ///
 
 #include <cstring>

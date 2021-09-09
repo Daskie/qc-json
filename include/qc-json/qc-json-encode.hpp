@@ -9,7 +9,7 @@
 ///
 /// Encodes data into a JSON string
 ///
-/// See the GitHub link above for more info and examples
+/// See the README for more info and examples
 ///
 
 #include <cctype>
