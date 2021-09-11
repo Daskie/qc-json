@@ -16,6 +16,7 @@ using qc::json::encode;
 using qc::json::Type;
 using qc::json::TypeError;
 using namespace qc::json::tokens;
+using qc::json::Density;
 using qc::json::Safety::safe;
 using qc::json::Safety::unsafe;
 
@@ -736,9 +737,9 @@ TEST(json, density)
     1,
     2,
     3
-])"s, encode(Array{1, 2, 3}, multiline));
-    EXPECT_EQ("[ 1, 2, 3 ]"s, encode(Array{1, 2, 3}, uniline));
-    EXPECT_EQ("[1,2,3]"s, encode(Array{1, 2, 3}, compact));
+])"s, encode(Array{1, 2, 3}, Density::multiline));
+    EXPECT_EQ("[ 1, 2, 3 ]"s, encode(Array{1, 2, 3}, Density::uniline));
+    EXPECT_EQ("[1,2,3]"s, encode(Array{1, 2, 3}, Density::compact));
 }
 
 TEST(json, general)

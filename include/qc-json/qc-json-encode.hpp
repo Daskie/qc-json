@@ -42,6 +42,20 @@ namespace qc::json
             std::runtime_error{msg.data()}
         {}
     };
+
+    ///
+    /// Pass with an object or array to specify its density
+    ///
+    /// TODO: Change this to enum class and add a `using enum Density` after once intellisense supports it. This is
+    ///   to prevent `Density` from being implicitly cast to an integer, which can lead to issues
+    ///
+    enum class Density : int
+    {
+        unspecified = 0b000, /// Use that of the root or parent element
+        multiline   = 0b001, /// Elements are put on new lines
+        uniline     = 0b011, /// Elements are put on one line separated by spaces
+        compact     = 0b111  /// No whitespace is used whatsoever
+    };
 }
 
 #endif // QC_JSON_COMMON
@@ -62,34 +76,19 @@ namespace qc::json
     ///
     inline namespace tokens
     {
-
-        ///
-        /// Pass with an object or array to specify its density
-        ///
-        /// TODO: Change this to enum class and add a `using enum Density` after once intellisense supports it. This is
-        ///   to prevent `Density` from being implicitly cast to an integer, which can lead to issues
-        ///
-        enum Density : int
-        {
-            unspecified, /// Use that of the root or parent element
-            multiline,   /// Elements are put on new lines
-            uniline,     /// Elements are put on one line separated by spaces
-            compact      /// No whitespace is used whatsoever
-        };
-
         ///
         /// Stream this `object` variable to start a new object. Optionally specify a density
         ///
         /// This weird struct/operator()/variable setup allows for both ` << object ` and ` << object(density) `
         ///
-        constexpr struct ObjectToken { Density density{unspecified}; constexpr ObjectToken operator()(Density density_) const noexcept { return ObjectToken{density_}; } } object{};
+        constexpr struct ObjectToken { Density density{Density::unspecified}; constexpr ObjectToken operator()(Density density_) const noexcept { return ObjectToken{density_}; } } object{};
 
         ///
         /// Stream this `array` variable to start a new array. Optionally specify a density
         ///
         /// This weird struct/operator()/variable setup allows for both ` << array ` and ` << array(density) `
         ///
-        constexpr struct ArrayToken { Density density{unspecified}; constexpr ArrayToken operator()(Density density_) const noexcept { return ArrayToken{density_}; } } array{};
+        constexpr struct ArrayToken { Density density{Density::unspecified}; constexpr ArrayToken operator()(Density density_) const noexcept { return ArrayToken{density_}; } } array{};
 
         ///
         /// Stream this to end the current object or array
@@ -127,7 +126,7 @@ namespace qc::json
         /// @param singleQuotes whether to use `'` instead of `"` for strings
         /// @param identifiers whether to encode all eligible keys as identifiers instead of strings
         ///
-        Encoder(Density density = unspecified, bool singleQuotes = false, bool identifiers = false);
+        Encoder(Density density = Density::unspecified, bool singleQuotes = false, bool identifiers = false);
 
         Encoder(const Encoder &) = delete;
 
@@ -241,6 +240,7 @@ namespace qc::json
 
         enum class _Element { none, key, val, start, comment };
 
+        // Using deltas allows us to start with an empty scope vector without needing a bunch of special root-case logic
         struct _ScopeDelta
         {
             int containerDelta;
@@ -252,7 +252,7 @@ namespace qc::json
         std::string _str{};
         std::vector<_ScopeDelta> _scopeDeltas{};
         _Container _container{_Container::none};
-        Density _density{unspecified};
+        Density _density{Density::unspecified};
         int _indentation{0};
         _Element _prevElement{_Element::none};
         bool _isContent{false};
@@ -359,7 +359,7 @@ namespace qc::json
         }
         _str += (_container == _Container::object ? '}' : ']');
         _container = _Container(int(_container) - _scopeDeltas.back().containerDelta);
-        _density = Density(_density - _scopeDeltas.back().densityDelta);
+        _density = Density(int(_density) - _scopeDeltas.back().densityDelta);
         _scopeDeltas.pop_back();
         _prevElement = _Element::val;
         _isContent = true;
@@ -398,7 +398,7 @@ namespace qc::json
         for (size_t i{0u}; i < v.comment.size(); ++i) {
             const char c{v.comment[i]};
             if (!std::isprint(uchar(c))) {
-                if (c == '\n' && _density <= multiline) {
+                if (c == '\n' && _density <= Density::multiline) {
                     lineLength = i;
                     break;
                 }
@@ -411,7 +411,7 @@ namespace qc::json
         _prefix();
 
         // Line comment
-        if (_density <= multiline) {
+        if (_density <= Density::multiline) {
             _str += "// "sv;
             _str += v.comment.substr(0u, lineLength);
         }
@@ -422,7 +422,7 @@ namespace qc::json
                 throw EncodeError{"Block comment must not contain `*/`"sv};
             }
 
-            if (_density == uniline) {
+            if (_density == Density::uniline) {
                 _str += "/* "sv;
                 _str += v.comment;
                 _str += " */"sv;
@@ -571,7 +571,7 @@ namespace qc::json
 
         const int containerDelta{int(container) - int(_container)};
         const Density newDensity{density > _density ? density : _density};
-        const int densityDelta{newDensity - _density};
+        const int densityDelta{int(newDensity) - int(_density)};
         _scopeDeltas.push_back(_ScopeDelta{containerDelta, densityDelta});
         _container = container;
         _density = newDensity;
@@ -630,7 +630,7 @@ namespace qc::json
     {
         switch (_prevElement) {
             case _Element::none: break;
-            case _Element::key: if (_density < compact) _str += ' '; break;
+            case _Element::key: if (_density < Density::compact) _str += ' '; break;
             case _Element::val: _str += ','; [[fallthrough]];
             case _Element::start: [[fallthrough]];
             case _Element::comment: _putSpace(); break;
@@ -647,15 +647,15 @@ namespace qc::json
     inline void Encoder::_putSpace()
     {
         switch (_density) {
-            case unspecified: [[fallthrough]];
-            case multiline:
+            case Density::unspecified: [[fallthrough]];
+            case Density::multiline:
                 _str += '\n';
                 _indent();
                 break;
-            case uniline:
+            case Density::uniline:
                 _str += ' ';
                 break;
-            case compact:
+            case Density::compact:
                 break;
         }
     }

@@ -10,65 +10,66 @@ using namespace std::string_view_literals;
 using qc::json::Encoder;
 using qc::json::EncodeError;
 using namespace qc::json::tokens;
+using qc::json::Density;
 
 struct CustomVal { int x, y; };
 
 Encoder & operator<<(Encoder & encoder, const CustomVal & v)
 {
-    return encoder << array(uniline) << v.x << v.y << end;
+    return encoder << array(Density::uniline) << v.x << v.y << end;
 }
 
 TEST(encode, object)
 {
     { // Empty
         Encoder encoder{};
-        encoder << object(multiline) << end;
+        encoder << object(Density::multiline) << end;
         EXPECT_EQ(R"({})"s, encoder.finish());
-        encoder << object(uniline) << end;
+        encoder << object(Density::uniline) << end;
         EXPECT_EQ(R"({})"s, encoder.finish());
-        encoder << object(compact) << end;
+        encoder << object(Density::compact) << end;
         EXPECT_EQ(R"({})"s, encoder.finish());
     }
     { // Non-empty
         Encoder encoder{};
-        encoder << object(multiline) << "k1" << "abc" << "k2" << 123 << "k3" << true << end;
+        encoder << object(Density::multiline) << "k1" << "abc" << "k2" << 123 << "k3" << true << end;
         EXPECT_EQ(R"({
     "k1": "abc",
     "k2": 123,
     "k3": true
 })"s, encoder.finish());
-        encoder << object(uniline) << "k1" << "abc" << "k2" << 123 << "k3" << true << end;
+        encoder << object(Density::uniline) << "k1" << "abc" << "k2" << 123 << "k3" << true << end;
         EXPECT_EQ(R"({ "k1": "abc", "k2": 123, "k3": true })"s, encoder.finish());
-        encoder << object(compact) << "k1" << "abc" << "k2" << 123 << "k3" << true << end;
+        encoder << object(Density::compact) << "k1" << "abc" << "k2" << 123 << "k3" << true << end;
         EXPECT_EQ(R"({"k1":"abc","k2":123,"k3":true})"s, encoder.finish());
     }
     { // String view key
-        Encoder encoder{uniline};
+        Encoder encoder{Density::uniline};
         encoder << object << "k"sv << "v" << end;
         EXPECT_EQ(R"({ "k": "v" })"s, encoder.finish());
     }
     { // String key
-        Encoder encoder{uniline};
+        Encoder encoder{Density::uniline};
         encoder << object << "k"s << "v" << end;
         EXPECT_EQ(R"({ "k": "v" })"s, encoder.finish());
     }
     { // Const C string key
-        Encoder encoder{uniline};
+        Encoder encoder{Density::uniline};
         encoder << object << "k" << "v" << end;
         EXPECT_EQ(R"({ "k": "v" })"s, encoder.finish());
     }
     { // Mutable C string key
-        Encoder encoder{uniline};
+        Encoder encoder{Density::uniline};
         encoder << object << const_cast<char *>("k") << "v" << end;
         EXPECT_EQ(R"({ "k": "v" })"s, encoder.finish());
     }
     { // Character key
-        Encoder encoder{uniline};
+        Encoder encoder{Density::uniline};
         encoder << object << 'k' << "v" << end;
         EXPECT_EQ(R"({ "k": "v" })"s, encoder.finish());
     }
     { // Empty key
-        Encoder encoder{uniline};
+        Encoder encoder{Density::uniline};
         encoder << object << "" << "" << end;
         EXPECT_EQ(R"({ "": "" })"s, encoder.finish());
     }
@@ -103,24 +104,24 @@ TEST(encode, array)
 {
     { // Empty
         Encoder encoder{};
-        encoder << array(multiline) << end;
+        encoder << array(Density::multiline) << end;
         EXPECT_EQ(R"([])"s, encoder.finish());
-        encoder << array(uniline) << end;
+        encoder << array(Density::uniline) << end;
         EXPECT_EQ(R"([])"s, encoder.finish());
-        encoder << array(compact) << end;
+        encoder << array(Density::compact) << end;
         EXPECT_EQ(R"([])"s, encoder.finish());
     }
     { // Non-empty
         Encoder encoder{};
-        encoder << array(multiline) << "abc" << 123 << true << end;
+        encoder << array(Density::multiline) << "abc" << 123 << true << end;
         EXPECT_EQ(R"([
     "abc",
     123,
     true
 ])"s, encoder.finish());
-        encoder << array(uniline) << "abc" << 123 << true << end;
+        encoder << array(Density::uniline) << "abc" << 123 << true << end;
         EXPECT_EQ(R"([ "abc", 123, true ])"s, encoder.finish());
-        encoder << array(compact) << "abc" << 123 << true << end;
+        encoder << array(Density::compact) << "abc" << 123 << true << end;
         EXPECT_EQ(R"(["abc",123,true])"s, encoder.finish());
     }
 }
@@ -192,7 +193,7 @@ TEST(encode, string)
         EXPECT_EQ(R"("a")"s, encoder.finish());
     }
     { // Double quotes
-        Encoder encoder{uniline, false};
+        Encoder encoder{Density::uniline, false};
         std::string expected{};
         encoder << R"(s"t'r)";
         expected = R"("s\"t'r")"s;
@@ -205,7 +206,7 @@ TEST(encode, string)
         EXPECT_EQ(expected, encoder.finish());
     }
     { // Single quotes
-        Encoder encoder{uniline, true};
+        Encoder encoder{Density::uniline, true};
         std::string expected{};
         encoder << R"(s"t'r)";
         expected = R"('s"t\'r')"s;
@@ -505,7 +506,7 @@ TEST(encode, custom)
 TEST(encode, finish)
 {
     { // Encoder left in clean state after finish
-        Encoder encoder{uniline};
+        Encoder encoder{Density::uniline};
         encoder << object << "val" << 123 << end;
         EXPECT_EQ(R"({ "val": 123 })"s, encoder.finish());
         encoder << array << 321 << end;
@@ -530,7 +531,7 @@ TEST(encode, finish)
 TEST(encode, density)
 {
     { // Top level multiline
-        Encoder encoder{multiline};
+        Encoder encoder{Density::multiline};
         encoder << object << "k1" << array << "v1" << "v2" << end << "k2" << "v3" << end;
         EXPECT_EQ(R"({
     "k1": [
@@ -541,20 +542,20 @@ TEST(encode, density)
 })"s, encoder.finish());
     }
     { // Top level uniline
-        Encoder encoder{uniline};
+        Encoder encoder{Density::uniline};
         encoder << object << "k1" << array << "v1" << "v2" << end << "k2" << "v3" << end;
         EXPECT_EQ(R"({ "k1": [ "v1", "v2" ], "k2": "v3" })"s, encoder.finish());
     }
     { // Top level compact
-        Encoder encoder{compact};
+        Encoder encoder{Density::compact};
         encoder << object << "k1" << array << "v1" << "v2" << end << "k2" << "v3" << end;
         EXPECT_EQ(R"({"k1":["v1","v2"],"k2":"v3"})"s, encoder.finish());
     }
     { // Inner density
         Encoder encoder{};
         encoder << object;
-            encoder << "k1" << array(uniline) << "v1" << array(compact) << "v2" << "v3" << end << end;
-            encoder << "k2" << object(uniline) << "k3" << "v4" << "k4" << object(compact) << "k5" << "v5" << "k6" << "v6" << end << end;
+            encoder << "k1" << array(Density::uniline) << "v1" << array(Density::compact) << "v2" << "v3" << end << end;
+            encoder << "k2" << object(Density::uniline) << "k3" << "v4" << "k4" << object(Density::compact) << "k5" << "v5" << "k6" << "v6" << end << end;
         encoder << end;
         EXPECT_EQ(R"({
     "k1": [ "v1", ["v2","v3"] ],
@@ -563,20 +564,20 @@ TEST(encode, density)
     }
     { // Density priority
         Encoder encoder{};
-        encoder << object(uniline) << "k" << array(multiline) << "v" << end << end;
+        encoder << object(Density::uniline) << "k" << array(Density::multiline) << "v" << end << end;
         EXPECT_EQ(R"({ "k": [ "v" ] })"s, encoder.finish());
-        encoder << array(uniline) << object(multiline) << "k" << "v" << end << end;
+        encoder << array(Density::uniline) << object(Density::multiline) << "k" << "v" << end << end;
         EXPECT_EQ(R"([ { "k": "v" } ])"s, encoder.finish());
-        encoder << object(compact) << "k" << array(uniline) << "v" << end << end;
+        encoder << object(Density::compact) << "k" << array(Density::uniline) << "v" << end << end;
         EXPECT_EQ(R"({"k":["v"]})"s, encoder.finish());
-        encoder << array(compact) << object(uniline) << "k" << "v" << end << end;
+        encoder << array(Density::compact) << object(Density::uniline) << "k" << "v" << end << end;
         EXPECT_EQ(R"([{"k":"v"}])"s, encoder.finish());
     }
 }
 
 TEST(encode, identifiers) {
     { // Valid identifiers
-        Encoder encoder{uniline, false, true};
+        Encoder encoder{Density::uniline, false, true};
         encoder << object << "a" << "v" << end;
         EXPECT_EQ(R"({ a: "v" })"s, encoder.finish());
         encoder << object << "A" << "v" << end;
@@ -591,17 +592,17 @@ TEST(encode, identifiers) {
         EXPECT_EQ(R"({ _0a: "v" })"s, encoder.finish());
     }
     { // Invalid identifiers
-        Encoder encoder{uniline, false, true};
+        Encoder encoder{Density::uniline, false, true};
         encoder << object << "w o a" << "v" << end;
         EXPECT_EQ(R"({ "w o a": "v" })"s, encoder.finish());
     }
     { // Preference off
-        Encoder encoder{uniline};
+        Encoder encoder{Density::uniline};
         encoder << object << "k" << "v" << end;
         EXPECT_EQ(R"({ "k": "v" })"s, encoder.finish());
     }
     { // Empty key
-        Encoder encoder{uniline, false, true};
+        Encoder encoder{Density::uniline, false, true};
         encoder << object;
         EXPECT_THROW(encoder << "", EncodeError);
     }
@@ -610,7 +611,7 @@ TEST(encode, identifiers) {
 TEST(encode, comments)
 {
     { // Simple one-line comments
-        Encoder encoder{multiline};
+        Encoder encoder{Density::multiline};
         const std::string_view str{"A comment"};
         encoder << comment(str) << comment(str) << 0 << comment(str) << comment(str);
         EXPECT_EQ(
@@ -621,7 +622,7 @@ R"(// A comment
 // A comment)"s, encoder.finish());
     }
     { // Simple multi-line comments
-        Encoder encoder{multiline};
+        Encoder encoder{Density::multiline};
         const std::string_view str{"A comment\nand some more"};
         encoder << comment(str) << comment(str) << 0 << comment(str) << comment(str);
         EXPECT_EQ(
@@ -636,7 +637,7 @@ R"(// A comment
 // and some more)"s, encoder.finish());
     }
     { // Complex
-        Encoder encoder{multiline};
+        Encoder encoder{Density::multiline};
         const std::string_view single{"A comment"};
         const std::string_view multi{"A comment\nand some more"};
         encoder << comment(single);
@@ -654,7 +655,7 @@ R"(// A comment
                 encoder << comment(multi);
                 encoder << comment(multi);
                 encoder << "c" << 2;
-                encoder << "d" << array(uniline) << comment(single) << 0 << comment(single) << comment(single) << array << comment(single) << end << comment(single) << end;
+                encoder << "d" << array(Density::uniline) << comment(single) << 0 << comment(single) << comment(single) << array << comment(single) << end << comment(single) << end;
                 encoder << "e" << array;
                     encoder << comment(single);
                 encoder << end;
@@ -711,13 +712,13 @@ R"(// A comment
         EXPECT_THROW(encoder << comment("nope"), EncodeError);
     }
     { // Escape sequence in block comment
-        Encoder encoder{uniline};
+        Encoder encoder{Density::uniline};
         encoder << comment("A comment /* and some more") << nullptr;
         EXPECT_EQ(R"(/* A comment /* and some more */ null)", encoder.finish());
         EXPECT_THROW(encoder << comment("A comment */ and some more"), EncodeError);
     }
     { // Escape sequence in line comment
-        Encoder encoder{multiline};
+        Encoder encoder{Density::multiline};
         encoder << comment("A comment /* and some more") << nullptr;
         EXPECT_EQ(
 R"(// A comment /* and some more
@@ -728,19 +729,19 @@ R"(// A comment */ and some more
 null)", encoder.finish());
     }
     { // Invalid characters
-        Encoder encoder{uniline};
+        Encoder encoder{Density::uniline};
         EXPECT_THROW(encoder << comment("A\ncomment"sv), EncodeError);
         EXPECT_THROW(encoder << comment("A\rcomment"sv), EncodeError);
         EXPECT_THROW(encoder << comment("A\tcomment"sv), EncodeError);
         EXPECT_THROW(encoder << comment("A\0comment"sv), EncodeError);
     }
     { // Compact
-        Encoder encoder{compact};
+        Encoder encoder{Density::compact};
         encoder << comment("A comment") << array << comment("A comment") << comment("A comment") << 0 << comment("A comment") << end << comment("A comment");
         EXPECT_EQ("/*A comment*/[/*A comment*//*A comment*/0,/*A comment*/],/*A comment*/", encoder.finish());
     }
     { // Weird
-        Encoder encoder{multiline};
+        Encoder encoder{Density::multiline};
         encoder << comment("") << nullptr;
         EXPECT_EQ("// \nnull", encoder.finish());
         encoder << comment("\n") << nullptr;
@@ -769,27 +770,27 @@ TEST(encode, general)
         encoder << "Name"sv << "Salt's Crust"sv;
         encoder << "Founded"sv << 1964;
         encoder << comment("Not necessarily up to date"sv) << "Employees"sv << array;
-            encoder << object(uniline) << "Name"sv << "Ol' Joe Fisher"sv << "Title"sv << "Fisherman"sv << "Age"sv << 69 << end;
-            encoder << object(uniline) << "Name"sv << "Mark Rower"sv << "Title"sv << "Cook"sv << "Age"sv << 41 << end;
-            encoder << object(uniline) << "Name"sv << "Phineas"sv << "Title"sv << "Server Boy"sv << "Age"sv << 19 << end;
+            encoder << object(Density::uniline) << "Name"sv << "Ol' Joe Fisher"sv << "Title"sv << "Fisherman"sv << "Age"sv << 69 << end;
+            encoder << object(Density::uniline) << "Name"sv << "Mark Rower"sv << "Title"sv << "Cook"sv << "Age"sv << 41 << end;
+            encoder << object(Density::uniline) << "Name"sv << "Phineas"sv << "Title"sv << "Server Boy"sv << "Age"sv << 19 << end;
         encoder << end;
         encoder << "Dishes"sv << array;
             encoder << object;
                 encoder << "Name"sv << "Basket o' Barnacles"sv;
                 encoder << "Price"sv << 5.45;
-                encoder << "Ingredients"sv << array(uniline) << "\"Salt\""sv << "Barnacles"sv << end;
+                encoder << "Ingredients"sv << array(Density::uniline) << "\"Salt\""sv << "Barnacles"sv << end;
                 encoder << "Gluten Free"sv << false;
             encoder << end;
             encoder << object;
                 encoder << "Name"sv << "Two Tuna"sv;
                 encoder << "Price"sv << -std::numeric_limits<double>::infinity();
-                encoder << "Ingredients"sv << array(uniline) << "Tuna"sv << comment("It's actually cod lmao") << end;
+                encoder << "Ingredients"sv << array(Density::uniline) << "Tuna"sv << comment("It's actually cod lmao") << end;
                 encoder << "Gluten Free"sv << true;
             encoder << end;
             encoder << object;
                 encoder << "Name"sv << "18 Leg Bouquet"sv;
                 encoder << "Price"sv << std::numeric_limits<double>::quiet_NaN();
-                encoder << "Ingredients"sv << array(uniline) << "\"Salt\""sv << "Octopus"sv << "Crab"sv << end;
+                encoder << "Ingredients"sv << array(Density::uniline) << "\"Salt\""sv << "Octopus"sv << "Crab"sv << end;
                 encoder << "Gluten Free"sv << false;
             encoder << end;
         encoder << end;
@@ -805,7 +806,7 @@ I do not like them anywhere
 I do not like green eggs and ham
 I do not like them Sam I am
 )";
-        encoder << "Magic Numbers"sv << array(uniline) << hex(777) << octal(777u) << binary(777) << end;
+        encoder << "Magic Numbers"sv << array(Density::uniline) << hex(777) << octal(777u) << binary(777) << end;
     encoder << end;
 
     EXPECT_EQ(R"(// Third quarter summary document

@@ -526,7 +526,7 @@ namespace qc::json
     /// @return an encoded JSON string of the given JSON value
     /// @throw `EncodeError` if there was an issue encoding the JSON
     ///
-    string encode(const Value & val, Density density = multiline);
+    string encode(const Value & val, Density density = Density::multiline);
 
     ///
     /// Specialization of the encoder's `operator<<` for `Value`
@@ -617,7 +617,7 @@ namespace qc::json
             _key = std::move(k);
         }
 
-        void end(State &&, State &) {}
+        void end(const Density, State &&, State &) {}
 
         template <typename T>
         void val(const T v, State & state)

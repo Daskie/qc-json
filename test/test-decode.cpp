@@ -13,6 +13,7 @@ using namespace std::string_view_literals;
 
 using qc::json::decode;
 using qc::json::DecodeError;
+using qc::json::Density;
 
 class DummyComposer
 {
@@ -20,7 +21,7 @@ class DummyComposer
 
     std::nullptr_t object(std::nullptr_t) { return nullptr; }
     std::nullptr_t array(std::nullptr_t) { return nullptr; }
-    void end(std::nullptr_t, std::nullptr_t) {}
+    void end(Density, std::nullptr_t, std::nullptr_t) {}
     void key(std::string &&, std::nullptr_t) {}
     void val(std::string_view, std::nullptr_t) {}
     void val(int64_t, std::nullptr_t) {}
@@ -36,7 +37,7 @@ class ExpectantComposer
 
     struct Object {};
     struct Array {};
-    struct End {};
+    struct End { Density d; };
     struct Key { std::string_view k; };
     struct String { std::string_view v; };
     struct SignedInteger { int64_t v; };
@@ -47,7 +48,7 @@ class ExpectantComposer
 
     friend bool operator==(const Object &, const Object &) { return true; }
     friend bool operator==(const Array &, const Array &) { return true; }
-    friend bool operator==(const End &, const End &) { return true; }
+    friend bool operator==(const End & a, const End & b) { return a.d == b.d || a.d == Density::unspecified || b.d == Density::unspecified; }
     friend bool operator==(const Key & a, const Key & b) { return a.k == b.k; }
     friend bool operator==(const String & a, const String & b) { return a.v == b.v; }
     friend bool operator==(const SignedInteger & a, const SignedInteger & b) { return a.v == b.v; }
@@ -60,7 +61,7 @@ class ExpectantComposer
 
     std::nullptr_t object(std::nullptr_t) { assertNextIs(Object{}); return nullptr; }
     std::nullptr_t array(std::nullptr_t) { assertNextIs(Array{}); return nullptr; }
-    void end(std::nullptr_t, std::nullptr_t) { assertNextIs(End{}); }
+    void end(const Density d, std::nullptr_t, std::nullptr_t) { assertNextIs(End{d}); }
     void key(std::string && k, std::nullptr_t) { assertNextIs(Key{k}); }
     void val(std::string_view v, std::nullptr_t) { assertNextIs(String{v}); }
     void val(int64_t v, std::nullptr_t) { assertNextIs(SignedInteger{v}); }
@@ -71,7 +72,7 @@ class ExpectantComposer
 
     ExpectantComposer & expectObject() { m_sequence.emplace_back(Object{}); return *this; }
     ExpectantComposer & expectArray() { m_sequence.emplace_back(Array{}); return *this; }
-    ExpectantComposer & expectEnd() { m_sequence.emplace_back(End{}); return *this; }
+    ExpectantComposer & expectEnd(const Density d = Density::unspecified) { m_sequence.emplace_back(End{d}); return *this; }
     ExpectantComposer & expectKey(std::string_view k) { m_sequence.emplace_back(Key{k}); return *this; }
     ExpectantComposer & expectString(std::string_view v) { m_sequence.emplace_back(String{v}); return *this; }
     ExpectantComposer & expectSignedInteger(int64_t v) { m_sequence.emplace_back(SignedInteger{v}); return *this; }
@@ -96,7 +97,7 @@ std::ostream & operator<<(std::ostream & os, const ExpectantComposer::Element & 
 {
     if (std::holds_alternative<ExpectantComposer::Object>(v)) return os << "Object";
     if (std::holds_alternative<ExpectantComposer::Array>(v)) return os << "Array";
-    if (std::holds_alternative<ExpectantComposer::End>(v)) return os << "End";
+    if (std::holds_alternative<ExpectantComposer::End>(v)) return os << "End `" << int(std::get<ExpectantComposer::End>(v).d) << "`";
     if (std::holds_alternative<ExpectantComposer::Key>(v)) return os << "Key `" << std::get<ExpectantComposer::Key>(v).k << "`";
     if (std::holds_alternative<ExpectantComposer::String>(v)) return os << "String `" << std::get<ExpectantComposer::String>(v).v << "`";
     if (std::holds_alternative<ExpectantComposer::SignedInteger>(v)) return os << "Signed Integer `" << std::get<ExpectantComposer::SignedInteger>(v).v << "`";
@@ -1056,6 +1057,216 @@ R"({ // AAAAA
     }
     { // Block comment that doesn't terminate
         EXPECT_THROW(decode("{ /* AAAAA\nBBBBB    CCCCC\n"sv, dummyComposer, nullptr), DecodeError);
+    }
+}
+
+TEST(decode, density)
+{
+    { // Multiline
+        ExpectantComposer composer{};
+        composer.expectArray();
+            composer.expectSignedInteger(0);
+            composer.expectSignedInteger(1);
+        composer.expectEnd(Density::multiline);
+        decode(
+R"([
+    0,
+    1
+])"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectArray();
+            composer.expectSignedInteger(0);
+            composer.expectSignedInteger(1);
+        composer.expectEnd(Density::multiline);
+        decode(
+R"([
+0,1])"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectArray();
+            composer.expectSignedInteger(0);
+            composer.expectSignedInteger(1);
+        composer.expectEnd(Density::multiline);
+        decode(
+R"([0
+,1])"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectArray();
+            composer.expectSignedInteger(0);
+            composer.expectSignedInteger(1);
+        composer.expectEnd(Density::multiline);
+        decode(
+R"([0,
+1])"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectArray();
+            composer.expectSignedInteger(0);
+            composer.expectSignedInteger(1);
+        composer.expectEnd(Density::multiline);
+        decode(
+R"([0,1
+])"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectObject();
+            composer.expectKey("a"sv).expectSignedInteger(0);
+            composer.expectKey("b"sv).expectSignedInteger(1);
+        composer.expectEnd(Density::multiline);
+        decode(
+R"({
+    "a": 0,
+    "b": 1
+})"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectObject();
+            composer.expectKey("a"sv).expectSignedInteger(0);
+            composer.expectKey("b"sv).expectSignedInteger(1);
+        composer.expectEnd(Density::multiline);
+        decode(
+R"({
+"a":0,"b":1})"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectObject();
+            composer.expectKey("a"sv).expectSignedInteger(0);
+            composer.expectKey("b"sv).expectSignedInteger(1);
+        composer.expectEnd(Density::multiline);
+        decode(
+R"({"a"
+:0,"b"
+:1})"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectObject();
+            composer.expectKey("a"sv).expectSignedInteger(0);
+            composer.expectKey("b"sv).expectSignedInteger(1);
+        composer.expectEnd(Density::multiline);
+        decode(
+R"({"a":
+0,"b":
+1})"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectObject();
+            composer.expectKey("a"sv).expectSignedInteger(0);
+            composer.expectKey("b"sv).expectSignedInteger(1);
+        composer.expectEnd(Density::multiline);
+        decode(
+R"({"a":0
+,"b":1})"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectObject();
+            composer.expectKey("a"sv).expectSignedInteger(0);
+            composer.expectKey("b"sv).expectSignedInteger(1);
+        composer.expectEnd(Density::multiline);
+        decode(
+R"({"a":0,
+"b":1})"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectObject();
+            composer.expectKey("a"sv).expectSignedInteger(0);
+            composer.expectKey("b"sv).expectSignedInteger(1);
+        composer.expectEnd(Density::multiline);
+        decode(
+R"({"a":0,"b":1
+})"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+    }
+    { // Uniline
+        ExpectantComposer composer{};
+        composer.expectArray().expectSignedInteger(0).expectSignedInteger(1).expectEnd(Density::uniline);
+        decode(R"([ 0, 1 ])"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectArray().expectSignedInteger(0).expectSignedInteger(1).expectEnd(Density::uniline);
+        decode(R"([ 0,1])"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectArray().expectSignedInteger(0).expectSignedInteger(1).expectEnd(Density::uniline);
+        decode(R"([0 ,1])"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectArray().expectSignedInteger(0).expectSignedInteger(1).expectEnd(Density::uniline);
+        decode(R"([0, 1])"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectArray().expectSignedInteger(0).expectSignedInteger(1).expectEnd(Density::uniline);
+        decode(R"([0,1 ])"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectObject().expectKey("a"sv).expectSignedInteger(0).expectKey("b"sv).expectSignedInteger(1).expectEnd(Density::uniline);
+        decode(R"({ "a": 0, "b": 1 })"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectObject().expectKey("a"sv).expectSignedInteger(0).expectKey("b"sv).expectSignedInteger(1).expectEnd(Density::uniline);
+        decode(R"({ "a":0,"b":1})"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectObject().expectKey("a"sv).expectSignedInteger(0).expectKey("b"sv).expectSignedInteger(1).expectEnd(Density::uniline);
+        decode(R"({"a" :0,"b" :1})"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectObject().expectKey("a"sv).expectSignedInteger(0).expectKey("b"sv).expectSignedInteger(1).expectEnd(Density::uniline);
+        decode(R"({"a": 0,"b": 1})"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectObject().expectKey("a"sv).expectSignedInteger(0).expectKey("b"sv).expectSignedInteger(1).expectEnd(Density::uniline);
+        decode(R"({"a":0 ,"b":1})"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectObject().expectKey("a"sv).expectSignedInteger(0).expectKey("b"sv).expectSignedInteger(1).expectEnd(Density::uniline);
+        decode(R"({"a":0, "b":1})"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectObject().expectKey("a"sv).expectSignedInteger(0).expectKey("b"sv).expectSignedInteger(1).expectEnd(Density::uniline);
+        decode(R"({"a":0,"b":1 })"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+    }
+    { // Compact
+        ExpectantComposer composer{};
+        composer.expectArray().expectSignedInteger(0).expectSignedInteger(1).expectEnd(Density::compact);
+        decode(R"([0,1])"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectObject().expectKey("a"sv).expectSignedInteger(0).expectKey("b"sv).expectSignedInteger(1).expectEnd(Density::compact);
+        decode(R"({"a":0,"b":1})"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectArray().expectEnd(Density::compact);
+        decode(R"([])"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectObject().expectEnd(Density::compact);
+        decode(R"({})"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+    }
+    { // Denser within
+        ExpectantComposer composer{};
+        composer.expectArray();
+            composer.expectArray().expectSignedInteger(0).expectEnd(Density::uniline);
+        composer.expectEnd(Density::multiline);
+        decode(
+R"([
+    [ 0 ]
+])"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectArray().expectArray().expectSignedInteger(0).expectEnd(Density::compact).expectEnd(Density::uniline);
+        decode(R"([ [0] ])"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+    }
+    { // Denser without
+        ExpectantComposer composer{};
+        composer.expectArray().expectArray();
+            composer.expectSignedInteger(0);
+        composer.expectEnd(Density::multiline).expectEnd(Density::uniline);
+        decode(
+R"([ [
+    0
+] ])"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectArray().expectArray().expectSignedInteger(0).expectEnd(Density::uniline).expectEnd(Density::compact);
+        decode(R"([[ 0 ]])"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+    }
+    { // Complex
+        ExpectantComposer composer{};
+        composer.expectObject();
+            composer.expectKey("a"sv).expectArray().expectObject();
+                composer.expectKey("b"sv).expectArray().expectSignedInteger(0).expectSignedInteger(1).expectSignedInteger(2).expectEnd(Density::uniline);
+            composer.expectEnd(Density::multiline).expectSignedInteger(3).expectEnd(Density::compact);
+            composer.expectKey("c"sv).expectObject().expectKey("d"sv).expectSignedInteger(4).expectKey("e"sv).expectArray().expectEnd(Density::compact).expectKey("f"sv).expectSignedInteger(5).expectEnd(Density::uniline);
+            composer.expectKey("g"sv).expectObject().expectEnd(Density::compact);
+        composer.expectEnd(Density::multiline);
+        decode(
+R"({
+    "a": [{
+        "b": [ 0, 1, 2 ]
+    },3],
+    "c": { "d": 4, "e": [], "f": 5 },
+    "g": {}
+})"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
     }
 }
 

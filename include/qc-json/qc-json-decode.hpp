@@ -43,6 +43,17 @@ namespace qc::json
             std::runtime_error(msg.data())
         {}
     };
+
+    ///
+    /// Pass with an object or array to specify its density
+    ///
+    enum class Density : int
+    {
+        unspecified = 0b000, /// Use that of the root or parent element
+        multiline   = 0b001, /// Elements are put on new lines
+        uniline     = 0b011, /// Elements are put on one line separated by spaces
+        compact     = 0b111  /// No whitespace is used whatsoever
+    };
 }
 
 #endif // QC_JSON_COMMON
@@ -80,6 +91,18 @@ namespace qc::json
 
 namespace qc::json
 {
+    inline Density & operator&=(Density & d1, const Density d2) noexcept
+    {
+        reinterpret_cast<int &>(d1) &= int(d2);
+        return d1;
+    }
+
+    inline Density & operator|=(Density & d1, const Density d2) noexcept
+    {
+        reinterpret_cast<int &>(d1) |= int(d2);
+        return d1;
+    }
+
     // This functionality is wrapped in a class purely as a convenient way to keep track of state
     template <typename Composer, typename State>
     class _Decoder
@@ -119,18 +142,28 @@ namespace qc::json
         Composer & _composer;
         string _stringBuffer{};
 
-        void _skipSpaceAndComments()
+        Density _skipSpaceAndComments()
         {
+            Density density{Density::compact};
+
             while (true) {
                 // Skip whitespace
-                while (_pos < _end && std::isspace(uchar(*_pos))) ++_pos;
+                while (_pos < _end) {
+                    if (std::isspace(uchar(*_pos))) {
+                        if (*_pos == '\n') density &= Density::multiline;
+                        else density &= Density::uniline;
+                        ++_pos;
+                    }
+                    else {
+                        break;
+                    }
+                }
 
                 if (_pos + 1 < _end && _pos[0] == '/') {
                     // Skip line comment
                     if (_pos[1] == '/') {
                         _pos += 2;
                         while (_pos < _end && *_pos != '\n') ++_pos;
-                        if (_pos < _end) ++_pos;
                         continue;
                     }
                     // Skip block comment
@@ -146,6 +179,8 @@ namespace qc::json
 
                 break;
             }
+
+            return density;
         }
 
         bool _tryConsumeChar(const char c)
@@ -269,7 +304,7 @@ namespace qc::json
             State innerState{_composer.object(outerState)};
 
             ++_pos; // We already know we have `{`
-            _skipSpaceAndComments();
+            Density density{_skipSpaceAndComments()};
 
             if (!_tryConsumeChar('}')) {
                 while (true) {
@@ -280,20 +315,20 @@ namespace qc::json
                     const char c{*_pos};
                     const string_view key{(c == '"' || c == '\'') ? _consumeString(c) : _consumeIdentifier()};
                     _composer.key(string{key}, innerState);
-                    _skipSpaceAndComments();
+                    density &= _skipSpaceAndComments();
 
                     _consumeChar(':');
-                    _skipSpaceAndComments();
+                    density &= _skipSpaceAndComments();
 
                     _ingestValue(innerState);
-                    _skipSpaceAndComments();
+                    density &= _skipSpaceAndComments();
 
                     if (_tryConsumeChar('}')) {
                         break;
                     }
                     else {
                         _consumeChar(',');
-                        _skipSpaceAndComments();
+                        density &= _skipSpaceAndComments();
 
                         // Allow trailing comma
                         if (_tryConsumeChar('}')) {
@@ -303,7 +338,7 @@ namespace qc::json
                 }
             }
 
-            _composer.end(std::move(innerState), outerState);
+            _composer.end(density, std::move(innerState), outerState);
         }
 
         void _ingestArray(State & outerState)
@@ -311,19 +346,19 @@ namespace qc::json
             State innerState{_composer.array(outerState)};
 
             ++_pos; // We already know we have `[`
-            _skipSpaceAndComments();
+            Density density{_skipSpaceAndComments()};
 
             if (!_tryConsumeChar(']')) {
                 while (true) {
                     _ingestValue(innerState);
-                    _skipSpaceAndComments();
+                    density &= _skipSpaceAndComments();
 
                     if (_tryConsumeChar(']')) {
                         break;
                     }
                     else {
                         _consumeChar(',');
-                        _skipSpaceAndComments();
+                        density &= _skipSpaceAndComments();
 
                         // Allow trailing comma
                         if (_tryConsumeChar(']')) {
@@ -333,7 +368,7 @@ namespace qc::json
                 }
             }
 
-            _composer.end(std::move(innerState), outerState);
+            _composer.end(density, std::move(innerState), outerState);
         }
 
         void _ingestString(State & state, const char quote)
