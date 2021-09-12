@@ -70,6 +70,13 @@ namespace qc::json
         DecodeError(const string_view msg, size_t position) noexcept;
     };
 
+    enum class Scope
+    {
+        root,
+        object,
+        array
+    };
+
     ///
     /// Decodes the JSON string
     ///
@@ -119,7 +126,7 @@ namespace qc::json
         void operator()(State & initialState)
         {
             _skipSpaceAndComments();
-            _ingestValue(initialState);
+            _ingestValue(Scope::root, initialState);
             _skipSpaceAndComments();
 
             // Allow trailing comma
@@ -224,7 +231,7 @@ namespace qc::json
             }
         }
 
-        void _ingestValue(State & state)
+        void _ingestValue(const Scope scope, State & state)
         {
             if (_pos >= _end) {
                 throw DecodeError{"Expected value"sv, size_t(_pos - _start)};
@@ -236,19 +243,19 @@ namespace qc::json
 
             switch (c) {
                 case '{': {
-                    _ingestObject(state);
+                    _ingestObject(scope, state);
                     return;
                 }
                 case '[': {
-                    _ingestArray(state);
+                    _ingestArray(scope, state);
                     return;
                 }
                 case '"': {
-                    _ingestString(state, '"');
+                    _ingestString('"', scope, state);
                     return;
                 }
                 case '\'': {
-                    _ingestString(state, '\'');
+                    _ingestString('\'', scope, state);
                     return;
                 }
             }
@@ -267,15 +274,15 @@ namespace qc::json
             else {
                 // There was no sign, so we can check the non-number keywords
                 if (_tryConsumeChars("true"sv)) {
-                    _composer.val(true, state);
+                    _composer.val(true, scope, state);
                     return;
                 }
                 else if (_tryConsumeChars("false"sv)) {
-                    _composer.val(false, state);
+                    _composer.val(false, scope, state);
                     return;
                 }
                 else if (_tryConsumeChars("null"sv)) {
-                    _composer.val(nullptr, state);
+                    _composer.val(nullptr, scope, state);
                     return;
                 }
             }
@@ -283,15 +290,15 @@ namespace qc::json
             // At this point, we know it is a number (or invalid)
 
             if (std::isdigit(uchar(c)) || (c == '.' && _pos + 1 < _end && std::isdigit(_pos[1]))) {
-                _ingestNumber(state, sign);
+                _ingestNumber(sign, scope, state);
                 return;
             }
             else if (_tryConsumeChars("nan"sv) || _tryConsumeChars("NaN"sv)) {
-                _composer.val(std::numeric_limits<double>::quiet_NaN(), state);
+                _composer.val(std::numeric_limits<double>::quiet_NaN(), scope, state);
                 return;
             }
             else if (_tryConsumeChars("inf"sv) || _tryConsumeChars("Infinity"sv)){
-                _composer.val(sign < 0 ? -std::numeric_limits<double>::infinity() : std::numeric_limits<double>::infinity(), state);
+                _composer.val(sign < 0 ? -std::numeric_limits<double>::infinity() : std::numeric_limits<double>::infinity(), scope, state);
                 return;
             }
 
@@ -299,9 +306,9 @@ namespace qc::json
             throw DecodeError{"Unknown value"sv, size_t(_pos - _start)};
         }
 
-        void _ingestObject(State & outerState)
+        void _ingestObject(const Scope outerScope, State & outerState)
         {
-            State innerState{_composer.object(outerState)};
+            State innerState{_composer.object(outerScope, outerState)};
 
             ++_pos; // We already know we have `{`
             Density density{_skipSpaceAndComments()};
@@ -314,13 +321,13 @@ namespace qc::json
                     }
                     const char c{*_pos};
                     const string_view key{(c == '"' || c == '\'') ? _consumeString(c) : _consumeIdentifier()};
-                    _composer.key(string{key}, innerState);
+                    _composer.key(string{key}, Scope::object, innerState);
                     density &= _skipSpaceAndComments();
 
                     _consumeChar(':');
                     density &= _skipSpaceAndComments();
 
-                    _ingestValue(innerState);
+                    _ingestValue(Scope::object, innerState);
                     density &= _skipSpaceAndComments();
 
                     if (_tryConsumeChar('}')) {
@@ -338,19 +345,19 @@ namespace qc::json
                 }
             }
 
-            _composer.end(density, std::move(innerState), outerState);
+            _composer.end(Scope::object, density, std::move(innerState), outerState);
         }
 
-        void _ingestArray(State & outerState)
+        void _ingestArray(const Scope outerScope, State & outerState)
         {
-            State innerState{_composer.array(outerState)};
+            State innerState{_composer.array(outerScope, outerState)};
 
             ++_pos; // We already know we have `[`
             Density density{_skipSpaceAndComments()};
 
             if (!_tryConsumeChar(']')) {
                 while (true) {
-                    _ingestValue(innerState);
+                    _ingestValue(Scope::array, innerState);
                     density &= _skipSpaceAndComments();
 
                     if (_tryConsumeChar(']')) {
@@ -368,12 +375,12 @@ namespace qc::json
                 }
             }
 
-            _composer.end(density, std::move(innerState), outerState);
+            _composer.end(Scope::array, density, std::move(innerState), outerState);
         }
 
-        void _ingestString(State & state, const char quote)
+        void _ingestString(const char quote, const Scope scope, State & state)
         {
-            _composer.val(_consumeString(quote), state);
+            _composer.val(_consumeString(quote), scope, state);
         }
 
         string_view _consumeString(const char quote)
@@ -526,7 +533,7 @@ namespace qc::json
             }
         }
 
-        void _ingestNumber(State & state, const int sign)
+        void _ingestNumber(const int sign, const Scope scope, State & state)
         {
             // Check if hex/octal/binary
             if (*_pos == '0' && _pos + 1 < _end) {
@@ -542,7 +549,7 @@ namespace qc::json
                         throw DecodeError{"Hex, octal, and binary numbers must not be signed"sv, size_t(_pos - _start)};
                     }
                     _pos += 2;
-                    _ingestHexOctalBinary(state, base);
+                    _ingestHexOctalBinary(base, scope, state);
                     return;
                 }
             }
@@ -550,18 +557,18 @@ namespace qc::json
             // Determine if integer or floater
             if (size_t length{_isInteger()}; length) {
                 if (sign < 0) {
-                    _ingestInteger<true>(state, length);
+                    _ingestInteger<true>(length, scope, state);
                 }
                 else {
-                    _ingestInteger<false>(state, length);
+                    _ingestInteger<false>(length, scope, state);
                 }
             }
             else {
-                _ingestFloater(state, sign < 0);
+                _ingestFloater(sign < 0, scope, state);
             }
         }
 
-        void _ingestHexOctalBinary(State & state, const int base)
+        void _ingestHexOctalBinary(const int base, const Scope scope, State & state)
         {
             uint64_t val;
             const std::from_chars_result res{std::from_chars(_pos, _end, val, base)};
@@ -573,11 +580,11 @@ namespace qc::json
 
             _pos = res.ptr;
 
-            _composer.val(val, state);
+            _composer.val(val, scope, state);
         }
 
         template <bool negative>
-        void _ingestInteger(State & state, const size_t length)
+        void _ingestInteger(const size_t length, const Scope scope, State & state)
         {
             std::conditional_t<negative, int64_t, uint64_t> val;
 
@@ -592,7 +599,7 @@ namespace qc::json
                 if (res.ec != std::errc{}) {
                     // If too large, parse as a floater instead
                     if (res.ec == std::errc::result_out_of_range) {
-                        _ingestFloater(state, negative);
+                        _ingestFloater(negative, scope, state);
                         return;
                     }
                     // Some other issue
@@ -607,15 +614,15 @@ namespace qc::json
             // If unsigned and the most significant bit is not set, we default to reporting it as signed
             if constexpr (!negative) {
                 if (!(val & 0x8000000000000000u)) {
-                    _composer.val(int64_t(val), state);
+                    _composer.val(int64_t(val), scope, state);
                     return;
                 }
             }
 
-            _composer.val(val, state);
+            _composer.val(val, scope, state);
         }
 
-        void _ingestFloater(State & state, const bool negative)
+        void _ingestFloater(const bool negative, const Scope scope, State & state)
         {
             double val;
             const std::from_chars_result res{std::from_chars(_pos - negative, _end, val)};
@@ -626,7 +633,7 @@ namespace qc::json
             }
 
             _pos = res.ptr;
-            _composer.val(val, state);
+            _composer.val(val, scope, state);
         }
     };
 

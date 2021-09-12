@@ -46,9 +46,6 @@ namespace qc::json
     ///
     /// Pass with an object or array to specify its density
     ///
-    /// TODO: Change this to enum class and add a `using enum Density` after once intellisense supports it. This is
-    ///   to prevent `Density` from being implicitly cast to an integer, which can lead to issues
-    ///
     enum class Density : int
     {
         unspecified = 0b000, /// Use that of the root or parent element

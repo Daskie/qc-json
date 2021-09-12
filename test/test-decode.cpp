@@ -14,21 +14,22 @@ using namespace std::string_view_literals;
 using qc::json::decode;
 using qc::json::DecodeError;
 using qc::json::Density;
+using qc::json::Scope;
 
 class DummyComposer
 {
     public: //------------------------------------------------------------------
 
-    std::nullptr_t object(std::nullptr_t) { return nullptr; }
-    std::nullptr_t array(std::nullptr_t) { return nullptr; }
-    void end(Density, std::nullptr_t, std::nullptr_t) {}
-    void key(std::string &&, std::nullptr_t) {}
-    void val(std::string_view, std::nullptr_t) {}
-    void val(int64_t, std::nullptr_t) {}
-    void val(uint64_t, std::nullptr_t) {}
-    void val(double, std::nullptr_t) {}
-    void val(bool, std::nullptr_t) {}
-    void val(std::nullptr_t, std::nullptr_t) {}
+    std::nullptr_t object(Scope, std::nullptr_t) { return nullptr; }
+    std::nullptr_t array(Scope, std::nullptr_t) { return nullptr; }
+    void end(Scope, Density, std::nullptr_t, std::nullptr_t) {}
+    void key(std::string &&, Scope, std::nullptr_t) {}
+    void val(std::string_view, Scope, std::nullptr_t) {}
+    void val(int64_t, Scope, std::nullptr_t) {}
+    void val(uint64_t, Scope, std::nullptr_t) {}
+    void val(double, Scope, std::nullptr_t) {}
+    void val(bool, Scope, std::nullptr_t) {}
+    void val(Scope, std::nullptr_t, std::nullptr_t) {}
 } dummyComposer;
 
 class ExpectantComposer
@@ -59,16 +60,16 @@ class ExpectantComposer
 
     using Element = std::variant<Object, Array, End, Key, String, SignedInteger, UnsignedInteger, Floater, Boolean, Null>;
 
-    std::nullptr_t object(std::nullptr_t) { assertNextIs(Object{}); return nullptr; }
-    std::nullptr_t array(std::nullptr_t) { assertNextIs(Array{}); return nullptr; }
-    void end(const Density d, std::nullptr_t, std::nullptr_t) { assertNextIs(End{d}); }
-    void key(std::string && k, std::nullptr_t) { assertNextIs(Key{k}); }
-    void val(std::string_view v, std::nullptr_t) { assertNextIs(String{v}); }
-    void val(int64_t v, std::nullptr_t) { assertNextIs(SignedInteger{v}); }
-    void val(uint64_t v, std::nullptr_t) { assertNextIs(UnsignedInteger{v}); }
-    void val(double v, std::nullptr_t) { assertNextIs(Floater{v}); }
-    void val(bool v, std::nullptr_t) { assertNextIs(Boolean{v}); }
-    void val(std::nullptr_t, std::nullptr_t) { assertNextIs(Null{}); }
+    std::nullptr_t object(Scope, std::nullptr_t) { assertNextIs(Object{}); return nullptr; }
+    std::nullptr_t array(Scope, std::nullptr_t) { assertNextIs(Array{}); return nullptr; }
+    void end(Scope, const Density d, std::nullptr_t, std::nullptr_t) { assertNextIs(End{d}); }
+    void key(std::string && k, Scope, std::nullptr_t) { assertNextIs(Key{k}); }
+    void val(std::string_view v, Scope, std::nullptr_t) { assertNextIs(String{v}); }
+    void val(int64_t v, Scope, std::nullptr_t) { assertNextIs(SignedInteger{v}); }
+    void val(uint64_t v, Scope, std::nullptr_t) { assertNextIs(UnsignedInteger{v}); }
+    void val(double v, Scope, std::nullptr_t) { assertNextIs(Floater{v}); }
+    void val(bool v, Scope, std::nullptr_t) { assertNextIs(Boolean{v}); }
+    void val(std::nullptr_t, Scope, std::nullptr_t) { assertNextIs(Null{}); }
 
     ExpectantComposer & expectObject() { m_sequence.emplace_back(Object{}); return *this; }
     ExpectantComposer & expectArray() { m_sequence.emplace_back(Array{}); return *this; }

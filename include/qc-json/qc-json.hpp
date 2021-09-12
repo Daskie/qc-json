@@ -573,63 +573,59 @@ namespace qc::json
     {
         public: //--------------------------------------------------------------
 
-        struct State
-        {
-            Value * node;
-            bool isObject;
-            bool isArray;
-        };
-
-        State object(State & outerState)
+        Value * object(const Scope outerScope, Value * const outerNode)
         {
             Value * innerNode;
-            if (outerState.isObject) {
-                innerNode = &outerState.node->asObject<unsafe>().add(std::move(_key), Object{}).second;
+            switch (outerScope) {
+                case Scope::object:
+                    innerNode = &outerNode->asObject<unsafe>().add(std::move(_key), Object{}).second;
+                    break;
+                case Scope::array:
+                    innerNode = &outerNode->asArray<unsafe>().add(Object{});
+                    break;
+                default:
+                    *outerNode = Object{};
+                    innerNode = outerNode;
             }
-            else if (outerState.isArray) {
-                innerNode = &outerState.node->asArray<unsafe>().add(Object{});
-            }
-            else {
-                *outerState.node = Object{};
-                innerNode = outerState.node;
-            }
-            return {innerNode, true, false};
+            return innerNode;
         }
 
-        State array(State & outerState)
+        Value * array(const Scope outerScope, Value * const outerNode)
         {
             Value * innerNode;
-            if (outerState.isObject) {
-                innerNode = &outerState.node->asObject<unsafe>().add(std::move(_key), Array{}).second;
+            switch (outerScope) {
+                case Scope::object:
+                    innerNode = &outerNode->asObject<unsafe>().add(std::move(_key), Array{}).second;
+                    break;
+                case Scope::array:
+                    innerNode = &outerNode->asArray<unsafe>().add(Array{});
+                    break;
+                default:
+                    *outerNode = Array{};
+                    innerNode = outerNode;
             }
-            else if (outerState.isArray) {
-                innerNode = &outerState.node->asArray<unsafe>().add(Array{});
-            }
-            else {
-                *outerState.node = Array{};
-                innerNode = outerState.node;
-            }
-            return {innerNode, false, true};
+            return innerNode;
         }
 
-        void key(string && k, State &)
+        void key(string && k, const Scope, Value * const)
         {
             _key = std::move(k);
         }
 
-        void end(const Density, State &&, State &) {}
+        void end(const Scope, const Density, Value * const, Value * const) {}
 
         template <typename T>
-        void val(const T v, State & state)
+        void val(const T v, const Scope scope, Value * const node)
         {
-            if (state.isObject) {
-                state.node->asObject<unsafe>().add(std::move(_key), v);
-            }
-            else if (state.isArray) {
-                state.node->asArray<unsafe>().add(v);
-            }
-            else {
-                *state.node = v;
+            switch (scope) {
+                case Scope::object:
+                    node->asObject<unsafe>().add(std::move(_key), v);
+                    break;
+                case Scope::array:
+                    node->asArray<unsafe>().add(v);
+                    break;
+                default:
+                    *node = v;
             }
         }
 
@@ -1391,7 +1387,7 @@ namespace qc::json
     {
         Value root;
         _Composer composer;
-        decode(json, composer, _Composer::State{&root, false, false});
+        decode(json, composer, &root);
         return root;
     }
 
