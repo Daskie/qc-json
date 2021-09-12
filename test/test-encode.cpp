@@ -27,7 +27,7 @@ TEST(encode, object)
         EXPECT_EQ(R"({})"s, encoder.finish());
         encoder << object(Density::uniline) << end;
         EXPECT_EQ(R"({})"s, encoder.finish());
-        encoder << object(Density::compact) << end;
+        encoder << object(Density::nospace) << end;
         EXPECT_EQ(R"({})"s, encoder.finish());
     }
     { // Non-empty
@@ -40,7 +40,7 @@ TEST(encode, object)
 })"s, encoder.finish());
         encoder << object(Density::uniline) << "k1" << "abc" << "k2" << 123 << "k3" << true << end;
         EXPECT_EQ(R"({ "k1": "abc", "k2": 123, "k3": true })"s, encoder.finish());
-        encoder << object(Density::compact) << "k1" << "abc" << "k2" << 123 << "k3" << true << end;
+        encoder << object(Density::nospace) << "k1" << "abc" << "k2" << 123 << "k3" << true << end;
         EXPECT_EQ(R"({"k1":"abc","k2":123,"k3":true})"s, encoder.finish());
     }
     { // String view key
@@ -108,7 +108,7 @@ TEST(encode, array)
         EXPECT_EQ(R"([])"s, encoder.finish());
         encoder << array(Density::uniline) << end;
         EXPECT_EQ(R"([])"s, encoder.finish());
-        encoder << array(Density::compact) << end;
+        encoder << array(Density::nospace) << end;
         EXPECT_EQ(R"([])"s, encoder.finish());
     }
     { // Non-empty
@@ -121,7 +121,7 @@ TEST(encode, array)
 ])"s, encoder.finish());
         encoder << array(Density::uniline) << "abc" << 123 << true << end;
         EXPECT_EQ(R"([ "abc", 123, true ])"s, encoder.finish());
-        encoder << array(Density::compact) << "abc" << 123 << true << end;
+        encoder << array(Density::nospace) << "abc" << 123 << true << end;
         EXPECT_EQ(R"(["abc",123,true])"s, encoder.finish());
     }
 }
@@ -546,16 +546,16 @@ TEST(encode, density)
         encoder << object << "k1" << array << "v1" << "v2" << end << "k2" << "v3" << end;
         EXPECT_EQ(R"({ "k1": [ "v1", "v2" ], "k2": "v3" })"s, encoder.finish());
     }
-    { // Top level compact
-        Encoder encoder{Density::compact};
+    { // Top level nospace
+        Encoder encoder{Density::nospace};
         encoder << object << "k1" << array << "v1" << "v2" << end << "k2" << "v3" << end;
         EXPECT_EQ(R"({"k1":["v1","v2"],"k2":"v3"})"s, encoder.finish());
     }
     { // Inner density
         Encoder encoder{};
         encoder << object;
-            encoder << "k1" << array(Density::uniline) << "v1" << array(Density::compact) << "v2" << "v3" << end << end;
-            encoder << "k2" << object(Density::uniline) << "k3" << "v4" << "k4" << object(Density::compact) << "k5" << "v5" << "k6" << "v6" << end << end;
+            encoder << "k1" << array(Density::uniline) << "v1" << array(Density::nospace) << "v2" << "v3" << end << end;
+            encoder << "k2" << object(Density::uniline) << "k3" << "v4" << "k4" << object(Density::nospace) << "k5" << "v5" << "k6" << "v6" << end << end;
         encoder << end;
         EXPECT_EQ(R"({
     "k1": [ "v1", ["v2","v3"] ],
@@ -568,9 +568,9 @@ TEST(encode, density)
         EXPECT_EQ(R"({ "k": [ "v" ] })"s, encoder.finish());
         encoder << array(Density::uniline) << object(Density::multiline) << "k" << "v" << end << end;
         EXPECT_EQ(R"([ { "k": "v" } ])"s, encoder.finish());
-        encoder << object(Density::compact) << "k" << array(Density::uniline) << "v" << end << end;
+        encoder << object(Density::nospace) << "k" << array(Density::uniline) << "v" << end << end;
         EXPECT_EQ(R"({"k":["v"]})"s, encoder.finish());
-        encoder << array(Density::compact) << object(Density::uniline) << "k" << "v" << end << end;
+        encoder << array(Density::nospace) << object(Density::uniline) << "k" << "v" << end << end;
         EXPECT_EQ(R"([{"k":"v"}])"s, encoder.finish());
     }
 }
@@ -735,8 +735,8 @@ null)", encoder.finish());
         EXPECT_THROW(encoder << comment("A\tcomment"sv), EncodeError);
         EXPECT_THROW(encoder << comment("A\0comment"sv), EncodeError);
     }
-    { // Compact
-        Encoder encoder{Density::compact};
+    { // Nospace
+        Encoder encoder{Density::nospace};
         encoder << comment("A comment") << array << comment("A comment") << comment("A comment") << 0 << comment("A comment") << end << comment("A comment");
         EXPECT_EQ("/*A comment*/[/*A comment*//*A comment*/0,/*A comment*/],/*A comment*/", encoder.finish());
     }
@@ -806,7 +806,7 @@ I do not like them anywhere
 I do not like green eggs and ham
 I do not like them Sam I am
 )";
-        encoder << "Magic Numbers"sv << array(Density::compact) << hex(777) << octal(777u) << binary(777) << end;
+        encoder << "Magic Numbers"sv << array(Density::nospace) << hex(777) << octal(777u) << binary(777) << end;
     encoder << end;
 
     EXPECT_EQ(R"(// Third quarter summary document

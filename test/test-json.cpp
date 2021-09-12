@@ -739,7 +739,7 @@ TEST(json, density)
     3
 ])"s, encode(Array{1, 2, 3}, Density::multiline));
     EXPECT_EQ("[ 1, 2, 3 ]"s, encode(Array{1, 2, 3}, Density::uniline));
-    EXPECT_EQ("[1,2,3]"s, encode(Array{1, 2, 3}, Density::compact));
+    EXPECT_EQ("[1,2,3]"s, encode(Array{1, 2, 3}, Density::nospace));
 }
 
 TEST(json, general)

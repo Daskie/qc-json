@@ -51,7 +51,7 @@ namespace qc::json
         unspecified = 0b000, /// Use that of the root or parent element
         multiline   = 0b001, /// Elements are put on new lines
         uniline     = 0b011, /// Elements are put on one line separated by spaces
-        compact     = 0b111  /// No whitespace is used whatsoever
+        nospace     = 0b111  /// No whitespace is used whatsoever
     };
 }
 
@@ -184,8 +184,8 @@ namespace qc::json
 
         ///
         /// Insert a comment. Comments always logically precede a value. Comments will be in line form (`// ...`) in
-        ///   multiline contexts, block form (`/* ... */`) in uniline contexts, and compact block form (`/*...*/`) in
-        ///   compact contexts
+        ///   multiline contexts, block form (`/* ... */`) in uniline contexts, and nospace block form (`/*...*/`) in
+        ///   nospace contexts
         ///
         /// @param v the comment
         /// @return this
@@ -627,7 +627,7 @@ namespace qc::json
     {
         switch (_prevElement) {
             case _Element::none: break;
-            case _Element::key: if (_density < Density::compact) _str += ' '; break;
+            case _Element::key: if (_density < Density::nospace) _str += ' '; break;
             case _Element::val: _str += ','; [[fallthrough]];
             case _Element::start: [[fallthrough]];
             case _Element::comment: _putSpace(); break;
@@ -652,7 +652,7 @@ namespace qc::json
             case Density::uniline:
                 _str += ' ';
                 break;
-            case Density::compact:
+            case Density::nospace:
                 break;
         }
     }

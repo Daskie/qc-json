@@ -52,7 +52,7 @@ namespace qc::json
         unspecified = 0b000, /// Use that of the root or parent element
         multiline   = 0b001, /// Elements are put on new lines
         uniline     = 0b011, /// Elements are put on one line separated by spaces
-        compact     = 0b111  /// No whitespace is used whatsoever
+        nospace     = 0b111  /// No whitespace is used whatsoever
     };
 }
 
@@ -151,7 +151,7 @@ namespace qc::json
 
         Density _skipSpaceAndComments()
         {
-            Density density{Density::compact};
+            Density density{Density::nospace};
 
             while (true) {
                 // Skip whitespace

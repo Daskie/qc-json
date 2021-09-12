@@ -1207,18 +1207,18 @@ R"({"a":0,"b":1
         decode(R"({"a":0,"b":1 })"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
-    { // Compact
+    { // Nospace
         ExpectantComposer composer{};
-        composer.expectArray().expectSignedInteger(0).expectSignedInteger(1).expectEnd(Density::compact);
+        composer.expectArray().expectSignedInteger(0).expectSignedInteger(1).expectEnd(Density::nospace);
         decode(R"([0,1])"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
-        composer.expectObject().expectKey("a"sv).expectSignedInteger(0).expectKey("b"sv).expectSignedInteger(1).expectEnd(Density::compact);
+        composer.expectObject().expectKey("a"sv).expectSignedInteger(0).expectKey("b"sv).expectSignedInteger(1).expectEnd(Density::nospace);
         decode(R"({"a":0,"b":1})"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
-        composer.expectArray().expectEnd(Density::compact);
+        composer.expectArray().expectEnd(Density::nospace);
         decode(R"([])"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
-        composer.expectObject().expectEnd(Density::compact);
+        composer.expectObject().expectEnd(Density::nospace);
         decode(R"({})"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
@@ -1232,7 +1232,7 @@ R"([
     [ 0 ]
 ])"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
-        composer.expectArray().expectArray().expectSignedInteger(0).expectEnd(Density::compact).expectEnd(Density::uniline);
+        composer.expectArray().expectArray().expectSignedInteger(0).expectEnd(Density::nospace).expectEnd(Density::uniline);
         decode(R"([ [0] ])"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
@@ -1246,7 +1246,7 @@ R"([ [
     0
 ] ])"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
-        composer.expectArray().expectArray().expectSignedInteger(0).expectEnd(Density::uniline).expectEnd(Density::compact);
+        composer.expectArray().expectArray().expectSignedInteger(0).expectEnd(Density::uniline).expectEnd(Density::nospace);
         decode(R"([[ 0 ]])"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
@@ -1255,9 +1255,9 @@ R"([ [
         composer.expectObject();
             composer.expectKey("a"sv).expectArray().expectObject();
                 composer.expectKey("b"sv).expectArray().expectSignedInteger(0).expectSignedInteger(1).expectSignedInteger(2).expectEnd(Density::uniline);
-            composer.expectEnd(Density::multiline).expectSignedInteger(3).expectEnd(Density::compact);
-            composer.expectKey("c"sv).expectObject().expectKey("d"sv).expectSignedInteger(4).expectKey("e"sv).expectArray().expectEnd(Density::compact).expectKey("f"sv).expectSignedInteger(5).expectEnd(Density::uniline);
-            composer.expectKey("g"sv).expectObject().expectEnd(Density::compact);
+            composer.expectEnd(Density::multiline).expectSignedInteger(3).expectEnd(Density::nospace);
+            composer.expectKey("c"sv).expectObject().expectKey("d"sv).expectSignedInteger(4).expectKey("e"sv).expectArray().expectEnd(Density::nospace).expectKey("f"sv).expectSignedInteger(5).expectEnd(Density::uniline);
+            composer.expectKey("g"sv).expectObject().expectEnd(Density::nospace);
         composer.expectEnd(Density::multiline);
         decode(
 R"({
@@ -1334,7 +1334,7 @@ I do not like them anywhere
 I do not like green eggs and ham
 I do not like them Sam I am
 )");
-        composer.expectKey("Magic Numbers"sv).expectArray().expectUnsignedInteger(777).expectUnsignedInteger(777).expectUnsignedInteger(777).expectEnd(Density::compact);
+        composer.expectKey("Magic Numbers"sv).expectArray().expectUnsignedInteger(777).expectUnsignedInteger(777).expectUnsignedInteger(777).expectEnd(Density::nospace);
     composer.expectEnd(Density::multiline);
     decode(
 R"(/**
