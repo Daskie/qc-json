@@ -1298,42 +1298,30 @@ TEST(decode, general)
         composer.expectKey("Name"sv).expectString("Salt's Crust"sv);
         composer.expectKey("Founded"sv).expectSignedInteger(1964);
         composer.expectKey("Employees"sv).expectArray();
-            composer.expectObject();
-                composer.expectKey("Name"sv).expectString("Ol' Joe Fisher"sv);
-                composer.expectKey("Title"sv).expectString("Fisherman"sv);
-                composer.expectKey("Age"sv).expectSignedInteger(69);
-            composer.expectEnd();
-            composer.expectObject();
-                composer.expectKey("Name"sv).expectString("Mark Rower"sv);
-                composer.expectKey("Title"sv).expectString("Cook"sv);
-                composer.expectKey("Age"sv).expectSignedInteger(41);
-            composer.expectEnd();
-            composer.expectObject();
-                composer.expectKey("Name"sv).expectString("Phineas"sv);
-                composer.expectKey("Title"sv).expectString("Server Boy"sv);
-                composer.expectKey("Age"sv).expectSignedInteger(19);
-            composer.expectEnd();
-        composer.expectEnd();
+            composer.expectObject().expectKey("Name"sv).expectString("Ol' Joe Fisher"sv).expectKey("Title"sv).expectString("Fisherman"sv).expectKey("Age"sv).expectSignedInteger(69).expectEnd(Density::uniline);
+            composer.expectObject().expectKey("Name"sv).expectString("Mark Rower"sv).expectKey("Title"sv).expectString("Cook"sv).expectKey("Age"sv).expectSignedInteger(41).expectEnd(Density::uniline);
+            composer.expectObject().expectKey("Name"sv).expectString("Phineas"sv).expectKey("Title"sv).expectString("Server Boy"sv).expectKey("Age"sv).expectSignedInteger(19).expectEnd(Density::uniline);
+        composer.expectEnd(Density::multiline);
         composer.expectKey("Dishes"sv).expectArray();
             composer.expectObject();
                 composer.expectKey("Name"sv).expectString("Basket o' Barnacles"sv);
                 composer.expectKey("Price"sv).expectFloater(5.45);
                 composer.expectKey("Ingredients"sv).expectArray().expectString("\"Salt\""sv).expectString("Barnacles"sv).expectEnd();
                 composer.expectKey("Gluten Free"sv).expectBoolean(false);
-            composer.expectEnd();
+            composer.expectEnd(Density::multiline);
             composer.expectObject();
                 composer.expectKey("Name"sv).expectString("Two Tuna"sv);
                 composer.expectKey("Price"sv).expectFloater(-std::numeric_limits<double>::infinity());
                 composer.expectKey("Ingredients"sv).expectArray().expectString("Tuna"sv).expectEnd();
                 composer.expectKey("Gluten Free"sv).expectBoolean(true);
-            composer.expectEnd();
+            composer.expectEnd(Density::multiline);
             composer.expectObject();
                 composer.expectKey("Name"sv).expectString("18 Leg Bouquet"sv);
                 composer.expectKey("Price"sv).expectFloater(std::numeric_limits<double>::quiet_NaN());
                 composer.expectKey("Ingredients"sv).expectArray().expectString("\"Salt\""sv).expectString("Octopus"sv).expectString("Crab"sv).expectEnd();
                 composer.expectKey("Gluten Free"sv).expectBoolean(false);
-            composer.expectEnd();
-        composer.expectEnd();
+            composer.expectEnd(Density::multiline);
+        composer.expectEnd(Density::multiline);
         composer.expectKey("Profit Margin"sv).expectNull();
         composer.expectKey("Ha\x03r Name"sv).expectString("M\0\0n"sv);
         composer.expectKey("Green Eggs and Ham"sv).expectString(
@@ -1346,8 +1334,8 @@ I do not like them anywhere
 I do not like green eggs and ham
 I do not like them Sam I am
 )");
-        composer.expectKey("Magic Numbers"sv).expectArray().expectUnsignedInteger(777).expectUnsignedInteger(777).expectUnsignedInteger(777).expectEnd();
-    composer.expectEnd();
+        composer.expectKey("Magic Numbers"sv).expectArray().expectUnsignedInteger(777).expectUnsignedInteger(777).expectUnsignedInteger(777).expectEnd(Density::compact);
+    composer.expectEnd(Density::multiline);
     decode(
 R"(/**
  * Restraunt report
@@ -1394,7 +1382,7 @@ I do not like them anywhere\n\
 I do not like green eggs and ham\n\
 I do not like them Sam I am\n\
 ",
-    "Magic Numbers": [ 0x309, 0o1411, 0b1100001001 ] // What could they mean?!
+    "Magic Numbers": [0x309,0o1411,0b1100001001] // What could they mean?!
 })"sv, composer, nullptr);
     EXPECT_TRUE(composer.isDone());
 }

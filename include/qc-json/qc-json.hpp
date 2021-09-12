@@ -265,7 +265,9 @@ namespace qc::json
         ///
         /// Construct an empty object. No memory is allocated until the first element is added
         ///
-        Object() noexcept = default;
+        /// @param density the encode density
+        ///
+        explicit Object(Density density = Density::unspecified) noexcept;
 
         Object(const Object &) = delete;
         Object(Object && other) noexcept;
@@ -345,11 +347,24 @@ namespace qc::json
         const_iterator end() const noexcept;
         const_iterator cend() const noexcept;
 
+        ///
+        /// @return the encode density of the object
+        ///
+        Density density() const noexcept;
+
+        ///
+        /// @param density the new encode density
+        ///
+        void density(Density density) noexcept;
+
         private: //-------------------------------------------------------------
 
         uint32_t _type_and_capacity{uint32_t(Type::object) << 29};
         uint32_t _size{0u};
-        alignas(8) Pair * _pairs{nullptr};
+        alignas(8) uintptr_t _pairs_and_density{0u};
+
+        Pair * _pairs() noexcept;
+        const Pair * _pairs() const noexcept;
 
         std::pair<const Pair *, bool> _search(string_view key) const;
         std::pair<Pair *, bool> _search(string_view key);
@@ -368,7 +383,9 @@ namespace qc::json
         ///
         /// Constructs an empty array. No memory is allocated until the first element is added
         ///
-        Array() noexcept = default;
+        /// @param density the encode density
+        ///
+        explicit Array(Density density = Density::unspecified) noexcept;
 
         ///
         /// Constructs an array from the given arguments, which may be differnt types. Memory is allocated to match the
@@ -378,8 +395,10 @@ namespace qc::json
         /// @tparam Ts the remaining value types, if any
         /// @param val the first value
         /// @param vals the remaining values, if any
+        /// @param density the encode density
         ///
         template <typename T, typename... Ts> explicit Array(T && val, Ts &&... vals);
+        template <typename T, typename... Ts> explicit Array(Density density, T && val, Ts &&... vals);
 
         Array(const Array & other) = delete;
         Array(Array && other) noexcept;
@@ -463,11 +482,24 @@ namespace qc::json
         const_iterator end() const noexcept;
         const_iterator cend() const noexcept;
 
+        ///
+        /// @return the encode density of the array
+        ///
+        Density density() const noexcept;
+
+        ///
+        /// @param density the new encode density
+        ///
+        void density(Density density) noexcept;
+
         private: //-------------------------------------------------------------
 
         uint32_t _type_and_capacity{uint32_t(Type::array) << 29};
         uint32_t _size{0u};
-        alignas(8) Value * _values{nullptr};
+        alignas(8) uintptr_t _values_and_density{0u};
+
+        Value * _values() noexcept;
+        const Value * _values() const noexcept;
     };
 
     ///
@@ -612,7 +644,18 @@ namespace qc::json
             _key = std::move(k);
         }
 
-        void end(const Scope, const Density, Value * const, Value * const) {}
+        void end(const Scope innerScope, const Density density, Value * const innerNode, Value * const) {
+            switch (innerScope) {
+                case Scope::object:
+                    innerNode->asObject<unsafe>().density(density);
+                    break;
+                case Scope::array:
+                    innerNode->asArray<unsafe>().density(density);
+                    break;
+                default:
+                    break;
+            }
+        }
 
         template <typename T>
         void val(const T v, const Scope scope, Value * const node)
@@ -952,10 +995,14 @@ namespace qc::json
         }
     }
 
+    inline Object::Object(const Density density) noexcept :
+        _pairs_and_density{uintptr_t(density)}
+    {}
+
     inline Object::Object(Object && other) noexcept :
         _type_and_capacity{std::exchange(other._type_and_capacity, uint32_t(Type::object) << 29)},
         _size{std::exchange(other._size, 0u)},
-        _pairs{std::exchange(other._pairs, nullptr)}
+        _pairs_and_density{std::exchange(other._pairs_and_density, 0u)}
     {}
 
     inline Object & Object::operator=(Object && other) noexcept
@@ -964,7 +1011,7 @@ namespace qc::json
 
         _type_and_capacity = std::exchange(other._type_and_capacity, uint32_t(Type::object) << 29);
         _size = std::exchange(other._size, 0u);
-        _pairs = std::exchange(other._pairs, nullptr);
+        _pairs_and_density = std::exchange(other._pairs_and_density, 0u);
 
         return *this;
     }
@@ -973,7 +1020,7 @@ namespace qc::json
     {
         if (_size) {
             clear();
-            ::operator delete(_pairs);
+            ::operator delete(_pairs(), std::align_val_t{8u});
         }
     }
 
@@ -994,9 +1041,13 @@ namespace qc::json
 
     inline Object::Pair & Object::add(string && key, Value && val)
     {
+        Pair * pairs{_pairs()};
+
         // If this is the first pair, allocate backing array
-        if (!_pairs) {
-            _pairs = static_cast<Pair *>(::operator new(8u * sizeof(Pair)));
+        if (!pairs) {
+            pairs = static_cast<Pair *>(::operator new(8u * sizeof(Pair), std::align_val_t{8u}));
+            _pairs_and_density &= 0b111u;
+            _pairs_and_density |= reinterpret_cast<uintptr_t>(pairs);
             _type_and_capacity = (uint32_t(Type::object) << 29) | 1u;
         }
 
@@ -1012,11 +1063,11 @@ namespace qc::json
         // If we're at capacity, expand
         if (const uint32_t capacity{Object::capacity()}; _size >= capacity) {
             const uint32_t newCapacity{capacity << 1};
-            Pair * const newPairs{static_cast<Pair *>(::operator new(newCapacity * sizeof(Pair)))};
-            Pair * const newPos{newPairs + (pos - _pairs)};
+            Pair * const newPairs{static_cast<Pair *>(::operator new(newCapacity * sizeof(Pair), std::align_val_t{8u}))};
+            Pair * const newPos{newPairs + (pos - pairs)};
 
             // Move over the pairs before the one we're inserting
-            for (Pair * src{_pairs}, * dst{newPairs}; src < pos; ++src, ++dst) {
+            for (Pair * src{pairs}, * dst{newPairs}; src < pos; ++src, ++dst) {
                 new (&dst->first) string{std::move(src->first)};
                 src->first.~string();
 
@@ -1034,8 +1085,10 @@ namespace qc::json
             }
 
             // Update our state
-            ::operator delete(_pairs);
-            _pairs = newPairs;
+            ::operator delete(pairs, std::align_val_t{8u});
+            pairs = newPairs;
+            _pairs_and_density &= 0b111u;
+            _pairs_and_density |= reinterpret_cast<uintptr_t>(pairs);
             _type_and_capacity = (uint32_t(Type::object) << 29) | (newCapacity >> 3);
             pos = newPos;
         }
@@ -1120,12 +1173,12 @@ namespace qc::json
 
     inline Object::iterator Object::begin() noexcept
     {
-        return _pairs;
+        return _pairs();
     }
 
     inline Object::const_iterator Object::begin() const noexcept
     {
-        return _pairs;
+        return _pairs();
     }
 
     inline Object::const_iterator Object::cbegin() const noexcept
@@ -1135,12 +1188,12 @@ namespace qc::json
 
     inline Object::iterator Object::end() noexcept
     {
-        return _pairs + _size;
+        return _pairs() + _size;
     }
 
     inline Object::const_iterator Object::end() const noexcept
     {
-        return _pairs + _size;
+        return _pairs() + _size;
     }
 
     inline Object::const_iterator Object::cend() const noexcept
@@ -1148,10 +1201,31 @@ namespace qc::json
         return end();
     }
 
+    inline Density Object::density() const noexcept
+    {
+        return Density(_pairs_and_density & 0b111u);
+    }
+
+    inline void Object::density(const Density density) noexcept
+    {
+        _pairs_and_density &= ~uintptr_t{0b111u};
+        _pairs_and_density |= uintptr_t(density);
+    }
+
+    inline Object::Pair * Object::_pairs() noexcept
+    {
+        return reinterpret_cast<Pair *>(_pairs_and_density & ~uintptr_t{0b111u});
+    }
+
+    inline const Object::Pair * Object::_pairs() const noexcept
+    {
+        return reinterpret_cast<const Pair *>(_pairs_and_density & ~uintptr_t{0b111u});
+    }
+
     inline std::pair<const Object::Pair *, bool> Object::_search(const string_view key) const
     {
         const Pair * const endPos{cend()};
-        const Pair * low{_pairs}, * high{endPos};
+        const Pair * low{_pairs()}, * high{endPos};
         while (low < high) {
             const Pair * const mid{low + ((high - low) >> 1)};
             const int delta{std::strcmp(key.data(), mid->first.c_str())};
@@ -1174,17 +1248,26 @@ namespace qc::json
         return {const_cast<Pair *>(pos), found};
     }
 
+    inline Array::Array(const Density density) noexcept :
+        _values_and_density{uintptr_t(density)}
+    {}
+
     template <typename T, typename... Ts>
     inline Array::Array(T && val, Ts &&... vals) :
+        Array{Density::unspecified, std::forward<T>(val), std::forward<Ts>(vals)...}
+    {}
+
+    template <typename T, typename... Ts>
+    inline Array::Array(const Density density, T && val, Ts &&... vals) :
         _type_and_capacity{(uint32_t(Type::array) << 29) | (std::max(uint32_t(std::bit_ceil(1u + sizeof...(Ts))), 8u) >> 3)},
         _size{1u + sizeof...(Ts)},
-        _values{static_cast<Value *>(::operator new(_size * sizeof(Value)))}
+        _values_and_density{reinterpret_cast<uintptr_t>(::operator new(_size * sizeof(Value), std::align_val_t{8u})) | uintptr_t(density)}
     {
         // Populate `_values` using fold expression
-        int index{0};
-        const auto populate{[this, &index](auto && val) {
-            new (_values + index) Value{std::forward<decltype(val)>(val)};
-            ++index;
+        Value * value{_values()};
+        const auto populate{[&value](auto && val) {
+            new (value) Value{std::forward<decltype(val)>(val)};
+            ++value;
         }};
         populate(std::forward<T>(val));
         (populate(std::forward<Ts>(vals)), ...);
@@ -1193,7 +1276,7 @@ namespace qc::json
     inline Array::Array(Array && other) noexcept :
         _type_and_capacity{std::exchange(other._type_and_capacity, uint32_t(Type::array) << 29)},
         _size{std::exchange(other._size, 0u)},
-        _values{std::exchange(other._values, nullptr)}
+        _values_and_density{std::exchange(other._values_and_density, 0u)}
     {}
 
     inline Array & Array::operator=(Array && other) noexcept
@@ -1202,7 +1285,7 @@ namespace qc::json
 
         _type_and_capacity = std::exchange(other._type_and_capacity, uint32_t(Type::array) << 29);
         _size = std::exchange(other._size, 0u);
-        _values = std::exchange(other._values, nullptr);
+        _values_and_density = std::exchange(other._values_and_density, 0u);
 
         return *this;
     }
@@ -1211,7 +1294,7 @@ namespace qc::json
     {
         if (_size) {
             clear();
-            ::operator delete(_values);
+            ::operator delete(_values(), std::align_val_t{8u});
         }
     }
 
@@ -1232,26 +1315,32 @@ namespace qc::json
 
     inline Value & Array::add(Value && val) noexcept
     {
+        Value * values{_values()};
+
         // If this is the first value, allocate initial storage
-        if (!_values) {
-            _values = static_cast<Value *>(::operator new(8u * sizeof(Value)));
+        if (!values) {
+            values = static_cast<Value *>(::operator new(8u * sizeof(Value), std::align_val_t{8u}));
+            _values_and_density &= 0b111u;
+            _values_and_density |= reinterpret_cast<uintptr_t>(values);
             _type_and_capacity = (uint32_t(Type::array) << 29) | 1u;
         }
         // If we're at capacity, expand
         else if (const uint32_t capacity{this->capacity()}; _size >= capacity) {
             const uint32_t newCapacity{capacity << 1};
-            Value * const newValues{static_cast<Value *>(::operator new(newCapacity * sizeof(Value)))};
+            Value * const newValues{static_cast<Value *>(::operator new(newCapacity * sizeof(Value), std::align_val_t{8u}))};
 
             // Copy over values
-            std::copy(reinterpret_cast<const uint64_t *>(_values), reinterpret_cast<const uint64_t *>(cend()), reinterpret_cast<uint64_t *>(newValues));
+            std::copy(reinterpret_cast<const uint64_t *>(values), reinterpret_cast<const uint64_t *>(cend()), reinterpret_cast<uint64_t *>(newValues));
 
             // Update our current state
-            ::operator delete(_values);
-            _values = newValues;
+            ::operator delete(values, std::align_val_t{8u});
+            values = newValues;
+            _values_and_density &= 0b111u;
+            _values_and_density |= reinterpret_cast<uintptr_t>(values);
             _type_and_capacity = (uint32_t(Type::array) << 29) | (newCapacity >> 3);
         }
 
-        return *new (_values + _size++) Value{std::move(val)};
+        return *new (values + _size++) Value{std::move(val)};
     }
 
     inline Value & Array::at(const uint32_t i)
@@ -1265,7 +1354,7 @@ namespace qc::json
             throw std::out_of_range{"Index out of bounds"};
         }
 
-        return _values[i];
+        return _values()[i];
     }
 
     inline Value Array::remove(const uint32_t i)
@@ -1310,12 +1399,12 @@ namespace qc::json
 
     inline Array::iterator Array::begin() noexcept
     {
-        return _values;
+        return _values();
     }
 
     inline Array::const_iterator Array::begin() const noexcept
     {
-        return _values;
+        return _values();
     }
 
     inline Array::const_iterator Array::cbegin() const noexcept
@@ -1325,17 +1414,38 @@ namespace qc::json
 
     inline Array::iterator Array::end() noexcept
     {
-        return _values + _size;
+        return _values() + _size;
     }
 
     inline Array::const_iterator Array::end() const noexcept
     {
-        return _values + _size;
+        return _values() + _size;
     }
 
     inline Array::const_iterator Array::cend() const noexcept
     {
         return end();
+    }
+
+    inline Density Array::density() const noexcept
+    {
+        return Density(_values_and_density & 0b111u);
+    }
+
+    inline void Array::density(const Density density) noexcept
+    {
+        _values_and_density &= ~uintptr_t{0b111u};
+        _values_and_density |= uintptr_t(density);
+    }
+
+    inline Value * Array::_values() noexcept
+    {
+        return reinterpret_cast<Value *>(_values_and_density & ~uintptr_t{0b111u});
+    }
+
+    inline const Value * Array::_values() const noexcept
+    {
+        return reinterpret_cast<const Value *>(_values_and_density & ~uintptr_t{0b111u});
     }
 
     inline String::String(const string_view str) noexcept :
@@ -1345,7 +1455,7 @@ namespace qc::json
             std::copy(str.cbegin(), str.cend(), reinterpret_cast<char *>(&_inlineChars0));
         }
         else {
-            _dynamicChars = static_cast<char *>(::operator new(str.size()));
+            _dynamicChars = static_cast<char *>(::operator new(str.size(), std::align_val_t{8u}));
             std::copy(str.cbegin(), str.cend(), _dynamicChars);
         }
     }
@@ -1369,7 +1479,7 @@ namespace qc::json
 
     inline String::~String() noexcept
     {
-        if (size() > 12u) ::operator delete(_dynamicChars);
+        if (size() > 12u) ::operator delete(_dynamicChars, std::align_val_t{8u});
     }
 
     inline uint32_t String::size() const noexcept
@@ -1406,16 +1516,18 @@ namespace qc::json
                 break;
             }
             case Type::object: {
-                encoder << object;
-                for (const auto & [key, v] : val.asObject<unsafe>()) {
+                const Object & obj{val.asObject<unsafe>()};
+                encoder << object(obj.density());
+                for (const auto & [key, v] : obj) {
                     encoder << key << v;
                 }
                 encoder << end;
                 break;
             }
             case Type::array: {
-                encoder << array;
-                for (const auto & v : val.asArray<unsafe>()) {
+                const Array & arr{val.asArray<unsafe>()};
+                encoder << array(arr.density());
+                for (const auto & v : arr) {
                     encoder << v;
                 }
                 encoder << end;
