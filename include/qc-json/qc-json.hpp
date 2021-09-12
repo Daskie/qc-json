@@ -1516,21 +1516,21 @@ namespace qc::json
                 break;
             }
             case Type::object: {
-                const Object & obj{val.asObject<unsafe>()};
-                encoder << object(obj.density());
-                for (const auto & [key, v] : obj) {
+                const Object & object{val.asObject<unsafe>()};
+                encoder << tokens::object(object.density());
+                for (const auto & [key, v] : object) {
                     encoder << key << v;
                 }
-                encoder << end;
+                encoder << tokens::end;
                 break;
             }
             case Type::array: {
-                const Array & arr{val.asArray<unsafe>()};
-                encoder << array(arr.density());
-                for (const auto & v : arr) {
+                const Array & array{val.asArray<unsafe>()};
+                encoder << tokens::array(array.density());
+                for (const auto & v : array) {
                     encoder << v;
                 }
-                encoder << end;
+                encoder << tokens::end;
                 break;
             }
             case Type::string: {

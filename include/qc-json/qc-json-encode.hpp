@@ -67,46 +67,52 @@ namespace qc::json
         explicit EncodeError(const string_view msg) noexcept;
     };
 
+    // This weird struct/operator()/variable setup allows for both ` << object ` and ` << object(density) `
+    struct _ObjectToken { Density density{Density::unspecified}; constexpr _ObjectToken operator()(Density density_) const noexcept { return _ObjectToken{density_}; } };
+
+    // This weird struct/operator()/variable setup allows for both ` << array ` and ` << array(density) `
+    struct _ArrayToken { Density density{Density::unspecified}; constexpr _ArrayToken operator()(Density density_) const noexcept { return _ArrayToken{density_}; } };
+
+    struct _EndToken {};
+
+    struct _BinaryToken { uint64_t val{}; };
+    struct _OctalToken { uint64_t val{}; };
+    struct _HexToken { uint64_t val{}; };
+
+    struct _CommentToken { string_view comment{}; };
+
     ///
     /// Namespace provided to allow the user to `using namespace qc::json::tokens` to avoid the verbosity of fully
     ///   qualifying the tokens namespace
     ///
-    inline namespace tokens
+    namespace tokens
     {
         ///
         /// Stream this `object` variable to start a new object. Optionally specify a density
         ///
-        /// This weird struct/operator()/variable setup allows for both ` << object ` and ` << object(density) `
-        ///
-        constexpr struct ObjectToken { Density density{Density::unspecified}; constexpr ObjectToken operator()(Density density_) const noexcept { return ObjectToken{density_}; } } object{};
+        constexpr _ObjectToken object{};
 
         ///
         /// Stream this `array` variable to start a new array. Optionally specify a density
         ///
-        /// This weird struct/operator()/variable setup allows for both ` << array ` and ` << array(density) `
-        ///
-        constexpr struct ArrayToken { Density density{Density::unspecified}; constexpr ArrayToken operator()(Density density_) const noexcept { return ArrayToken{density_}; } } array{};
+        constexpr _ArrayToken array{};
 
         ///
         /// Stream this to end the current object or array
         ///
-        constexpr struct EndToken {} end;
+        constexpr _EndToken end{};
 
         ///
         /// Stream ` << binary(val) `, ` << octal(val) `, or ` << hex(val) ` to encode an unsigned integer in that base
         ///
-        struct BinaryToken { uint64_t val{}; };
-        struct  OctalToken { uint64_t val{}; };
-        struct    HexToken { uint64_t val{}; };
-        constexpr struct { constexpr BinaryToken operator()(uint64_t v) const noexcept { return BinaryToken{v}; } } binary;
-        constexpr struct { constexpr  OctalToken operator()(uint64_t v) const noexcept { return  OctalToken{v}; } }  octal;
-        constexpr struct { constexpr    HexToken operator()(uint64_t v) const noexcept { return    HexToken{v}; } }    hex;
+        constexpr struct { constexpr _BinaryToken operator()(uint64_t v) const noexcept { return _BinaryToken{v}; } } binary;
+        constexpr struct { constexpr  _OctalToken operator()(uint64_t v) const noexcept { return  _OctalToken{v}; } }  octal;
+        constexpr struct { constexpr    _HexToken operator()(uint64_t v) const noexcept { return    _HexToken{v}; } }    hex;
 
         ///
         /// Stream ` << comment(str) ` to encode a comment
         ///
-        struct CommentToken { string_view comment{}; };
-        constexpr struct { constexpr CommentToken operator()(string_view str) const noexcept { return CommentToken{str}; } } comment;
+        constexpr struct { constexpr _CommentToken operator()(string_view str) const noexcept { return _CommentToken{str}; } } comment;
     }
 
     ///
@@ -152,21 +158,21 @@ namespace qc::json
         ///
         /// @return this
         ///
-        Encoder & operator<<(ObjectToken v);
+        Encoder & operator<<(_ObjectToken v);
 
         ///
         /// Start a new array
         ///
         /// @return this
         ///
-        Encoder & operator<<(ArrayToken v);
+        Encoder & operator<<(_ArrayToken v);
 
         ///
         /// End the current object or array
         ///
         /// @return this
         ///
-        Encoder & operator<<(EndToken);
+        Encoder & operator<<(_EndToken);
 
         ///
         /// Set the numeric base of the next number to be encoded. If this is anything other than decimal, the number
@@ -178,9 +184,9 @@ namespace qc::json
         /// @param base the base for the next number
         /// @return this
         ///
-        Encoder & operator<<(BinaryToken v);
-        Encoder & operator<<(OctalToken v);
-        Encoder & operator<<(HexToken v);
+        Encoder & operator<<(_BinaryToken v);
+        Encoder & operator<<(_OctalToken v);
+        Encoder & operator<<(_HexToken v);
 
         ///
         /// Insert a comment. Comments always logically precede a value. Comments will be in line form (`// ...`) in
@@ -190,7 +196,7 @@ namespace qc::json
         /// @param v the comment
         /// @return this
         ///
-        Encoder & operator<<(CommentToken v);
+        Encoder & operator<<(_CommentToken v);
 
         ///
         /// Prevent the easy mistake of streaming the density directly
@@ -269,9 +275,9 @@ namespace qc::json
         void _encode(string_view val);
         void _encode(int64_t val);
         void _encode(uint64_t val);
-        void _encode(BinaryToken v);
-        void _encode(OctalToken v);
-        void _encode(HexToken v);
+        void _encode(_BinaryToken v);
+        void _encode(_OctalToken v);
+        void _encode(_HexToken v);
         void _encode(double val);
         void _encode(bool val);
         void _encode(std::nullptr_t);
@@ -329,19 +335,19 @@ namespace qc::json
         return *this;
     }
 
-    inline Encoder & Encoder::operator<<(const ObjectToken v)
+    inline Encoder & Encoder::operator<<(const _ObjectToken v)
     {
         _start(_Container::object, v.density);
         return *this;
     }
 
-    inline Encoder & Encoder::operator<<(const ArrayToken v)
+    inline Encoder & Encoder::operator<<(const _ArrayToken v)
     {
         _start(_Container::array, v.density);
         return *this;
     }
 
-    inline Encoder & Encoder::operator<<(const EndToken)
+    inline Encoder & Encoder::operator<<(const _EndToken)
     {
         if (_container == _Container::none) {
             throw EncodeError{"No object or array to end"sv};
@@ -364,25 +370,25 @@ namespace qc::json
         return *this;
     }
 
-    inline Encoder & Encoder::operator<<(const BinaryToken v)
+    inline Encoder & Encoder::operator<<(const _BinaryToken v)
     {
         _val(v);
         return *this;
     }
 
-    inline Encoder & Encoder::operator<<(const OctalToken v)
+    inline Encoder & Encoder::operator<<(const _OctalToken v)
     {
         _val(v);
         return *this;
     }
 
-    inline Encoder & Encoder::operator<<(const HexToken v)
+    inline Encoder & Encoder::operator<<(const _HexToken v)
     {
         _val(v);
         return *this;
     }
 
-    inline Encoder & Encoder::operator<<(const CommentToken v)
+    inline Encoder & Encoder::operator<<(const _CommentToken v)
     {
         // Ensure comment does not come after key
         if (_prevElement == _Element::key) {
@@ -435,7 +441,7 @@ namespace qc::json
 
         // Simply recurse to handle the remaining lines
         if (lineLength < v.comment.size()) {
-            operator<<(CommentToken{v.comment.substr(lineLength + 1)});
+            operator<<(_CommentToken{v.comment.substr(lineLength + 1)});
         }
 
         return *this;
@@ -702,7 +708,7 @@ namespace qc::json
         _str.append(buffer, size_t(res.ptr - buffer));
     }
 
-    inline void Encoder::_encode(const BinaryToken v)
+    inline void Encoder::_encode(const _BinaryToken v)
     {
         char buffer[64];
         const std::to_chars_result res{std::to_chars(buffer, buffer + sizeof(buffer), v.val, 2)};
@@ -710,7 +716,7 @@ namespace qc::json
         _str.append(buffer, size_t(res.ptr - buffer));
     }
 
-    inline void Encoder::_encode(const OctalToken v)
+    inline void Encoder::_encode(const _OctalToken v)
     {
         char buffer[24];
         const std::to_chars_result res{std::to_chars(buffer, buffer + sizeof(buffer), v.val, 8)};
@@ -718,7 +724,7 @@ namespace qc::json
         _str.append(buffer, size_t(res.ptr - buffer));
     }
 
-    inline void Encoder::_encode(const HexToken v)
+    inline void Encoder::_encode(const _HexToken v)
     {
         char buffer[16];
         const std::to_chars_result res{std::to_chars(buffer, buffer + sizeof(buffer), v.val, 16)};
