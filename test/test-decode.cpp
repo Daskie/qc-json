@@ -23,7 +23,7 @@ class DummyComposer
     std::nullptr_t object(Scope, std::nullptr_t) { return nullptr; }
     std::nullptr_t array(Scope, std::nullptr_t) { return nullptr; }
     void end(Scope, Density, std::nullptr_t, std::nullptr_t) {}
-    void key(std::string &&, Scope, std::nullptr_t) {}
+    void key(std::string_view, Scope, std::nullptr_t) {}
     void val(std::string_view, Scope, std::nullptr_t) {}
     void val(int64_t, Scope, std::nullptr_t) {}
     void val(uint64_t, Scope, std::nullptr_t) {}
@@ -63,7 +63,7 @@ class ExpectantComposer
     std::nullptr_t object(Scope, std::nullptr_t) { assertNextIs(Object{}); return nullptr; }
     std::nullptr_t array(Scope, std::nullptr_t) { assertNextIs(Array{}); return nullptr; }
     void end(Scope, const Density d, std::nullptr_t, std::nullptr_t) { assertNextIs(End{d}); }
-    void key(std::string && k, Scope, std::nullptr_t) { assertNextIs(Key{k}); }
+    void key(std::string_view k, Scope, std::nullptr_t) { assertNextIs(Key{k}); }
     void val(std::string_view v, Scope, std::nullptr_t) { assertNextIs(String{v}); }
     void val(int64_t v, Scope, std::nullptr_t) { assertNextIs(SignedInteger{v}); }
     void val(uint64_t v, Scope, std::nullptr_t) { assertNextIs(UnsignedInteger{v}); }

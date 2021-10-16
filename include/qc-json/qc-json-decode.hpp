@@ -321,7 +321,7 @@ namespace qc::json
                     }
                     const char c{*_pos};
                     const string_view key{(c == '"' || c == '\'') ? _consumeString(c) : _consumeIdentifier()};
-                    _composer.key(string{key}, Scope::object, innerState);
+                    _composer.key(key, Scope::object, innerState);
                     density &= _skipSpaceAndComments();
 
                     _consumeChar(':');

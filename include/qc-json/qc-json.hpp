@@ -300,6 +300,7 @@ namespace qc::json
         /// @return the new pair entry in the object
         ///
         Pair & add(string && key, Value && val);
+        Pair & add(string_view key, Value && val);
 
         ///
         /// @param key the key in question
@@ -362,6 +363,8 @@ namespace qc::json
         uint32_t _type_and_capacity{uint32_t(Type::object) << 29};
         uint32_t _size{0u};
         alignas(8) uintptr_t _pairs_and_density{0u};
+
+        template <typename K> Pair & _add(K && key, Value && val);
 
         Pair * _pairs() noexcept;
         const Pair * _pairs() const noexcept;
@@ -639,9 +642,9 @@ namespace qc::json
             return innerNode;
         }
 
-        void key(string && k, const Scope, Value * const)
+        void key(const string_view k, const Scope, Value * const)
         {
-            _key = std::move(k);
+            _key = k;
         }
 
         void end(const Scope innerScope, const Density density, Value * const innerNode, Value * const) {
@@ -1041,6 +1044,17 @@ namespace qc::json
 
     inline Object::Pair & Object::add(string && key, Value && val)
     {
+        return _add(std::move(key), std::move(val));
+    }
+
+    inline Object::Pair & Object::add(const string_view key, Value && val)
+    {
+        return _add(key, std::move(val));
+    }
+
+    template <typename K>
+    inline Object::Pair & Object::_add(K && key, Value && val)
+    {
         Pair * pairs{_pairs()};
 
         // If this is the first pair, allocate backing array
@@ -1107,7 +1121,7 @@ namespace qc::json
         }
 
         // Add new entry
-        new (&pos->first) string{std::move(key)};
+        new (&pos->first) string{std::forward<K>(key)};
         new (&pos->second) Value{std::move(val)};
         ++_size;
 
