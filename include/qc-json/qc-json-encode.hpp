@@ -68,6 +68,16 @@ namespace qc::json
         explicit EncodeError(const string_view msg) noexcept;
     };
 
+    ///
+    /// Simple enum representing a json container type
+    ///
+    enum class Container : int8_t
+    {
+        none,
+        object,
+        array
+    };
+
     // This weird struct/operator()/variable setup allows for both ` << object ` and ` << object(density) `
     struct _ObjectToken { Density density{Density::unspecified}; constexpr _ObjectToken operator()(Density density_) const noexcept { return _ObjectToken{density_}; } };
 
@@ -238,9 +248,17 @@ namespace qc::json
         ///
         string finish();
 
-        private: //-------------------------------------------------------------
+        ///
+        /// @return the current container
+        ///
+        Container container() const noexcept;
 
-        enum class _Container : int8_t { none, object, array };
+        ///
+        /// @return the current density
+        ///
+        Density density() const noexcept;
+
+        private: //-------------------------------------------------------------
 
         enum class _Element { none, key, val, start, comment };
 
@@ -255,13 +273,13 @@ namespace qc::json
         bool _identifiers{false};
         std::string _str{};
         std::vector<_ScopeDelta> _scopeDeltas{};
-        _Container _container{_Container::none};
+        Container _container{Container::none};
         Density _density{Density::unspecified};
         int _indentation{0};
         _Element _prevElement{_Element::none};
         bool _isContent{false};
 
-        void _start(_Container container, Density density);
+        void _start(Container container, Density density);
 
         template <typename T> void _val(T v);
 
@@ -338,19 +356,19 @@ namespace qc::json
 
     inline Encoder & Encoder::operator<<(const _ObjectToken v)
     {
-        _start(_Container::object, v.density);
+        _start(Container::object, v.density);
         return *this;
     }
 
     inline Encoder & Encoder::operator<<(const _ArrayToken v)
     {
-        _start(_Container::array, v.density);
+        _start(Container::array, v.density);
         return *this;
     }
 
     inline Encoder & Encoder::operator<<(const _EndToken)
     {
-        if (_container == _Container::none) {
+        if (_container == Container::none) {
             throw EncodeError{"No object or array to end"sv};
         }
         if (_prevElement == _Element::key) {
@@ -361,8 +379,8 @@ namespace qc::json
         if (_prevElement == _Element::val || _prevElement == _Element::comment) {
             _putSpace();
         }
-        _str += (_container == _Container::object ? '}' : ']');
-        _container = _Container(int8_t(_container) - _scopeDeltas.back().containerDelta);
+        _str += (_container == Container::object ? '}' : ']');
+        _container = Container(int8_t(_container) - _scopeDeltas.back().containerDelta);
         _density = Density(int8_t(_density) - _scopeDeltas.back().densityDelta);
         _scopeDeltas.pop_back();
         _prevElement = _Element::val;
@@ -402,9 +420,11 @@ namespace qc::json
         for (size_t i{0u}; i < v.comment.size(); ++i) {
             const char c{v.comment[i]};
             if (!std::isprint(uchar(c))) {
-                if (c == '\n' && _density <= Density::multiline) {
-                    lineLength = i;
-                    break;
+                if (c == '\n') {
+                    if (_density <= Density::multiline) {
+                        lineLength = i;
+                        break;
+                    }
                 }
                 else {
                     throw EncodeError{("Comment has invalid character `\\x"s += std::to_string(int(uchar(c)))) += '`'};
@@ -450,7 +470,7 @@ namespace qc::json
 
     inline Encoder & Encoder::operator<<(const string_view v)
     {
-        if (_container == _Container::object && _prevElement != _Element::key) {
+        if (_container == Container::object && _prevElement != _Element::key) {
             _key(v);
         }
         else {
@@ -547,7 +567,7 @@ namespace qc::json
 
     inline string Encoder::finish()
     {
-        if (_container != _Container::none || !_isContent) {
+        if (_container != Container::none || !_isContent) {
             throw EncodeError{"Cannot finish, JSON is not yet complete"sv};
         }
 
@@ -561,21 +581,31 @@ namespace qc::json
         return str;
     }
 
-    inline void Encoder::_start(const _Container container, const Density density)
+    inline Container Encoder::container() const noexcept
     {
-        if (_container == _Container::none && _isContent) {
+        return _container;
+    }
+
+    inline Density Encoder::density() const noexcept
+    {
+        return _density;
+    }
+
+    inline void Encoder::_start(const Container container, const Density density)
+    {
+        if (_container == Container::none && _isContent) {
             throw EncodeError{"Cannot add to complete JSON"sv};
         }
-        if (_container == _Container::object && _prevElement != _Element::key) {
+        if (_container == Container::object && _prevElement != _Element::key) {
             throw EncodeError{"Cannot add to object without first providing a key"sv};
         }
 
         _prefix();
-        _str += container == _Container::object ? '{' : '[';
+        _str += container == Container::object ? '{' : '[';
 
-        const int8_t containerDelta{int8_t(container) - int8_t(_container)};
+        const int8_t containerDelta{int8_t(int8_t(container) - int8_t(_container))};
         const Density newDensity{density > _density ? density : _density};
-        const int8_t densityDelta{int8_t(newDensity) - int8_t(_density)};
+        const int8_t densityDelta{int8_t(int8_t(newDensity) - int8_t(_density))};
         _scopeDeltas.push_back(_ScopeDelta{containerDelta, densityDelta});
         _container = container;
         _density = newDensity;
@@ -586,10 +616,10 @@ namespace qc::json
     template <typename T>
     inline void Encoder::_val(const T v)
     {
-        if (_container == _Container::none && _isContent) {
+        if (_container == Container::none && _isContent) {
             throw EncodeError{"Cannot add to complete JSON"sv};
         }
-        if (_container == _Container::object && _prevElement != _Element::key) {
+        if (_container == Container::object && _prevElement != _Element::key) {
             throw EncodeError{"Cannot add to object without first providing a key"sv};
         }
 

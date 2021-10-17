@@ -730,7 +730,6 @@ null)", encoder.finish());
     }
     { // Invalid characters
         Encoder encoder{Density::uniline};
-        EXPECT_THROW(encoder << comment("A\ncomment"sv), EncodeError);
         EXPECT_THROW(encoder << comment("A\rcomment"sv), EncodeError);
         EXPECT_THROW(encoder << comment("A\tcomment"sv), EncodeError);
         EXPECT_THROW(encoder << comment("A\0comment"sv), EncodeError);

@@ -18,6 +18,7 @@
 #include <cstring>
 
 #include <algorithm>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -45,7 +46,7 @@ namespace qc::json
     ///
     /// The type of the JSON value
     ///
-    enum class Type : uint32_t
+    enum class Type : uint8_t
     {
         null,
         object,
@@ -55,42 +56,41 @@ namespace qc::json
         boolean
     };
 
-    enum class _NumberType : uint32_t
+    ///
+    /// The backing type for number values
+    ///
+    enum class NumberType : uint8_t
     {
-        nan,
+        invalid,
         signedInteger,
         unsignedInteger,
         floater
     };
 
-    class Object;
-    class Array;
-    class String;
+    class Value;
+
+    using Object = std::map<string, Value>;
+    using Array = std::vector<Value>;
 
     ///
     /// Represents one JSON value, which can be an object, array, string, number, boolean, or null
     ///
     class Value
     {
-        friend Object;
-        friend Array;
-        friend String;
-
         public: //--------------------------------------------------------------
 
         ///
         /// Constructs a null value
         ///
-        Value(std::nullptr_t = nullptr) noexcept;
+        Value(std::nullptr_t = nullptr) noexcept {}
 
         ///
         /// @param val the value whith which to be constructed
         ///
-        Value(Object && val) noexcept;
-        Value(Array && val) noexcept;
-        Value(String && val) noexcept;
+        Value(Object && val, Density density = Density::unspecified) noexcept;
+        Value(Array && val, Density density = Density::unspecified) noexcept;
+        Value(string && val) noexcept;
         Value(string_view val) noexcept;
-        Value(const string & val) noexcept;
         Value(const char * val);
         Value(char * val);
         Value(char val) noexcept;
@@ -108,7 +108,7 @@ namespace qc::json
 
         ///
         /// Attempts to construct a value from a custom type `T` using a specialized `qc::json::valueFrom` function,
-        ///   details of which can be found below
+        /// details of which can be found below
         ///
         /// @tparam T the custom type
         /// @param val the custom type value
@@ -127,6 +127,23 @@ namespace qc::json
         /// @return the type of the value
         ///
         Type type() const noexcept;
+
+        ///
+        /// @return the density of the object or array, or `unspecified` if not an object or array
+        ///
+        Density density() const noexcept;
+
+        ///
+        /// Sets the density of the object or array
+        ///
+        /// @param density the new density
+        ///
+        void setDensity(Density density) noexcept;
+
+        ///
+        /// @return the number type or `invalid` if not a number
+        ///
+        NumberType numberType() const noexcept;
 
         ///
         /// @return whether the value is an object
@@ -149,6 +166,21 @@ namespace qc::json
         bool isNumber() const noexcept;
 
         ///
+        /// @return whether the value is a signed integer
+        ///
+        bool isSignedInteger() const noexcept;
+
+        ///
+        /// @return whether the value is an unsigned integer
+        ///
+        bool isUnsignedInteger() const noexcept;
+
+        ///
+        /// @return whether the value is a floater
+        ///
+        bool isFloater() const noexcept;
+
+        ///
         /// @return whether the value is a boolean
         ///
         bool isBoolean() const noexcept;
@@ -159,10 +191,10 @@ namespace qc::json
         bool isNull() const noexcept;
 
         ///
-        /// Determines if the value type is compatible with `T`, which is to say calling `as<T>()` would be valid. See
-        ///   the `as` method docs below for more details
+        /// Determines if the value type is compatible with `T`, which is to say calling `to<T>()` would be valid. See
+        /// the `to` method docs below for more details
         ///
-        /// @tparam T the type in question, e.g. `int` or `std::string_view`
+        /// @tparam T the type in question, e.g. `int` or `std::string`
         /// @return whether the value type is compatible with type `T`
         ///
         template <typename T> bool is() const noexcept;
@@ -188,35 +220,54 @@ namespace qc::json
         /// @return this value as a string
         /// @throw `TypeError` if this value is not a string and `isSafe` is true
         ///
-        template <Safety isSafe = safe> string_view asString() const noexcept(isSafe == unsafe);
+        template <Safety isSafe = safe> string & asString() noexcept(isSafe == unsafe);
+        template <Safety isSafe = safe> const string & asString() const noexcept(isSafe == unsafe);
 
         ///
-        /// @tparam isSafe whether to check if this value is actually a number
-        /// @return this value as a number
-        /// @throw `TypeError` if this value is not a number and `isSafe` is true
+        /// @tparam isSafe whether to check if this value is actually a signed integer
+        /// @return this value as a signed integer
+        /// @throw `TypeError` if this value is not a signed integer and `isSafe` is true
         ///
-        template <Safety isSafe = safe> std::variant<int64_t, uint64_t, double> asNumber() const noexcept(isSafe == unsafe);
+        template <Safety isSafe = safe> int64_t & asSignedInteger() noexcept(isSafe == unsafe);
+        template <Safety isSafe = safe> const int64_t & asSignedInteger() const noexcept(isSafe == unsafe);
+
+        ///
+        /// @tparam isSafe whether to check if this value is actually an unsigned integer
+        /// @return this value as an unsigned integer
+        /// @throw `TypeError` if this value is not an unsigned integer and `isSafe` is true
+        ///
+        template <Safety isSafe = safe> uint64_t & asUnsignedInteger() noexcept(isSafe == unsafe);
+        template <Safety isSafe = safe> const uint64_t & asUnsignedInteger() const noexcept(isSafe == unsafe);
+
+        ///
+        /// @tparam isSafe whether to check if this value is actually a floater
+        /// @return this value as a floater
+        /// @throw `TypeError` if this value is not a floater and `isSafe` is true
+        ///
+        template <Safety isSafe = safe> double & asFloater() noexcept(isSafe == unsafe);
+        template <Safety isSafe = safe> const double & asFloater() const noexcept(isSafe == unsafe);
 
         ///
         /// @tparam isSafe whether to check if this value is actually a boolean
         /// @return this value as a boolean
         /// @throw `TypeError` if this value is not a boolean and `isSafe` is true
         ///
-        template <Safety isSafe = safe> bool asBoolean() const noexcept(isSafe == unsafe);
+        template <Safety isSafe = safe> bool & asBoolean() noexcept(isSafe == unsafe);
+        template <Safety isSafe = safe> const bool & asBoolean() const noexcept(isSafe == unsafe);
 
         ///
         /// Retrieves the value as the given type
         ///
         /// If the actual type does not match the requested type and `isSafe` is true, a `TypeError` is thrown
         ///
-        /// If `T` is `std::string_view`, this call is equivalent to `asString`. `std::string` and `char *` are
-        ///   incompatible and may not be used
+        /// If `T` is `std::string`, this call is equivalent to `asString`, except a copy of the string is returnsd
         ///
-        /// If `T` is `bool`, this call is equivalent to `asBoolean`
+        /// If `T` is `std::string_view`, `const char *`, or `char *`, a view/pointer to the current string is returned
         ///
-        /// If `T` is `char`, a single character string will try to be fetched. Note that in c++ `char`,
-        /// `signed char`, and `unsigned char` are distinct types. Asking for a `signed char` or `unsigned char` will
-        ///   instead try to fetch a number as type `int8_t` or `uint8_t` respectively
+        /// If `T` is `char`, the first/only character of the current string is returned. If the current string has more
+        /// then one character `TypeError` is thrown. Note that in c++ `char`, `signed char`, and `unsigned char` are
+        /// distinct types. Asking for a `signed char` or `unsigned char` will instead try to fetch a number of type
+        /// `int8_t` or `uint8_t` respectively
         ///
         /// If `T` is a numeric type...
         ///   ...and the value is a positive integer, it may be accessed as:
@@ -228,325 +279,67 @@ namespace qc::json
         ///     - any signed integer type (`int64_t`, `int32_t`, `int16_t`, `int8_t`), but only if it can fit
         ///   ...and the value is not an integer, it may only be accessed as a floater (`double`, `float`)
         ///
+        /// If `T` is `bool`, this call is equivalent to `asBoolean` by value
+        ///
+        /// If `T` is `nullptr_t` simply returns `nullptr`
+        ///
         /// If `T` is an unrecognized type, then we attempt to use the specialized `qc::json::valueTo` struct, details
-        ///   of which can be found below
+        /// of which can be found below
         ///
-        template <typename T, Safety isSafe = safe> T as() const;
+        template <typename T, Safety isSafe = safe> T to() const;
+
+        ///
+        /// @return whether the value has a comment
+        ///
+        bool hasComment() const noexcept;
+
+        ///
+        /// @return the value's comment, or `nullptr` if it has no comment
+        ///
+        string * comment() noexcept;
+        const string * comment() const noexcept;
+
+        ///
+        /// @param str the new comment
+        ///
+        void setComment(string && str);
+        void setComment(string_view str);
+        void setComment(const char * str);
+
+        ///
+        /// Removes the value's comment
+        ///
+        /// @return ownership of the value's comment
+        ///
+        std::unique_ptr<string> removeComment() noexcept;
 
         private: //-------------------------------------------------------------
 
-        struct
-        {
-            uint32_t type_and_data;
-            _NumberType numberType;
-        } _data0{};
-        union
-        {
-            int64_t signedInteger;
-            uint64_t unsignedInteger;
-            double floater;
-            bool boolean;
-        } _data1{};
-
+        Type _type{Type::null};
+        Density _density{Density::unspecified};
+        NumberType _numberType{NumberType::invalid};
+        void * _ptr{nullptr};
+        std::unique_ptr<string> _comment{};
     };
 
     ///
-    /// Represents a JSON object
+    /// Efficiently creates an object from the given key and value arguments
     ///
-    class Object
-    {
-        public: //--------------------------------------------------------------
-
-        using Pair = std::pair<string, Value>;
-
-        using iterator = Pair *;
-        using const_iterator = const Pair *;
-
-        ///
-        /// Construct an empty object. No memory is allocated until the first element is added
-        ///
-        /// @param density the encode density
-        ///
-        explicit Object(Density density = Density::unspecified) noexcept;
-
-        Object(const Object &) = delete;
-        Object(Object && other) noexcept;
-
-        Object & operator=(const Object &) = delete;
-        Object & operator=(Object && other) noexcept;
-
-        ~Object() noexcept;
-
-        ///
-        /// @return the current number of elements in the object
-        ///
-        uint32_t size() const noexcept;
-
-        ///
-        /// @return whether the object has no elements
-        ///
-        bool empty() const noexcept;
-
-        ///
-        /// @return the size of the backing array. Always a power of two
-        ///
-        uint32_t capacity() const noexcept;
-
-        ///
-        /// Add a new key/value element to the object, growing to the next power of two if at full capacity
-        ///
-        /// @param key the key to add or replace
-        /// @param val the value to add or replace
-        /// @return the new pair entry in the object
-        ///
-        Pair & add(string && key, Value && val);
-        Pair & add(string_view key, Value && val);
-
-        ///
-        /// @param key the key in question
-        /// @return whether the object has an element with `key`
-        ///
-        bool contains(string_view key) const;
-
-        ///
-        /// @param key the key of the element to fetch
-        /// @return the pair entry matching `key` if it exists
-        /// @throw `std::out_of_range` if the key does not exist in the object
-        ///
-        Value & at(string_view key);
-        const Value & at(string_view key) const;
-
-        ///
-        /// @param key the key of the element to find
-        /// @return an iterator to the pair entry matching `key`, or the end iterator if the key does not exist
-        ///
-        iterator find(string_view key);
-        const_iterator find(string_view key) const;
-
-        ///
-        /// @param it a valid iterator to an element present in the object
-        /// @return the removed element
-        ///
-        Pair remove(iterator it) noexcept;
-
-        ///
-        /// Deletes all elements
-        ///
-        void clear() noexcept;
-
-        ///
-        /// @return an iterator to the first element, or the end iterator if the object is empty
-        ///
-        iterator begin() noexcept;
-        const_iterator begin() const noexcept;
-        const_iterator cbegin() const noexcept;
-
-        ///
-        /// @return the end iterator, which is one-past the last element
-        ///
-        iterator end() noexcept;
-        const_iterator end() const noexcept;
-        const_iterator cend() const noexcept;
-
-        ///
-        /// @return the encode density of the object
-        ///
-        Density density() const noexcept;
-
-        ///
-        /// @param density the new encode density
-        ///
-        void density(Density density) noexcept;
-
-        private: //-------------------------------------------------------------
-
-        uint32_t _type_and_capacity{uint32_t(Type::object) << 29};
-        uint32_t _size{0u};
-        alignas(8) uintptr_t _pairs_and_density{0u};
-
-        template <typename K> Pair & _add(K && key, Value && val);
-
-        Pair * _pairs() noexcept;
-        const Pair * _pairs() const noexcept;
-
-        std::pair<const Pair *, bool> _search(string_view key) const;
-        std::pair<Pair *, bool> _search(string_view key);
-    };
+    /// @param key the first key, forwarded to `std::string` constructor
+    /// @param val the first value, forwarded to `qc::json::Value` constructor
+    /// @param more any number of additional key and value arguments
+    /// @return the created object
+    ///
+    template <typename K, typename V, typename... MoreKVs> Object makeObject(K && key, V && val, MoreKVs &&... moreKVs);
+    Object makeObject();
 
     ///
-    /// Represents a JSON array
+    /// Efficiently creates an array from the given value arguments
     ///
-    class Array
-    {
-        public: //--------------------------------------------------------------
-
-        using iterator = Value *;
-        using const_iterator = const Value *;
-
-        ///
-        /// Constructs an empty array. No memory is allocated until the first element is added
-        ///
-        /// @param density the encode density
-        ///
-        explicit Array(Density density = Density::unspecified) noexcept;
-
-        ///
-        /// Constructs an array from the given arguments, which may be differnt types. Memory is allocated to match the
-        ///   number of elements
-        ///
-        /// @tparam T the type of the first value
-        /// @tparam Ts the remaining value types, if any
-        /// @param val the first value
-        /// @param vals the remaining values, if any
-        /// @param density the encode density
-        ///
-        template <typename T, typename... Ts> explicit Array(T && val, Ts &&... vals);
-        template <typename T, typename... Ts> explicit Array(Density density, T && val, Ts &&... vals);
-
-        Array(const Array & other) = delete;
-        Array(Array && other) noexcept;
-
-        Array & operator=(const Array &) = delete;
-        Array & operator=(Array && other) noexcept;
-
-        ~Array() noexcept;
-
-        ///
-        /// @return the current number of elements in the array
-        ///
-        uint32_t size() const noexcept;
-
-        ///
-        /// @return whether the array has no elements
-        ///
-        bool empty() const noexcept;
-
-        ///
-        /// @return the backing capacity of the array
-        ///
-        uint32_t capacity() const noexcept;
-
-        ///
-        /// Adds the value to the end of the array, growing to the next power of two if at full capacity
-        ///
-        /// @param val the value to add
-        /// @return the new element in the array
-        ///
-        Value & add(Value && val) noexcept;
-
-        ///
-        /// @param i the index of the element to fetch
-        /// @return the element at index `i`
-        /// @throw `std::out_of_range` if `i` >= the current size of the array
-        Value & at(uint32_t i);
-        const Value & at(uint32_t i) const;
-
-        ///
-        /// Removes the element at the given index and shifts all posterior elements forward
-        ///
-        /// @param i the index of the element to remove
-        /// @return the removed element
-        /// @throw `std::out_of_range` if `i` >= the current size of the array
-        ///
-        Value remove(uint32_t i);
-
-        ///
-        /// Removes the element at the given iterator and shifts all posterior elements forward
-        ///
-        /// @param it a valid iterator to an element to remove
-        /// @return the removed element
-        ///
-        Value remove(iterator it) noexcept;
-
-        ///
-        /// Removes the elements in the given iterator range and shifts all posterior elements forward
-        ///
-        /// @param it1 a valid iterator to the first element to remove
-        /// @param it2 an iterator to one-past the last element to remove
-        ///
-        void remove(iterator it1, iterator it2) noexcept;
-
-        ///
-        /// Deletes all elements in the array
-        ///
-        void clear() noexcept;
-
-        ///
-        /// @return an iterator to the first element or the end iterator if the array is empty
-        ///
-        iterator begin() noexcept;
-        const_iterator begin() const noexcept;
-        const_iterator cbegin() const noexcept;
-
-        ///
-        /// @return the end iterator, which is one-past the last element in the array
-        ///
-        iterator end() noexcept;
-        const_iterator end() const noexcept;
-        const_iterator cend() const noexcept;
-
-        ///
-        /// @return the encode density of the array
-        ///
-        Density density() const noexcept;
-
-        ///
-        /// @param density the new encode density
-        ///
-        void density(Density density) noexcept;
-
-        private: //-------------------------------------------------------------
-
-        uint32_t _type_and_capacity{uint32_t(Type::array) << 29};
-        uint32_t _size{0u};
-        alignas(8) uintptr_t _values_and_density{0u};
-
-        Value * _values() noexcept;
-        const Value * _values() const noexcept;
-    };
-
+    /// @param vals the values, each forwarded to `qc::json::Value` constructor
+    /// @return the created array
     ///
-    /// Represents a JSON string
-    ///
-    class String
-    {
-        public: //--------------------------------------------------------------
-
-        ///
-        /// Constructs a string copied from the given string view
-        ///
-        /// @param str the string to copy
-        ///
-        explicit String(string_view str) noexcept;
-
-        String(const String &) = delete;
-        String(String && other) noexcept;
-
-        String & operator=(const String &) = delete;
-        String & operator=(String && other) noexcept;
-
-        ~String() noexcept;
-
-        ///
-        /// @return the number of characters in the string
-        ///
-        uint32_t size() const noexcept;
-
-        ///
-        /// @return a string view of the string
-        ///
-        string_view view() const noexcept;
-
-        private: //-------------------------------------------------------------
-
-        uint32_t _type_and_size{uint32_t(Type::string) << 29};
-        uint32_t _inlineChars0{0u};
-        union
-        {
-            uint64_t _inlineChars1{0u};
-            char * _dynamicChars;
-        };
-    };
+    template <typename... Vs> Array makeArray(Vs &&... vals);
 
     ///
     /// @param json the JSON string to decode
@@ -613,10 +406,10 @@ namespace qc::json
             Value * innerNode;
             switch (outerScope) {
                 case Scope::object:
-                    innerNode = &outerNode->asObject<unsafe>().add(std::move(_key), Object{}).second;
+                    innerNode = &outerNode->asObject<unsafe>().emplace(std::move(_key), Object{}).first->second;
                     break;
                 case Scope::array:
-                    innerNode = &outerNode->asArray<unsafe>().add(Object{});
+                    innerNode = &outerNode->asArray<unsafe>().emplace_back(Object{});
                     break;
                 default:
                     *outerNode = Object{};
@@ -630,10 +423,10 @@ namespace qc::json
             Value * innerNode;
             switch (outerScope) {
                 case Scope::object:
-                    innerNode = &outerNode->asObject<unsafe>().add(std::move(_key), Array{}).second;
+                    innerNode = &outerNode->asObject<unsafe>().emplace(std::move(_key), Array{}).first->second;
                     break;
                 case Scope::array:
-                    innerNode = &outerNode->asArray<unsafe>().add(Array{});
+                    innerNode = &outerNode->asArray<unsafe>().emplace_back(Array{});
                     break;
                 default:
                     *outerNode = Array{};
@@ -650,10 +443,10 @@ namespace qc::json
         void end(const Scope innerScope, const Density density, Value * const innerNode, Value * const) {
             switch (innerScope) {
                 case Scope::object:
-                    innerNode->asObject<unsafe>().density(density);
+                    innerNode->setDensity(density);
                     break;
                 case Scope::array:
-                    innerNode->asArray<unsafe>().density(density);
+                    innerNode->setDensity(density);
                     break;
                 default:
                     break;
@@ -665,10 +458,10 @@ namespace qc::json
         {
             switch (scope) {
                 case Scope::object:
-                    node->asObject<unsafe>().add(std::move(_key), v);
+                    node->asObject<unsafe>().emplace(std::move(_key), v);
                     break;
                 case Scope::array:
-                    node->asArray<unsafe>().add(v);
+                    node->asArray<unsafe>().emplace_back(v);
                     break;
                 default:
                     *node = v;
@@ -680,34 +473,39 @@ namespace qc::json
         string _key;
     };
 
-    inline Value::Value(const std::nullptr_t) noexcept {}
+    // Ensure size and alignment of `Value` are as expected
+    static_assert(sizeof(Value) == 3 * sizeof(void *));
+    static_assert(alignof(Value) == alignof(void *));
 
-    inline Value::Value(Object && val) noexcept :
-        Value{std::move(reinterpret_cast<Value &>(val))}
+    inline Value::Value(Object && val, const Density density) noexcept :
+        _type{Type::object},
+        _density{density},
+        _ptr{new Object{std::move(val)}}
     {}
 
-    inline Value::Value(Array && val) noexcept :
-        Value{std::move(reinterpret_cast<Value &>(val))}
+    inline Value::Value(Array && val, const Density density) noexcept :
+        _type{Type::array},
+        _density{density},
+        _ptr{new Array{std::move(val)}}
     {}
 
-    inline Value::Value(String && val) noexcept :
-        Value{std::move(reinterpret_cast<Value &>(val))}
+    inline Value::Value(string && val) noexcept :
+        _type{Type::string},
+        _density{Density::unspecified},
+        _ptr{new string{std::move(val)}}
     {}
 
     inline Value::Value(const string_view val) noexcept :
-        Value{String{val}}
-    {}
-
-    inline Value::Value(const string & val) noexcept :
-        Value{string_view{val}}
+        _type{Type::string},
+        _ptr{new string{val}}
     {}
 
     inline Value::Value(const char * const val) :
-        Value{string_view{val}}
+        Value(string_view{val})
     {}
 
     inline Value::Value(char * const val) :
-        Value{string_view{val}}
+        Value(string_view{val})
     {}
 
     inline Value::Value(const char val) noexcept :
@@ -715,8 +513,9 @@ namespace qc::json
     {}
 
     inline Value::Value(const int64_t val) noexcept :
-        _data0{uint32_t(Type::number) << 29, _NumberType::signedInteger},
-        _data1{.signedInteger = val}
+        _type{Type::number},
+        _numberType{NumberType::signedInteger},
+        _ptr{new int64_t{val}}
     {}
 
     inline Value::Value(const int32_t val) noexcept :
@@ -732,8 +531,9 @@ namespace qc::json
     {}
 
     inline Value::Value(const uint64_t val) noexcept :
-        _data0{uint32_t(Type::number) << 29, _NumberType::unsignedInteger},
-        _data1{.unsignedInteger = val}
+        _type{Type::number},
+        _numberType{NumberType::unsignedInteger},
+        _ptr{new uint64_t{val}}
     {}
 
     inline Value::Value(const uint32_t val) noexcept :
@@ -749,8 +549,9 @@ namespace qc::json
     {}
 
     inline Value::Value(const double val) noexcept :
-        _data0{uint32_t(Type::number) << 29, _NumberType::floater},
-        _data1{.floater = val}
+        _type{Type::number},
+        _numberType{NumberType::floater},
+        _ptr{new double{val}}
     {}
 
     inline Value::Value(const float val) noexcept :
@@ -758,8 +559,8 @@ namespace qc::json
     {}
 
     inline Value::Value(const bool val) noexcept :
-        _data0{uint32_t(Type::boolean) << 29, _NumberType::nan},
-        _data1{.boolean = val}
+        _type{Type::boolean},
+        _ptr{new bool{val}}
     {}
 
     template <typename T>
@@ -768,91 +569,111 @@ namespace qc::json
     {}
 
     inline Value::Value(Value && other) noexcept :
-        _data0{std::exchange(other._data0, {})},
-        _data1{std::exchange(other._data1, {})}
+        _type{std::exchange(other._type, Type::null)},
+        _density{std::exchange(other._density, Density::unspecified)},
+        _numberType{std::exchange(other._numberType, NumberType::invalid)},
+        _ptr{std::exchange(other._ptr, nullptr)},
+        _comment{std::move(other._comment)}
     {}
 
     inline Value & Value::operator=(Value && other) noexcept
     {
-        switch (type()) {
-            case Type::object:
-                reinterpret_cast<Object &>(*this) = std::move(reinterpret_cast<Object &>(other));
-                break;
-            case Type::array:
-                reinterpret_cast<Array &>(*this) = std::move(reinterpret_cast<Array &>(other));
-                break;
-            case Type::string:
-                reinterpret_cast<String &>(*this) = std::move(reinterpret_cast<String &>(other));
-                break;
-            default:
-                _data0 = std::exchange(other._data0, {});
-                _data1 = std::exchange(other._data1, {});
-        }
-
+        _type = std::exchange(other._type, Type::null);
+        _density = std::exchange(other._density, Density::unspecified);
+        _numberType = std::exchange(other._numberType, NumberType::invalid);
+        _ptr = std::exchange(other._ptr, nullptr);
+        _comment = std::move(other._comment);
         return *this;
     }
 
     inline Value::~Value() noexcept
     {
-        switch (type()) {
-            case Type::object:
-                reinterpret_cast<Object &>(*this).~Object();
+        switch (_type) {
+            case Type::object: delete &asObject<unsafe>(); break;
+            case Type::array: delete &asArray<unsafe>(); break;
+            case Type::string: delete &asString<unsafe>(); break;
+            case Type::number:
+                switch (_numberType) {
+                    case NumberType::invalid: break;
+                    case NumberType::signedInteger: delete &asSignedInteger<unsafe>(); break;
+                    case NumberType::unsignedInteger: delete &asUnsignedInteger<unsafe>(); break;
+                    case NumberType::floater: delete &asFloater<unsafe>(); break;
+                }
                 break;
-            case Type::array:
-                reinterpret_cast<Array &>(*this).~Array();
-                break;
-            case Type::string:
-                reinterpret_cast<String &>(*this).~String();
-                break;
-            default:;
+            case Type::boolean: delete &asBoolean<unsafe>(); break;
+            default: break;
         }
     }
 
     inline Type Value::type() const noexcept
     {
-        return Type{_data0.type_and_data >> 29};
+        return _type;
+    }
+
+    inline Density Value::density() const noexcept
+    {
+        return _density;
+    }
+
+    inline void Value::setDensity(const Density density) noexcept
+    {
+        _density = density;
+    }
+
+    inline NumberType Value::numberType() const noexcept
+    {
+        return _numberType;
     }
 
     inline bool Value::isObject() const noexcept
     {
-        return type() == Type::object;
+        return _type == Type::object;
     }
 
     inline bool Value::isArray() const noexcept
     {
-        return type() == Type::array;
+        return _type == Type::array;
     }
 
     inline bool Value::isString() const noexcept
     {
-        return type() == Type::string;
+        return _type == Type::string;
     }
 
     inline bool Value::isNumber() const noexcept
     {
-        return type() == Type::number;
+        return _type == Type::number;
+    }
+
+    inline bool Value::isSignedInteger() const noexcept
+    {
+        return _numberType == NumberType::signedInteger;
+    }
+
+    inline bool Value::isUnsignedInteger() const noexcept
+    {
+        return _numberType == NumberType::unsignedInteger;
+    }
+
+    inline bool Value::isFloater() const noexcept
+    {
+        return _numberType == NumberType::floater;
     }
 
     inline bool Value::isBoolean() const noexcept
     {
-        return type() == Type::boolean;
+        return _type == Type::boolean;
     }
 
     inline bool Value::isNull() const noexcept
     {
-        return type() == Type::null;
+        return _type == Type::null;
     }
 
     template <typename T>
     inline bool Value::is() const noexcept
     {
         using U = std::decay_t<T>;
-
-        // Type should not be `std::string`, `const char *`, or `char *`
-        static_assert(
-            !(std::is_same_v<U, string> || std::is_same_v<U, const char *> || std::is_same_v<U, char *>),
-            "Use `qc::json::Value::isString` or `qc::json::Value::is<std::string_view>` instead"
-        );
 
         // Object
         if constexpr (std::is_same_v<U, Object>) {
@@ -863,12 +684,12 @@ namespace qc::json
             return isArray();
         }
         // String
-        else if constexpr (std::is_same_v<U, String> || std::is_same_v<U, string_view>) {
+        else if constexpr (std::is_same_v<U, string> || std::is_same_v<U, string_view> || std::is_same_v<U, const char *> || std::is_same_v<U, char *>) {
             return isString();
         }
         // Character
         else if constexpr (std::is_same_v<U, char>) {
-            return isString() && reinterpret_cast<const String &>(*this).size() == 1u;
+            return isString() && asString<unsafe>().size() == 1u;
         }
         // Boolean
         else if constexpr (std::is_same_v<U, bool>) {
@@ -876,19 +697,51 @@ namespace qc::json
         }
         // Signed integer
         else if constexpr (std::is_integral_v<U> && std::is_signed_v<U>) {
-            return isNumber() && (
-                                     ((_data0.numberType == _NumberType::signedInteger) && (_data1.signedInteger <= std::numeric_limits<U>::max()) && (_data1.signedInteger >= std::numeric_limits<U>::min())) ||
-                                     ((_data0.numberType == _NumberType::unsignedInteger) && (_data1.unsignedInteger <= uint64_t{std::numeric_limits<U>::max()})) ||
-                                     ((_data0.numberType == _NumberType::floater) && (U(_data1.floater) == _data1.floater))
-            );
+            switch (_numberType) {
+                case NumberType::signedInteger: {
+                    if constexpr (std::is_same_v<U, int64_t>) {
+                        return true;
+                    }
+                    else {
+                        const int64_t val{asSignedInteger<unsafe>()};
+                        return val <= std::numeric_limits<U>::max() && val >= std::numeric_limits<U>::min();
+                    }
+                }
+                case NumberType::unsignedInteger: {
+                    return asUnsignedInteger<unsafe>() <= uint64_t(std::numeric_limits<U>::max());
+                }
+                case NumberType::floater: {
+                    const double val{asFloater<unsafe>()};
+                    return double(U(val)) == val;
+                }
+                default: {
+                    return false;
+                }
+            }
         }
         // Unsigned integer
         else if constexpr (std::is_integral_v<U> && std::is_unsigned_v<U>) {
-            return isNumber() && (
-                                     ((_data0.numberType == _NumberType::unsignedInteger) && (_data1.unsignedInteger <= std::numeric_limits<U>::max())) ||
-                                     ((_data0.numberType == _NumberType::signedInteger) && (_data1.signedInteger >= 0) && (uint64_t(_data1.signedInteger) <= std::numeric_limits<U>::max())) ||
-                                     ((_data0.numberType == _NumberType::floater) && (U(_data1.floater) == _data1.floater))
-            );
+            switch (_numberType) {
+                case NumberType::signedInteger: {
+                    const int64_t val{asSignedInteger<unsafe>()};
+                    return val >= 0 && uint64_t(val) <= std::numeric_limits<U>::max();
+                }
+                case NumberType::unsignedInteger: {
+                    if constexpr (std::is_same_v<U, uint64_t>) {
+                        return true;
+                    }
+                    else {
+                        return asUnsignedInteger<unsafe>() <= std::numeric_limits<U>::max();
+                    }
+                }
+                case NumberType::floater: {
+                    const double val{asFloater<unsafe>()};
+                    return val >= 0.0 && double(U(val)) == val;
+                }
+                default: {
+                    return false;
+                }
+            }
         }
         // Floater
         else if constexpr (std::is_floating_point_v<U>) {
@@ -910,7 +763,7 @@ namespace qc::json
     inline const Object & Value::asObject() const noexcept(isSafe == unsafe)
     {
         if constexpr (isSafe == safe) if (!isObject()) throw TypeError{};
-        return reinterpret_cast<const Object &>(*this);
+        return *static_cast<const Object *>(_ptr);
     }
 
     template <Safety isSafe>
@@ -923,55 +776,94 @@ namespace qc::json
     inline const Array & Value::asArray() const noexcept(isSafe == unsafe)
     {
         if constexpr (isSafe == safe) if (!isArray()) throw TypeError{};
-        return reinterpret_cast<const Array &>(*this);
+        return *static_cast<const Array *>(_ptr);
     }
 
     template <Safety isSafe>
-    inline string_view Value::asString() const noexcept(isSafe == unsafe)
+    inline string & Value::asString() noexcept(isSafe == unsafe)
+    {
+        return const_cast<string &>(static_cast<const Value &>(*this).asString<isSafe>());
+    }
+
+    template <Safety isSafe>
+    inline const string & Value::asString() const noexcept(isSafe == unsafe)
     {
         if constexpr (isSafe == safe) if (!isString()) throw TypeError{};
-        return reinterpret_cast<const String &>(*this).view();
+        return *static_cast<const string *>(_ptr);
     }
 
     template <Safety isSafe>
-    inline std::variant<int64_t, uint64_t, double> Value::asNumber() const noexcept(isSafe == unsafe)
+    inline int64_t & Value::asSignedInteger() noexcept(isSafe == unsafe)
     {
-        if constexpr (isSafe == safe) if (!isNumber()) throw TypeError{};
-        switch (_data0.numberType) {
-            case _NumberType::signedInteger: return _data1.signedInteger;
-            case _NumberType::unsignedInteger: return _data1.unsignedInteger;
-            case _NumberType::floater: return _data1.floater;
-            default: if constexpr (isSafe == safe) throw TypeError{}; else return _data1.signedInteger;
-        }
+        return const_cast<int64_t &>(static_cast<const Value &>(*this).asSignedInteger<isSafe>());
     }
 
     template <Safety isSafe>
-    inline bool Value::asBoolean() const noexcept(isSafe == unsafe)
+    inline const int64_t & Value::asSignedInteger() const noexcept(isSafe == unsafe)
+    {
+        if constexpr (isSafe == safe) if (!isSignedInteger()) throw TypeError{};
+        return *static_cast<const int64_t *>(_ptr);
+    }
+
+    template <Safety isSafe>
+    inline uint64_t & Value::asUnsignedInteger() noexcept(isSafe == unsafe)
+    {
+        return const_cast<uint64_t &>(static_cast<const Value &>(*this).asUnsignedInteger<isSafe>());
+    }
+
+    template <Safety isSafe>
+    inline const uint64_t & Value::asUnsignedInteger() const noexcept(isSafe == unsafe)
+    {
+        if constexpr (isSafe == safe) if (!isUnsignedInteger()) throw TypeError{};
+        return *static_cast<const uint64_t *>(_ptr);
+    }
+
+    template <Safety isSafe>
+    inline double & Value::asFloater() noexcept(isSafe == unsafe)
+    {
+        return const_cast<double &>(static_cast<const Value &>(*this).asFloater<isSafe>());
+    }
+
+    template <Safety isSafe>
+    inline const double & Value::asFloater() const noexcept(isSafe == unsafe)
+    {
+        if constexpr (isSafe == safe) if (!isFloater()) throw TypeError{};
+        return *static_cast<const double *>(_ptr);
+    }
+
+    template <Safety isSafe>
+    inline bool & Value::asBoolean() noexcept(isSafe == unsafe)
+    {
+        return const_cast<bool &>(static_cast<const Value &>(*this).asBoolean<isSafe>());
+    }
+
+    template <Safety isSafe>
+    inline const bool & Value::asBoolean() const noexcept(isSafe == unsafe)
     {
         if constexpr (isSafe == safe) if (!isBoolean()) throw TypeError{};
-        return _data1.boolean;
+        return *static_cast<const bool *>(_ptr);
     }
 
     template <typename T, Safety isSafe>
-    inline T Value::as() const
+    inline T Value::to() const
     {
         using U = std::decay_t<T>;
 
-        // Type should not be `qc::json::Object`
-        static_assert(!std::is_same_v<U, Object>, "Use `qc::json::Value::asObject` instead, as this function must return by value");
+        // Type must not be `qc::json::Object`
+        static_assert(!std::is_same_v<U, Object>, "This function would have to make a copy of the object, use `qc::json::Value::asObject` instead");
 
-        // Type should not be `qc::json::Array`
-        static_assert(!std::is_same_v<U, Object>, "Use `qc::json::Value::asArray` instead, as this function must return by value");
+        // Type must not be `qc::json::Array`
+        static_assert(!std::is_same_v<U, Array>, "This function would have to make a copy of the array. Use `qc::json::Value::asArray` instead");
 
-        // Type should not be `std::string`, `const char *`, `char *`, or `qc::json::String`
-        static_assert(
-            !(std::is_same_v<U, string> || std::is_same_v<U, const char *> || std::is_same_v<U, char *> || std::is_same_v<U, String>),
-            "Use `qc::json::Value::asString` or `qc::json::Value::as<std::string_view>` instead"
-        );
+        // Type must not be `char *`
+        static_assert(!std::is_same_v<U, char *>, "Mutable char pointer may not be accessed by const function. Use `qc::json::Value::asString` or `qc::json::Value::to<const char *>` instead");
 
         // String
-        if constexpr (std::is_same_v<U, string_view>) {
+        if constexpr (std::is_same_v<U, string> || std::is_same_v<U, string_view>) {
             return asString<isSafe>();
+        }
+        else if constexpr (std::is_same_v<U, const char *>) {
+            return asString<isSafe>().c_str();
         }
         // Character
         else if constexpr (std::is_same_v<U, char>) {
@@ -985,12 +877,16 @@ namespace qc::json
         // Number
         else if constexpr (std::is_arithmetic_v<U>) {
             if constexpr (isSafe == safe) if (!is<U>()) throw TypeError{};
-            switch (_data0.numberType) {
-                case _NumberType::signedInteger: return U(_data1.signedInteger);
-                case _NumberType::unsignedInteger: return U(_data1.unsignedInteger);
-                case _NumberType::floater: return U(_data1.floater);
-                default: if constexpr (isSafe == safe) throw TypeError{}; else return U(_data1.signedInteger);
+            switch (_numberType) {
+                case NumberType::signedInteger: return U(asSignedInteger<unsafe>());
+                case NumberType::unsignedInteger: return U(asUnsignedInteger<unsafe>());
+                case NumberType::floater: return U(asFloater<unsafe>());
+                default: return {};
             }
+        }
+        else if constexpr (std::is_same_v<U, nullptr_t>) {
+            if constexpr (isSafe == safe) if (!isNull()) throw TypeError{};
+            return nullptr;
         }
         // Other
         else {
@@ -998,513 +894,86 @@ namespace qc::json
         }
     }
 
-    inline Object::Object(const Density density) noexcept :
-        _pairs_and_density{uintptr_t(density)}
-    {}
-
-    inline Object::Object(Object && other) noexcept :
-        _type_and_capacity{std::exchange(other._type_and_capacity, uint32_t(Type::object) << 29)},
-        _size{std::exchange(other._size, 0u)},
-        _pairs_and_density{std::exchange(other._pairs_and_density, 0u)}
-    {}
-
-    inline Object & Object::operator=(Object && other) noexcept
+    inline bool Value::hasComment() const noexcept
     {
-        this->~Object();
-
-        _type_and_capacity = std::exchange(other._type_and_capacity, uint32_t(Type::object) << 29);
-        _size = std::exchange(other._size, 0u);
-        _pairs_and_density = std::exchange(other._pairs_and_density, 0u);
-
-        return *this;
+        return bool(_comment);
     }
 
-    inline Object::~Object() noexcept
+    inline string * Value::comment() noexcept
     {
-        if (_size) {
-            clear();
-            ::operator delete(_pairs(), std::align_val_t{8u});
-        }
+        return _comment.get();
     }
 
-    inline uint32_t Object::size() const noexcept
+    inline const string * Value::comment() const noexcept
     {
-        return _size;
+        return _comment.get();
     }
 
-    inline bool Object::empty() const noexcept
+    inline void Value::setComment(string && str)
     {
-        return !_size;
-    }
-
-    inline uint32_t Object::capacity() const noexcept
-    {
-        return _type_and_capacity << 3;
-    }
-
-    inline Object::Pair & Object::add(string && key, Value && val)
-    {
-        return _add(std::move(key), std::move(val));
-    }
-
-    inline Object::Pair & Object::add(const string_view key, Value && val)
-    {
-        return _add(key, std::move(val));
-    }
-
-    template <typename K>
-    inline Object::Pair & Object::_add(K && key, Value && val)
-    {
-        Pair * pairs{_pairs()};
-
-        // If this is the first pair, allocate backing array
-        if (!pairs) {
-            pairs = static_cast<Pair *>(::operator new(8u * sizeof(Pair), std::align_val_t{8u}));
-            _pairs_and_density &= 0b111u;
-            _pairs_and_density |= reinterpret_cast<uintptr_t>(pairs);
-            _type_and_capacity = (uint32_t(Type::object) << 29) | 1u;
-        }
-
-        // Find the position in the backing array where this pair should go
-        auto [pos, found]{_search(key)};
-
-        // If key already exists, replace it
-        if (found) {
-            pos->second = std::move(val);
-            return *pos;
-        }
-
-        // If we're at capacity, expand
-        if (const uint32_t capacity{Object::capacity()}; _size >= capacity) {
-            const uint32_t newCapacity{capacity << 1};
-            Pair * const newPairs{static_cast<Pair *>(::operator new(newCapacity * sizeof(Pair), std::align_val_t{8u}))};
-            Pair * const newPos{newPairs + (pos - pairs)};
-
-            // Move over the pairs before the one we're inserting
-            for (Pair * src{pairs}, * dst{newPairs}; src < pos; ++src, ++dst) {
-                new (&dst->first) string{std::move(src->first)};
-                src->first.~string();
-
-                dst->second._data0 = src->second._data0;
-                dst->second._data1 = src->second._data1;
-            }
-
-            // Move over the pairs after the one we're inserting, leaving a gap
-            for (Pair * src{pos}, * dst{newPos + 1}, * end{this->end()}; src < end; ++src, ++dst) {
-                new (&dst->first) string{std::move(src->first)};
-                src->first.~string();
-
-                dst->second._data0 = src->second._data0;
-                dst->second._data1 = src->second._data1;
-            }
-
-            // Update our state
-            ::operator delete(pairs, std::align_val_t{8u});
-            pairs = newPairs;
-            _pairs_and_density &= 0b111u;
-            _pairs_and_density |= reinterpret_cast<uintptr_t>(pairs);
-            _type_and_capacity = (uint32_t(Type::object) << 29) | (newCapacity >> 3);
-            pos = newPos;
-        }
-        // Otherwise, we've still got space
-        else {
-            // Shift back the pairs after the one we're inserting, leaving a gap
-            Pair * const end{this->end()};
-            new (&end->first) string{};
-            for (Pair * src{end - 1}, * dst{end}; src >= pos; --src, --dst) {
-                dst->first = std::move(src->first);
-
-                dst->second._data0 = src->second._data0;
-                dst->second._data1 = src->second._data1;
-            }
-            pos->first.~string();
-        }
-
-        // Add new entry
-        new (&pos->first) string{std::forward<K>(key)};
-        new (&pos->second) Value{std::move(val)};
-        ++_size;
-
-        return *pos;
-    }
-
-    inline bool Object::contains(const string_view key) const
-    {
-        return _search(key).second;
-    }
-
-    inline Value & Object::at(const string_view key)
-    {
-        return const_cast<Value &>(static_cast<const Object &>(*this).at(key));
-    }
-
-    inline const Value & Object::at(const string_view key) const
-    {
-        const auto [pos, found]{_search(key)};
-        if (!found) {
-            throw std::out_of_range{"Key not found"};
-        }
-        return pos->second;
-    }
-
-    inline Object::iterator Object::find(const string_view key)
-    {
-        return const_cast<iterator>(static_cast<const Object &>(*this).find(key));
-    }
-
-    inline Object::const_iterator Object::find(const string_view key) const
-    {
-        const auto [pos, found]{_search(key)};
-        return found ? pos : cend();
-    }
-
-    inline Object::Pair Object::remove(const iterator it) noexcept
-    {
-        // Save off pair
-        Pair pair{std::move(*it)};
-
-        // Shift forward posterior pairs
-        Pair * const end{this->end()};
-        for (Pair * src{it + 1}, * dst{it}; src < end; ++src, ++dst) {
-            dst->first = std::move(src->first);
-
-            dst->second._data0 = src->second._data0;
-            dst->second._data1 = src->second._data1;
-        }
-        (end - 1)->first.~string();
-
-        --_size;
-
-        return pair;
-    }
-
-    inline void Object::clear() noexcept
-    {
-        // Destruct the pairs
-        for (Pair & pair : *this) pair.~pair();
-        _size = 0u;
-    }
-
-    inline Object::iterator Object::begin() noexcept
-    {
-        return _pairs();
-    }
-
-    inline Object::const_iterator Object::begin() const noexcept
-    {
-        return _pairs();
-    }
-
-    inline Object::const_iterator Object::cbegin() const noexcept
-    {
-        return begin();
-    }
-
-    inline Object::iterator Object::end() noexcept
-    {
-        return _pairs() + _size;
-    }
-
-    inline Object::const_iterator Object::end() const noexcept
-    {
-        return _pairs() + _size;
-    }
-
-    inline Object::const_iterator Object::cend() const noexcept
-    {
-        return end();
-    }
-
-    inline Density Object::density() const noexcept
-    {
-        return Density(_pairs_and_density & 0b111u);
-    }
-
-    inline void Object::density(const Density density) noexcept
-    {
-        _pairs_and_density &= ~uintptr_t{0b111u};
-        _pairs_and_density |= uintptr_t(density);
-    }
-
-    inline Object::Pair * Object::_pairs() noexcept
-    {
-        return reinterpret_cast<Pair *>(_pairs_and_density & ~uintptr_t{0b111u});
-    }
-
-    inline const Object::Pair * Object::_pairs() const noexcept
-    {
-        return reinterpret_cast<const Pair *>(_pairs_and_density & ~uintptr_t{0b111u});
-    }
-
-    inline std::pair<const Object::Pair *, bool> Object::_search(const string_view key) const
-    {
-        const Pair * const endPos{cend()};
-        const Pair * low{_pairs()}, * high{endPos};
-        while (low < high) {
-            const Pair * const mid{low + ((high - low) >> 1)};
-            const int delta{std::strcmp(key.data(), mid->first.c_str())};
-            if (delta < 0) {
-                high = mid;
-            }
-            else if (delta > 0) {
-                low = mid + 1;
-            }
-            else {
-                return {mid, true};
-            }
-        }
-        return {low, low != endPos && low->first == key};
-    }
-
-    inline std::pair<Object::Pair *, bool> Object::_search(const string_view key)
-    {
-        const auto [pos, found]{static_cast<const Object *>(this)->_search(key)};
-        return {const_cast<Pair *>(pos), found};
-    }
-
-    inline Array::Array(const Density density) noexcept :
-        _values_and_density{uintptr_t(density)}
-    {}
-
-    template <typename T, typename... Ts>
-    inline Array::Array(T && val, Ts &&... vals) :
-        Array{Density::unspecified, std::forward<T>(val), std::forward<Ts>(vals)...}
-    {}
-
-    template <typename T, typename... Ts>
-    inline Array::Array(const Density density, T && val, Ts &&... vals) :
-        _type_and_capacity{(uint32_t(Type::array) << 29) | (std::max(uint32_t(std::bit_ceil(1u + sizeof...(Ts))), 8u) >> 3)},
-        _size{1u + sizeof...(Ts)},
-        _values_and_density{reinterpret_cast<uintptr_t>(::operator new(_size * sizeof(Value), std::align_val_t{8u})) | uintptr_t(density)}
-    {
-        // Populate `_values` using fold expression
-        Value * value{_values()};
-        const auto populate{[&value](auto && val) {
-            new (value) Value{std::forward<decltype(val)>(val)};
-            ++value;
-        }};
-        populate(std::forward<T>(val));
-        (populate(std::forward<Ts>(vals)), ...);
-    }
-
-    inline Array::Array(Array && other) noexcept :
-        _type_and_capacity{std::exchange(other._type_and_capacity, uint32_t(Type::array) << 29)},
-        _size{std::exchange(other._size, 0u)},
-        _values_and_density{std::exchange(other._values_and_density, 0u)}
-    {}
-
-    inline Array & Array::operator=(Array && other) noexcept
-    {
-        this->~Array();
-
-        _type_and_capacity = std::exchange(other._type_and_capacity, uint32_t(Type::array) << 29);
-        _size = std::exchange(other._size, 0u);
-        _values_and_density = std::exchange(other._values_and_density, 0u);
-
-        return *this;
-    }
-
-    inline Array::~Array() noexcept
-    {
-        if (_size) {
-            clear();
-            ::operator delete(_values(), std::align_val_t{8u});
-        }
-    }
-
-    inline uint32_t Array::size() const noexcept
-    {
-        return _size;
-    }
-
-    inline bool Array::empty() const noexcept
-    {
-        return !_size;
-    }
-
-    inline uint32_t Array::capacity() const noexcept
-    {
-        return _type_and_capacity << 3;
-    }
-
-    inline Value & Array::add(Value && val) noexcept
-    {
-        Value * values{_values()};
-
-        // If this is the first value, allocate initial storage
-        if (!values) {
-            values = static_cast<Value *>(::operator new(8u * sizeof(Value), std::align_val_t{8u}));
-            _values_and_density &= 0b111u;
-            _values_and_density |= reinterpret_cast<uintptr_t>(values);
-            _type_and_capacity = (uint32_t(Type::array) << 29) | 1u;
-        }
-        // If we're at capacity, expand
-        else if (const uint32_t capacity{this->capacity()}; _size >= capacity) {
-            const uint32_t newCapacity{capacity << 1};
-            Value * const newValues{static_cast<Value *>(::operator new(newCapacity * sizeof(Value), std::align_val_t{8u}))};
-
-            // Copy over values
-            std::copy(reinterpret_cast<const uint64_t *>(values), reinterpret_cast<const uint64_t *>(cend()), reinterpret_cast<uint64_t *>(newValues));
-
-            // Update our current state
-            ::operator delete(values, std::align_val_t{8u});
-            values = newValues;
-            _values_and_density &= 0b111u;
-            _values_and_density |= reinterpret_cast<uintptr_t>(values);
-            _type_and_capacity = (uint32_t(Type::array) << 29) | (newCapacity >> 3);
-        }
-
-        return *new (values + _size++) Value{std::move(val)};
-    }
-
-    inline Value & Array::at(const uint32_t i)
-    {
-        return const_cast<Value &>(static_cast<const Array &>(*this).at(i));
-    }
-
-    inline const Value & Array::at(const uint32_t i) const
-    {
-        if (i >= _size) {
-            throw std::out_of_range{"Index out of bounds"};
-        }
-
-        return _values()[i];
-    }
-
-    inline Value Array::remove(const uint32_t i)
-    {
-        if (i >= _size) {
-            throw std::out_of_range{"Index out of bounds"};
-        }
-
-        return remove(begin() + i);
-    }
-
-    inline Value Array::remove(iterator it) noexcept
-    {
-        // Save off value and destruct
-        Value val{std::move(*it)};
-
-        // Shift posterior elements forward
-        std::copy(reinterpret_cast<const uint64_t *>(it + 1), reinterpret_cast<const uint64_t *>(cend()), reinterpret_cast<uint64_t *>(it));
-
-        --_size;
-
-        return val;
-    }
-
-    inline void Array::remove(const iterator it1, const iterator it2) noexcept
-    {
-        // Destruct the values
-        for (iterator it{it1}; it != it2; ++it) it->~Value();
-
-        // Shift the posterior elements forward
-        std::copy(reinterpret_cast<const uint64_t *>(it2), reinterpret_cast<const uint64_t *>(cend()), reinterpret_cast<uint64_t *>(it1));
-
-        _size -= uint32_t(it2 - it1);
-    }
-
-    inline void Array::clear() noexcept
-    {
-        // Destruct the values
-        for (Value & val : *this) val.~Value();
-        _size = 0u;
-    }
-
-    inline Array::iterator Array::begin() noexcept
-    {
-        return _values();
-    }
-
-    inline Array::const_iterator Array::begin() const noexcept
-    {
-        return _values();
-    }
-
-    inline Array::const_iterator Array::cbegin() const noexcept
-    {
-        return begin();
-    }
-
-    inline Array::iterator Array::end() noexcept
-    {
-        return _values() + _size;
-    }
-
-    inline Array::const_iterator Array::end() const noexcept
-    {
-        return _values() + _size;
-    }
-
-    inline Array::const_iterator Array::cend() const noexcept
-    {
-        return end();
-    }
-
-    inline Density Array::density() const noexcept
-    {
-        return Density(_values_and_density & 0b111u);
-    }
-
-    inline void Array::density(const Density density) noexcept
-    {
-        _values_and_density &= ~uintptr_t{0b111u};
-        _values_and_density |= uintptr_t(density);
-    }
-
-    inline Value * Array::_values() noexcept
-    {
-        return reinterpret_cast<Value *>(_values_and_density & ~uintptr_t{0b111u});
-    }
-
-    inline const Value * Array::_values() const noexcept
-    {
-        return reinterpret_cast<const Value *>(_values_and_density & ~uintptr_t{0b111u});
-    }
-
-    inline String::String(const string_view str) noexcept :
-        _type_and_size{(uint32_t(Type::string) << 29) | uint32_t(str.size())}
-    {
-        if (str.size() <= 12u) {
-            std::copy(str.cbegin(), str.cend(), reinterpret_cast<char *>(&_inlineChars0));
+        if (!_comment) {
+            _comment = std::make_unique<string>(std::move(str));
         }
         else {
-            _dynamicChars = static_cast<char *>(::operator new(str.size(), std::align_val_t{8u}));
-            std::copy(str.cbegin(), str.cend(), _dynamicChars);
+            *_comment = std::move(str);
         }
     }
 
-    inline String::String(String && other) noexcept :
-        _type_and_size{std::exchange(other._type_and_size, uint32_t(Type::string) << 29)},
-        _inlineChars0{std::exchange(other._inlineChars0, 0u)},
-        _inlineChars1{std::exchange(other._inlineChars1, 0u)}
-    {}
-
-    inline String & String::operator=(String && other) noexcept
+    inline void Value::setComment(const string_view str)
     {
-        this->~String();
-
-        _type_and_size = std::exchange(other._type_and_size, uint32_t(Type::string) << 29);
-        _inlineChars0 = std::exchange(other._inlineChars0, 0u);
-        _inlineChars1 = std::exchange(other._inlineChars1, 0u);
-
-        return *this;
+        if (!_comment) {
+            _comment = std::make_unique<string>(str);
+        }
+        else {
+            *_comment = str;
+        }
     }
 
-    inline String::~String() noexcept
+    inline void Value::setComment(const char * str)
     {
-        if (size() > 12u) ::operator delete(_dynamicChars, std::align_val_t{8u});
+        if (!_comment) {
+            _comment = std::make_unique<string>(str);
+        }
+        else {
+            *_comment = str;
+        }
     }
 
-    inline uint32_t String::size() const noexcept
+    inline std::unique_ptr<string> Value::removeComment() noexcept
     {
-        return _type_and_size & 0b000'11111'11111111'11111111'11111111u;
+        return std::move(_comment);
     }
 
-    inline string_view String::view() const noexcept
+    template <typename K, typename V, typename... MoreKVs>
+    inline void _makeObjectHelper(Object & obj, K && key, V && val, MoreKVs &&... moreKVs)
     {
-        const uint32_t size{this->size()};
-        return {size > 12u ? _dynamicChars : reinterpret_cast<const char *>(&_inlineChars0), size};
+        obj.emplace(std::forward<K>(key), std::forward<V>(val));
+        if constexpr (sizeof...(moreKVs) > 0) {
+            _makeObjectHelper(obj, std::forward<MoreKVs>(moreKVs)...);
+        }
+    }
+
+    template <typename K, typename V, typename... MoreKVs>
+    inline Object makeObject(K && key, V && val, MoreKVs &&... moreKVs)
+    {
+        static_assert(sizeof...(moreKVs) % 2 == 0, "Must provide an even number of arguments alternating between key and value");
+        Object obj{};
+        _makeObjectHelper(obj, std::forward<K>(key), std::forward<V>(val), std::forward<MoreKVs>(moreKVs)...);
+        return obj;
+    }
+
+    inline Object makeObject()
+    {
+        return Object{};
+    }
+
+    template <typename... Vs>
+    inline Array makeArray(Vs &&... vals)
+    {
+        Array arr{};
+        arr.reserve(sizeof...(vals));
+        (arr.emplace_back(std::forward<Vs>(vals)), ...);
+        return arr;
     }
 
     inline Value decode(const string_view json)
@@ -1524,6 +993,10 @@ namespace qc::json
 
     inline Encoder & operator<<(Encoder & encoder, const Value & val)
     {
+        if (val.hasComment() && encoder.container() != Container::object) {
+            encoder << tokens::comment(*val.comment());
+        }
+
         switch (val.type()) {
             case Type::null: {
                 encoder << nullptr;
@@ -1531,8 +1004,11 @@ namespace qc::json
             }
             case Type::object: {
                 const Object & object{val.asObject<unsafe>()};
-                encoder << tokens::object(object.density());
+                encoder << tokens::object(val.density());
                 for (const auto & [key, v] : object) {
+                    if (v.hasComment()) {
+                        encoder << tokens::comment(*v.comment());
+                    }
                     encoder << key << v;
                 }
                 encoder << tokens::end;
@@ -1540,7 +1016,7 @@ namespace qc::json
             }
             case Type::array: {
                 const Array & array{val.asArray<unsafe>()};
-                encoder << tokens::array(array.density());
+                encoder << tokens::array(val.density());
                 for (const auto & v : array) {
                     encoder << v;
                 }
@@ -1552,7 +1028,12 @@ namespace qc::json
                 break;
             }
             case Type::number: {
-                std::visit([&encoder](auto v) { encoder << v; }, val.asNumber<unsafe>());
+                switch (val.numberType()) {
+                    case NumberType::signedInteger: encoder << val.asSignedInteger<unsafe>(); break;
+                    case NumberType::unsignedInteger: encoder << val.asUnsignedInteger<unsafe>(); break;
+                    case NumberType::floater: encoder << val.asFloater<unsafe>(); break;
+                    default: break;
+                }
                 break;
             }
             case Type::boolean: {
