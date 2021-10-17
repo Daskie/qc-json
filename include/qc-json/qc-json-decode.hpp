@@ -47,7 +47,7 @@ namespace qc::json
     ///
     /// Pass with an object or array to specify its density
     ///
-    enum class Density : int
+    enum class Density : int8_t
     {
         unspecified = 0b000, /// Use that of the root or parent element
         multiline   = 0b001, /// Elements are put on new lines
@@ -100,13 +100,13 @@ namespace qc::json
 {
     inline Density & operator&=(Density & d1, const Density d2) noexcept
     {
-        reinterpret_cast<int &>(d1) &= int(d2);
+        reinterpret_cast<uint8_t &>(d1) &= uint8_t(int8_t(d2));
         return d1;
     }
 
     inline Density & operator|=(Density & d1, const Density d2) noexcept
     {
-        reinterpret_cast<int &>(d1) |= int(d2);
+        reinterpret_cast<uint8_t &>(d1) |= uint8_t(int8_t(d2));
         return d1;
     }
 

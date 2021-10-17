@@ -18,6 +18,7 @@
 #include <charconv>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -46,7 +47,7 @@ namespace qc::json
     ///
     /// Pass with an object or array to specify its density
     ///
-    enum class Density : int
+    enum class Density : int8_t
     {
         unspecified = 0b000, /// Use that of the root or parent element
         multiline   = 0b001, /// Elements are put on new lines
@@ -239,15 +240,15 @@ namespace qc::json
 
         private: //-------------------------------------------------------------
 
-        enum class _Container : int { none, object, array };
+        enum class _Container : int8_t { none, object, array };
 
         enum class _Element { none, key, val, start, comment };
 
         // Using deltas allows us to start with an empty scope vector without needing a bunch of special root-case logic
         struct _ScopeDelta
         {
-            int containerDelta;
-            int densityDelta;
+            int8_t containerDelta;
+            int8_t densityDelta;
         };
 
         char _quote{'"'};
@@ -361,8 +362,8 @@ namespace qc::json
             _putSpace();
         }
         _str += (_container == _Container::object ? '}' : ']');
-        _container = _Container(int(_container) - _scopeDeltas.back().containerDelta);
-        _density = Density(int(_density) - _scopeDeltas.back().densityDelta);
+        _container = _Container(int8_t(_container) - _scopeDeltas.back().containerDelta);
+        _density = Density(int8_t(_density) - _scopeDeltas.back().densityDelta);
         _scopeDeltas.pop_back();
         _prevElement = _Element::val;
         _isContent = true;
@@ -572,9 +573,9 @@ namespace qc::json
         _prefix();
         _str += container == _Container::object ? '{' : '[';
 
-        const int containerDelta{int(container) - int(_container)};
+        const int8_t containerDelta{int8_t(container) - int8_t(_container)};
         const Density newDensity{density > _density ? density : _density};
-        const int densityDelta{int(newDensity) - int(_density)};
+        const int8_t densityDelta{int8_t(newDensity) - int8_t(_density)};
         _scopeDeltas.push_back(_ScopeDelta{containerDelta, densityDelta});
         _container = container;
         _density = newDensity;
