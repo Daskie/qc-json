@@ -266,6 +266,109 @@ TEST(json, valueMove)
     EXPECT_EQ(Type::null, v2.type());
 }
 
+TEST(json, valueAssignAndEquality)
+{
+    Value v{};
+
+    const Object objRef{qc::json::makeObject("a", 1, "b", "wow", "c", nullptr)};
+    v = qc::json::makeObject("a", 1, "b", "wow", "c", nullptr);
+    EXPECT_EQ(Type::object, v.type());
+    EXPECT_TRUE(v == objRef);
+
+    const Array arrRef{qc::json::makeArray(0, "a", true)};
+    v = qc::json::makeArray(0, "a", true);
+    EXPECT_EQ(Type::array, v.type());
+    EXPECT_TRUE(v == arrRef);
+
+    v = "hello"s;
+    EXPECT_EQ(Type::string, v.type());
+    EXPECT_TRUE(v == "hello"s);
+
+    v = "hellu"sv;
+    EXPECT_EQ(Type::string, v.type());
+    EXPECT_TRUE(v == "hellu"sv);
+
+    v = "helli";
+    EXPECT_EQ(Type::string, v.type());
+    EXPECT_TRUE(v == "helli");
+
+    v = const_cast<char *>("hella");
+    EXPECT_EQ(Type::string, v.type());
+    EXPECT_TRUE(v == const_cast<char *>("hella"));
+
+    v = 'h';
+    EXPECT_EQ(Type::string, v.type());
+    EXPECT_TRUE(v == 'h');
+
+    v = int64_t(5);
+    EXPECT_EQ(Type::integer, v.type());
+    EXPECT_TRUE(v == int64_t(5));
+
+    v = int32_t(6);
+    EXPECT_EQ(Type::integer, v.type());
+    EXPECT_TRUE(v == int32_t(6));
+
+    v = int16_t(7);
+    EXPECT_EQ(Type::integer, v.type());
+    EXPECT_TRUE(v == int16_t(7));
+
+    v = int8_t(8);
+    EXPECT_EQ(Type::integer, v.type());
+    EXPECT_TRUE(v == int8_t(8));
+
+    v = uint64_t(10u);
+    EXPECT_EQ(Type::unsigner, v.type());
+    EXPECT_TRUE(v == uint64_t(10u));
+
+    v = uint32_t(11u);
+    EXPECT_EQ(Type::unsigner, v.type());
+    EXPECT_TRUE(v == uint32_t(11u));
+
+    v = uint16_t(12u);
+    EXPECT_EQ(Type::unsigner, v.type());
+    EXPECT_TRUE(v == uint16_t(12u));
+
+    v = uint8_t(13u);
+    EXPECT_EQ(Type::unsigner, v.type());
+    EXPECT_TRUE(v == uint8_t(13u));
+
+    v = 7.7;
+    EXPECT_EQ(Type::floater, v.type());
+    EXPECT_TRUE(v == 7.7);
+
+    v = 7.7f;
+    EXPECT_EQ(Type::floater, v.type());
+    EXPECT_TRUE(v == 7.7f);
+
+    v = true;
+    EXPECT_EQ(Type::boolean, v.type());
+    EXPECT_TRUE(v == true);
+
+    v = nullptr;
+    EXPECT_EQ(Type::null, v.type());
+    EXPECT_TRUE(v == nullptr);
+}
+
+TEST(json, swap)
+{
+    const Array arrRef{qc::json::makeArray(0, "a", true)};
+    Value v1{qc::json::makeArray(0, "a", true)};
+    EXPECT_EQ(Type::array, v1.type());
+    EXPECT_EQ(arrRef, v1);
+
+    Value v2{"hello"s};
+    EXPECT_EQ(Type::string, v2.type());
+    EXPECT_EQ("hello"s, v2);
+
+    std::swap(v1, v2);
+
+    EXPECT_EQ(Type::string, v1.type());
+    EXPECT_EQ("hello"s, v1);
+
+    EXPECT_EQ(Type::array, v2.type());
+    EXPECT_EQ(arrRef, v2);
+}
+
 TEST(json, valueTypes)
 {
     { // Object

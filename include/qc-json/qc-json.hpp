@@ -88,8 +88,8 @@ namespace qc::json
         Value(Array && val, Density density = Density::unspecified) noexcept;
         Value(string && val) noexcept;
         Value(string_view val) noexcept;
-        Value(const char * val);
-        Value(char * val);
+        Value(const char * val) noexcept;
+        Value(char * val) noexcept;
         Value(char val) noexcept;
         Value(int64_t val) noexcept;
         Value(int32_t val) noexcept;
@@ -114,6 +114,31 @@ namespace qc::json
 
         Value(const Value &) = delete;
         Value(Value && other) noexcept;
+
+        ///
+        /// Assigns a new value to the json value
+        ///
+        /// @param val
+        /// @return this
+        ///
+        Value & operator=(Object && val);
+        Value & operator=(Array && val);
+        Value & operator=(string && val);
+        Value & operator=(string_view val);
+        Value & operator=(const char * val);
+        Value & operator=(char val);
+        Value & operator=(int64_t val);
+        Value & operator=(int32_t val);
+        Value & operator=(int16_t val);
+        Value & operator=(int8_t val);
+        Value & operator=(uint64_t val);
+        Value & operator=(uint32_t val);
+        Value & operator=(uint16_t val);
+        Value & operator=(uint8_t val);
+        Value & operator=(double val);
+        Value & operator=(float val);
+        Value & operator=(bool val);
+        Value & operator=(nullptr_t);
 
         Value & operator=(const Value &) = delete;
         Value & operator=(Value && other) noexcept;
@@ -305,6 +330,38 @@ namespace qc::json
         ///
         std::unique_ptr<string> removeComment() noexcept;
 
+        ///
+        /// Compares if two values are equivalent, that is they have the same type and value
+        ///
+        /// The presence/content of comments is ignored
+        ///
+        /// @param other the value to compare with
+        /// @return whether this is equivalent to the other value
+        ///
+        bool operator==(const Value & other) const noexcept;
+
+        ///
+        /// Directly compares if this value is equivalent to that provided
+        ///
+        bool operator==(const Object & val) const noexcept;
+        bool operator==(const Array & val) const noexcept;
+        bool operator==(const string & val) const noexcept;
+        bool operator==(string_view val) const noexcept;
+        bool operator==(const char * val) const noexcept;
+        bool operator==(char val) const noexcept;
+        bool operator==(int64_t val) const noexcept;
+        bool operator==(int32_t val) const noexcept;
+        bool operator==(int16_t val) const noexcept;
+        bool operator==(int8_t val) const noexcept;
+        bool operator==(uint64_t val) const noexcept;
+        bool operator==(uint32_t val) const noexcept;
+        bool operator==(uint16_t val) const noexcept;
+        bool operator==(uint8_t val) const noexcept;
+        bool operator==(double val) const noexcept;
+        bool operator==(float val) const noexcept;
+        bool operator==(bool val) const noexcept;
+        bool operator==(nullptr_t) const noexcept;
+
         private: //-------------------------------------------------------------
 
         union {
@@ -318,7 +375,13 @@ namespace qc::json
         };
         uintptr_t _typeAndComment{};
 
+        void _setType(Type type);
+
         template <typename T> void _setComment(T && str);
+
+        void _deleteValue();
+
+        void _deleteComment();
     };
 
     ///
@@ -523,11 +586,11 @@ namespace qc::json
         _typeAndComment{uintptr_t(Type::string)}
     {}
 
-    inline Value::Value(const char * const val) :
+    inline Value::Value(const char * const val) noexcept :
         Value(string_view{val})
     {}
 
-    inline Value::Value(char * const val) :
+    inline Value::Value(char * const val) noexcept :
         Value(string_view{val})
     {}
 
@@ -593,8 +656,157 @@ namespace qc::json
         _typeAndComment{std::exchange(other._typeAndComment, 0u)}
     {}
 
+    inline Value & Value::operator=(Object && val)
+    {
+        if (type() == Type::object) {
+            asObject<unsafe>() = std::move(val);
+        }
+        else {
+            _deleteValue();
+            _setType(Type::object);
+            _ptrAndDensity = reinterpret_cast<uintptr_t>(new Object{std::move(val)});
+        }
+        return *this;
+    }
+
+    inline Value & Value::operator=(Array && val)
+    {
+        if (type() == Type::array) {
+            asArray<unsafe>() = std::move(val);
+        }
+        else {
+            _deleteValue();
+            _setType(Type::array);
+            _ptrAndDensity = reinterpret_cast<uintptr_t>(new Array{std::move(val)});
+        }
+        return *this;
+    }
+
+    inline Value & Value::operator=(string && val)
+    {
+        if (type() == Type::string) {
+            asString<unsafe>() = std::move(val);
+        }
+        else {
+            _deleteValue();
+            _setType(Type::string);
+            _ptrAndDensity = reinterpret_cast<uintptr_t>(new string{std::move(val)});
+        }
+        return *this;
+    }
+
+    inline Value & Value::operator=(const string_view val)
+    {
+        if (type() == Type::string) {
+            asString<unsafe>() = val;
+        }
+        else {
+            _deleteValue();
+            _setType(Type::string);
+            _ptrAndDensity = reinterpret_cast<uintptr_t>(new string{val});
+        }
+        return *this;
+    }
+
+    inline Value & Value::operator=(const char * const val)
+    {
+        return *this = string_view{val};
+    }
+
+    inline Value & Value::operator=(const char val)
+    {
+        return *this = string_view{&val, 1u};
+    }
+
+    inline Value & Value::operator=(const int64_t val)
+    {
+        if (type() != Type::integer) {
+            _deleteValue();
+            _setType(Type::integer);
+        }
+        _integer = val;
+        return *this;
+    }
+
+    inline Value & Value::operator=(const int32_t val)
+    {
+        return *this = int64_t{val};
+    }
+
+    inline Value & Value::operator=(const int16_t val)
+    {
+        return *this = int64_t{val};
+    }
+
+    inline Value & Value::operator=(const int8_t val)
+    {
+        return *this = int64_t{val};
+    }
+
+    inline Value & Value::operator=(const uint64_t val)
+    {
+        if (type() != Type::unsigner) {
+            _deleteValue();
+            _setType(Type::unsigner);
+        }
+        _unsigner = val;
+        return *this;
+    }
+
+    inline Value & Value::operator=(const uint32_t val)
+    {
+        return *this = uint64_t{val};
+    }
+
+    inline Value & Value::operator=(const uint16_t val)
+    {
+        return *this = uint64_t{val};
+    }
+
+    inline Value & Value::operator=(const uint8_t val)
+    {
+        return *this = uint64_t{val};
+    }
+
+    inline Value & Value::operator=(const double val)
+    {
+        if (type() != Type::floater) {
+            _deleteValue();
+            _setType(Type::floater);
+        }
+        _floater = val;
+        return *this;
+    }
+
+    inline Value & Value::operator=(const float val)
+    {
+        return *this = double{val};
+    }
+
+    inline Value & Value::operator=(const bool val)
+    {
+        if (type() != Type::boolean) {
+            _deleteValue();
+            _setType(Type::boolean);
+        }
+        _boolean = val;
+        return *this;
+    }
+
+    inline Value & Value::operator=(const nullptr_t)
+    {
+        if (type() != Type::null) {
+            _deleteValue();
+            _setType(Type::null);
+        }
+        _null = nullptr;
+        return *this;
+    }
+
     inline Value & Value::operator=(Value && other) noexcept
     {
+        _deleteValue();
+        _deleteComment();
         _ptrAndDensity = std::exchange(other._ptrAndDensity, 0u);
         _typeAndComment = std::exchange(other._typeAndComment, 0u);
         return *this;
@@ -602,17 +814,8 @@ namespace qc::json
 
     inline Value::~Value() noexcept
     {
-        switch (type()) {
-            case Type::object: delete &asObject<unsafe>(); break;
-            case Type::array: delete &asArray<unsafe>(); break;
-            case Type::string: delete _string; break;
-            default: break;
-        }
-
-        string * const comment{this->comment()};
-        if (comment) {
-            delete comment;
-        }
+        _deleteValue();
+        _deleteComment();
     }
 
     inline Type Value::type() const noexcept
@@ -958,6 +1161,141 @@ namespace qc::json
         string * const comment{this->comment()};
         _typeAndComment &= 0b111u;
         return std::unique_ptr<string>{comment};
+    }
+
+    inline bool Value::operator==(const Value & other) const noexcept
+    {
+        const Type type{this->type()};
+
+        if (other.type() != type) {
+            return false;
+        }
+
+        switch (type) {
+            case Type::null: return true;
+            case Type::object: return asObject<unsafe>() == other.asObject<unsafe>();
+            case Type::array: return asArray<unsafe>() == other.asArray<unsafe>();
+            case Type::string: return asString<unsafe>() == other.asString<unsafe>();
+            case Type::integer: return _integer == other._integer;
+            case Type::unsigner: return _unsigner == other._unsigner;
+            case Type::floater: return _floater == other._floater;
+            case Type::boolean: return _boolean == other._boolean;
+            default: return false;
+        }
+    }
+
+    inline bool Value::operator==(const Object & val) const noexcept
+    {
+        return type() == Type::object && asObject<unsafe>() == val;
+    }
+
+    inline bool Value::operator==(const Array & val) const noexcept
+    {
+        return type() == Type::array && asArray<unsafe>() == val;
+    }
+
+    inline bool Value::operator==(const string & val) const noexcept
+    {
+        return *this == string_view{val};
+    }
+
+    inline bool Value::operator==(const string_view val) const noexcept
+    {
+        return type() == Type::string && asString<unsafe>() == val;
+    }
+
+    inline bool Value::operator==(const char * const val) const noexcept
+    {
+        return *this == string_view{val};
+    }
+
+    inline bool Value::operator==(const char val) const noexcept
+    {
+        return *this == string_view{&val, 1u};
+    }
+
+    inline bool Value::operator==(const int64_t val) const noexcept
+    {
+        return type() == Type::integer && _integer == val;
+    }
+
+    inline bool Value::operator==(const int32_t val) const noexcept
+    {
+        return *this == int64_t{val};
+    }
+
+    inline bool Value::operator==(const int16_t val) const noexcept
+    {
+        return *this == int64_t{val};
+    }
+
+    inline bool Value::operator==(const int8_t val) const noexcept
+    {
+        return *this == int64_t{val};
+    }
+
+    inline bool Value::operator==(const uint64_t val) const noexcept
+    {
+        return type() == Type::unsigner && _unsigner == val;
+    }
+
+    inline bool Value::operator==(const uint32_t val) const noexcept
+    {
+        return *this == uint64_t{val};
+    }
+
+    inline bool Value::operator==(const uint16_t val) const noexcept
+    {
+        return *this == uint64_t{val};
+    }
+
+    inline bool Value::operator==(const uint8_t val) const noexcept
+    {
+        return *this == uint64_t{val};
+    }
+
+    inline bool Value::operator==(const double val) const noexcept
+    {
+        return type() == Type::floater && _floater == val;
+    }
+
+    inline bool Value::operator==(const float val) const noexcept
+    {
+        return *this == double{val};
+    }
+
+    inline bool Value::operator==(const bool val) const noexcept
+    {
+        return type() == Type::boolean && _boolean == val;
+    }
+
+    inline bool Value::operator==(const nullptr_t) const noexcept
+    {
+        return type() == Type::null;
+    }
+
+    inline void Value::_setType(const Type type)
+    {
+        _typeAndComment &= ~uintptr_t{0b111u};
+        _typeAndComment |= uintptr_t(type);
+    }
+
+    inline void Value::_deleteValue()
+    {
+        switch (type()) {
+            case Type::object: delete &asObject<unsafe>(); break;
+            case Type::array: delete &asArray<unsafe>(); break;
+            case Type::string: delete _string; break;
+            default: break;
+        }
+    }
+
+    inline void Value::_deleteComment()
+    {
+        string * const comment{this->comment()};
+        if (comment) {
+            delete comment;
+        }
     }
 
     template <typename K, typename V, typename... MoreKVs>
