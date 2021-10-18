@@ -16,21 +16,7 @@ using qc::json::DecodeError;
 using qc::json::Density;
 using qc::json::Scope;
 
-class DummyComposer
-{
-    public: //------------------------------------------------------------------
-
-    std::nullptr_t object(Scope, std::nullptr_t) { return nullptr; }
-    std::nullptr_t array(Scope, std::nullptr_t) { return nullptr; }
-    void end(Scope, Density, std::nullptr_t, std::nullptr_t) {}
-    void key(std::string_view, Scope, std::nullptr_t) {}
-    void val(std::string_view, Scope, std::nullptr_t) {}
-    void val(int64_t, Scope, std::nullptr_t) {}
-    void val(uint64_t, Scope, std::nullptr_t) {}
-    void val(double, Scope, std::nullptr_t) {}
-    void val(bool, Scope, std::nullptr_t) {}
-    void val(Scope, std::nullptr_t, std::nullptr_t) {}
-} dummyComposer;
+static qc::json::DummyComposer dummyComposer{};
 
 class ExpectantComposer
 {
@@ -46,6 +32,7 @@ class ExpectantComposer
     struct Floater { double v; };
     struct Boolean { bool v; };
     struct Null {};
+    struct Comment { std::string_view str; };
 
     friend bool operator==(const Object &, const Object &) { return true; }
     friend bool operator==(const Array &, const Array &) { return true; }
@@ -57,12 +44,13 @@ class ExpectantComposer
     friend bool operator==(const Floater & a, const Floater & b) { return a.v == b.v || (std::isnan(a.v) && std::isnan(b.v)); }
     friend bool operator==(const Boolean & a, const Boolean & b) { return a.v == b.v; }
     friend bool operator==(const Null &, const Null &) { return true; }
+    friend bool operator==(const Comment & a, const Comment & b) { return a.str == b.str; }
 
-    using Element = std::variant<Object, Array, End, Key, String, SignedInteger, UnsignedInteger, Floater, Boolean, Null>;
+    using Element = std::variant<Object, Array, End, Key, String, SignedInteger, UnsignedInteger, Floater, Boolean, Null, Comment>;
 
     std::nullptr_t object(Scope, std::nullptr_t) { assertNextIs(Object{}); return nullptr; }
     std::nullptr_t array(Scope, std::nullptr_t) { assertNextIs(Array{}); return nullptr; }
-    void end(Scope, const Density d, std::nullptr_t, std::nullptr_t) { assertNextIs(End{d}); }
+    void end(Scope, Density d, std::nullptr_t, std::nullptr_t) { assertNextIs(End{d}); }
     void key(std::string_view k, Scope, std::nullptr_t) { assertNextIs(Key{k}); }
     void val(std::string_view v, Scope, std::nullptr_t) { assertNextIs(String{v}); }
     void val(int64_t v, Scope, std::nullptr_t) { assertNextIs(SignedInteger{v}); }
@@ -70,10 +58,11 @@ class ExpectantComposer
     void val(double v, Scope, std::nullptr_t) { assertNextIs(Floater{v}); }
     void val(bool v, Scope, std::nullptr_t) { assertNextIs(Boolean{v}); }
     void val(std::nullptr_t, Scope, std::nullptr_t) { assertNextIs(Null{}); }
+    void comment(std::string_view str, Scope, std::nullptr_t) { assertNextIs(Comment{str}); }
 
     ExpectantComposer & expectObject() { m_sequence.emplace_back(Object{}); return *this; }
     ExpectantComposer & expectArray() { m_sequence.emplace_back(Array{}); return *this; }
-    ExpectantComposer & expectEnd(const Density d = Density::unspecified) { m_sequence.emplace_back(End{d}); return *this; }
+    ExpectantComposer & expectEnd(Density d = Density::unspecified) { m_sequence.emplace_back(End{d}); return *this; }
     ExpectantComposer & expectKey(std::string_view k) { m_sequence.emplace_back(Key{k}); return *this; }
     ExpectantComposer & expectString(std::string_view v) { m_sequence.emplace_back(String{v}); return *this; }
     ExpectantComposer & expectSignedInteger(int64_t v) { m_sequence.emplace_back(SignedInteger{v}); return *this; }
@@ -81,6 +70,7 @@ class ExpectantComposer
     ExpectantComposer & expectFloater(double v) { m_sequence.emplace_back(Floater{v}); return *this; }
     ExpectantComposer & expectBoolean(bool v) { m_sequence.emplace_back(Boolean{v}); return *this; }
     ExpectantComposer & expectNull() { m_sequence.emplace_back(Null{}); return *this; }
+    ExpectantComposer & expectComment(std::string_view str) { m_sequence.emplace_back(Comment{str}); return *this; }
 
     bool isDone() const { return m_sequence.empty(); }
 
@@ -89,6 +79,7 @@ class ExpectantComposer
     std::deque<Element> m_sequence;
 
     void assertNextIs(const Element & e) {
+        EXPECT_FALSE(m_sequence.empty());
         EXPECT_EQ(m_sequence.front(), e);
         m_sequence.pop_front();
     }
@@ -106,6 +97,7 @@ std::ostream & operator<<(std::ostream & os, const ExpectantComposer::Element & 
     if (std::holds_alternative<ExpectantComposer::Floater>(v)) return os << "Floater `" << std::get<ExpectantComposer::Floater>(v).v << "`";
     if (std::holds_alternative<ExpectantComposer::Boolean>(v)) return os << "Boolean `" << (std::get<ExpectantComposer::Boolean>(v).v ? "true" : "false") << "`";
     if (std::holds_alternative<ExpectantComposer::Null>(v)) return os << "Null";
+    if (std::holds_alternative<ExpectantComposer::Comment>(v)) return os << "Comment `" << std::get<ExpectantComposer::Comment>(v).str << "`";
     return os << "Unknown Element";
 }
 
@@ -974,19 +966,25 @@ TEST(decode, comments)
 {
     { // Line comment
         ExpectantComposer composer{};
-        composer.expectSignedInteger(0);
+        composer.expectSignedInteger(0).expectComment("AAAAA"sv);
         decode(R"(0 // AAAAA)"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
-        composer.expectSignedInteger(0);
+        composer.expectSignedInteger(0).expectComment("AAAAA // BBBBB 1"sv);
         decode(R"(0 // AAAAA // BBBBB 1)"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+    }
+    { // Multi-line comment
+        ExpectantComposer composer{};
+        composer.expectComment("AAAAA\n BBBBB \nCCCCC"sv).expectComment("DD DD").expectSignedInteger(0);
+        decode("// AAAAA\n//  BBBBB \n //CCCCC\n\n// DD DD\n0"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Block comment
         ExpectantComposer composer{};
-        composer.expectSignedInteger(0);
+        composer.expectComment("AAAAA"sv).expectSignedInteger(0);
         decode(R"(/* AAAAA */ 0)"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
-        composer.expectSignedInteger(0);
+        composer.expectComment("AAAAA \n BBBBB \r\n CCCCC"sv).expectSignedInteger(0);
         decode("/* AAAAA \n BBBBB \r\n CCCCC */ 0"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
@@ -1001,13 +999,20 @@ TEST(decode, comments)
     }
     { // Comments in array
         ExpectantComposer composer{};
-        composer.expectArray().expectSignedInteger(0).expectSignedInteger(1).expectEnd();
+        composer.expectComment("AAAAA"sv).expectArray();
+            composer.expectComment("BBBBB"sv).expectSignedInteger(0).expectComment("CCCCC"sv).expectComment("DDDDD"sv).expectSignedInteger(1).expectComment("EEEEE"sv);
+        composer.expectEnd().expectComment("FFFFF"sv).expectComment("GGGGG"sv);
         decode(R"(/* AAAAA */ [ /* BBBBB */ 0 /* CCCCC */ , /* DDDDD */ 1 /* EEEEE */ ] /* FFFFF */ // GGGGG)"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
-        composer.expectArray().expectSignedInteger(0).expectSignedInteger(1).expectEnd();
-        decode(R"(/* AAAAA */[/* BBBBB */0/* CCCCC */,/* DDDDD */1/* EEEEE */]/* FFFFF */// GGGGG)"sv, composer, nullptr);
+        composer.expectComment("AAAAA"sv).expectArray();
+            composer.expectComment("BBBBB"sv).expectSignedInteger(0).expectComment("CCCCC"sv).expectComment("DDDDD"sv).expectSignedInteger(1).expectComment("EEEEE"sv);
+        composer.expectEnd().expectComment("FFFFF"sv).expectComment("GGGGG"sv);
+        decode(R"(/*AAAAA*/[/*BBBBB*/0/*CCCCC*/,/*DDDDD*/1/*EEEEE*/]/*FFFFF*///GGGGG)"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
-        composer.expectArray().expectSignedInteger(0).expectSignedInteger(1).expectEnd();
+        composer.expectArray().expectComment("AAAAA"sv);
+            composer.expectSignedInteger(0).expectComment("BBBBB"sv);
+            composer.expectSignedInteger(1).expectComment("CCCCC"sv);
+        composer.expectEnd().expectComment("DDDDD"sv);
         decode(
 R"([ // AAAAA
     0, // BBBBB
@@ -1017,13 +1022,22 @@ R"([ // AAAAA
     }
     { // Comments in object
         ExpectantComposer composer{};
-        composer.expectObject().expectKey("0"sv).expectSignedInteger(0).expectKey("1"sv).expectSignedInteger(1).expectEnd();
+        composer.expectComment("AAAAA"sv).expectObject();
+            composer.expectComment("BBBBB"sv).expectKey("0"sv).expectComment("CCCCC"sv).expectComment("DDDDD"sv).expectSignedInteger(0).expectComment("EEEEE"sv);
+            composer.expectComment("FFFFF"sv).expectKey("1"sv).expectComment("GGGGG"sv).expectComment("HHHHH"sv).expectSignedInteger(1).expectComment("IIIII"sv);
+        composer.expectEnd().expectComment("JJJJJ"sv).expectComment("KKKKK"sv);
         decode(R"(/* AAAAA */ { /* BBBBB */ 0 /* CCCCC */ : /* DDDDD */ 0 /* EEEEE */ , /* FFFFF */ 1 /* GGGGG */ : /* HHHHH */ 1 /* IIIII */ } /* JJJJJ */ // KKKKK)"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
-        composer.expectObject().expectKey("0"sv).expectSignedInteger(0).expectKey("1"sv).expectSignedInteger(1).expectEnd();
-        decode(R"(/* AAAAA */{/* BBBBB */0/* CCCCC */:/* DDDDD */0/* EEEEE */,/* FFFFF */1/* GGGGG */:/* HHHHH */1/* IIIII */}/* JJJJJ */// KKKKK)"sv, composer, nullptr);
+        composer.expectComment("AAAAA"sv).expectObject();
+            composer.expectComment("BBBBB"sv).expectKey("0"sv).expectComment("CCCCC"sv).expectComment("DDDDD"sv).expectSignedInteger(0).expectComment("EEEEE"sv);
+            composer.expectComment("FFFFF"sv).expectKey("1"sv).expectComment("GGGGG"sv).expectComment("HHHHH"sv).expectSignedInteger(1).expectComment("IIIII"sv);
+        composer.expectEnd().expectComment("JJJJJ"sv).expectComment("KKKKK"sv);
+        decode(R"(/*AAAAA*/{/*BBBBB*/0/*CCCCC*/:/*DDDDD*/0/*EEEEE*/,/*FFFFF*/1/*GGGGG*/:/*HHHHH*/1/*IIIII*/}/*JJJJJ*///KKKKK)"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
-        composer.expectObject().expectKey("0"sv).expectSignedInteger(0).expectKey("1"sv).expectSignedInteger(1).expectEnd();
+        composer.expectObject().expectComment("AAAAA"sv);
+            composer.expectKey("0"sv).expectSignedInteger(0).expectComment("BBBBB"sv);
+            composer.expectKey("1"sv).expectSignedInteger(1).expectComment("CCCCC"sv);
+        composer.expectEnd().expectComment("DDDDD"sv);
         decode(
 R"({ // AAAAA
     0: 0, // BBBBB
@@ -1033,24 +1047,42 @@ R"({ // AAAAA
     }
     { // CRLF
         ExpectantComposer composer{};
-        composer.expectArray().expectSignedInteger(0).expectSignedInteger(1).expectEnd();
+        composer.expectArray().expectComment("AAAAA"sv).expectSignedInteger(0).expectComment("BBBBB"sv).expectSignedInteger(1).expectComment("CCCCC"sv).expectEnd().expectComment("DDDDD "sv);
         decode("[ // AAAAA\r\n    0, // BBBBB\n    1 // CCCCC\r\n] // DDDDD \n"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
-        composer.expectArray().expectSignedInteger(1).expectEnd();
+        composer.expectArray().expectComment("AAAAA\r 0, // BBBBB"sv).expectSignedInteger(1).expectComment("CCCCC"sv).expectEnd().expectComment("DDDDD "sv);
         decode("[ // AAAAA\r 0, // BBBBB\n    1 // CCCCC\r\n] // DDDDD \n"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
-    { // Block weirdness
+    { // Weirdness
         ExpectantComposer composer{};
         EXPECT_THROW(decode(R"(/*/ 0)"sv, dummyComposer, nullptr), DecodeError);
-        composer.expectSignedInteger(0);
-        decode(R"(/**/ 0)"sv, composer, nullptr);
+        composer.expectComment(""sv).expectSignedInteger(0);
+        decode("//\n0"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
-        composer.expectSignedInteger(0);
-        decode(R"(/*/*/ 0)"sv, composer, nullptr);
+        composer.expectComment(""sv).expectSignedInteger(0);
+        decode("// \n0"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
-        composer.expectSignedInteger(0);
-        decode(R"(/*///*** /* //** ** /*/ 0)"sv, composer, nullptr);
+        composer.expectComment(" "sv).expectSignedInteger(0);
+        decode("//  \n0"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectComment(""sv).expectSignedInteger(0);
+        decode("/**/ 0"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectComment(""sv).expectSignedInteger(0);
+        decode("/* */ 0"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectComment(""sv).expectSignedInteger(0);
+        decode("/*  */ 0"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectComment(" "sv).expectSignedInteger(0);
+        decode("/*   */ 0"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectComment("/"sv).expectSignedInteger(0);
+        decode("/*/*/ 0"sv, composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+        composer.expectComment("///*** /* //** ** /"sv).expectSignedInteger(0);
+        decode("/*///*** /* //** ** /*/ 0"sv, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
     { // Nothing but comments
@@ -1294,9 +1326,11 @@ TEST(decode, misc)
 TEST(decode, general)
 {
     ExpectantComposer composer{};
+    composer.expectComment("*\n * Third quarter summary document\n * Protected information, do not propagate!\n"sv);
     composer.expectObject();
         composer.expectKey("Name"sv).expectString("Salt's Crust"sv);
         composer.expectKey("Founded"sv).expectSignedInteger(1964);
+        composer.expectComment("Not necessarily up to date"sv);
         composer.expectKey("Employees"sv).expectArray();
             composer.expectObject().expectKey("Name"sv).expectString("Ol' Joe Fisher"sv).expectKey("Title"sv).expectString("Fisherman"sv).expectKey("Age"sv).expectSignedInteger(69).expectEnd(Density::uniline);
             composer.expectObject().expectKey("Name"sv).expectString("Mark Rower"sv).expectKey("Title"sv).expectString("Cook"sv).expectKey("Age"sv).expectSignedInteger(41).expectEnd(Density::uniline);
@@ -1312,7 +1346,7 @@ TEST(decode, general)
             composer.expectObject();
                 composer.expectKey("Name"sv).expectString("Two Tuna"sv);
                 composer.expectKey("Price"sv).expectFloater(-std::numeric_limits<double>::infinity());
-                composer.expectKey("Ingredients"sv).expectArray().expectString("Tuna"sv).expectEnd();
+                composer.expectKey("Ingredients"sv).expectArray().expectComment("It's actually cod lmao"sv).expectString("Tuna"sv).expectEnd();
                 composer.expectKey("Gluten Free"sv).expectBoolean(true);
             composer.expectEnd(Density::multiline);
             composer.expectObject();
@@ -1322,7 +1356,7 @@ TEST(decode, general)
                 composer.expectKey("Gluten Free"sv).expectBoolean(false);
             composer.expectEnd(Density::multiline);
         composer.expectEnd(Density::multiline);
-        composer.expectKey("Profit Margin"sv).expectNull();
+        composer.expectKey("Profit Margin"sv).expectComment("Pay no heed"sv).expectNull();
         composer.expectKey("Ha\x03r Name"sv).expectString("M\0\0n"sv);
         composer.expectKey("Green Eggs and Ham"sv).expectString(
 R"(I do not like them in a box
@@ -1334,16 +1368,17 @@ I do not like them anywhere
 I do not like green eggs and ham
 I do not like them Sam I am
 )");
-        composer.expectKey("Magic Numbers"sv).expectArray().expectUnsignedInteger(777).expectUnsignedInteger(777).expectUnsignedInteger(777).expectEnd(Density::nospace);
+        composer.expectKey("Magic Numbers"sv).expectArray().expectUnsignedInteger(777).expectUnsignedInteger(777).expectUnsignedInteger(777).expectEnd(Density::nospace).expectComment("What could they mean?!"sv);
     composer.expectEnd(Density::multiline);
     decode(
 R"(/**
- * Restraunt report
- * October 2021
+ * Third quarter summary document
+ * Protected information, do not propagate!
  */
 {
     "Name": "Salt's Crust",
     "Founded": 1964,
+    // Not necessarily up to date
     "Employees": [
         { Name: "Ol' Joe Fisher", Title: "Fisherman", Age: 69 },
         { Name: "Mark Rower", Title: "Cook", Age: 41. },
@@ -1359,7 +1394,7 @@ R"(/**
         {
             "Name": "Two Tuna",
             "Price": -inf,
-            "Ingredients": [ "Tuna" ],
+            "Ingredients": [ /* It's actually cod lmao */ "Tuna" ],
             "Gluten Free": true
         },
         {

@@ -404,6 +404,7 @@ namespace qc::json
         Value * object(const Scope outerScope, Value * const outerNode)
         {
             Value * innerNode;
+
             switch (outerScope) {
                 case Scope::object:
                     innerNode = &outerNode->asObject<unsafe>().emplace(std::move(_key), Object{}).first->second;
@@ -415,12 +416,18 @@ namespace qc::json
                     *outerNode = Object{};
                     innerNode = outerNode;
             }
+
+            if (!_comment.empty()) {
+                innerNode->setComment(std::move(_comment));
+            }
+
             return innerNode;
         }
 
         Value * array(const Scope outerScope, Value * const outerNode)
         {
             Value * innerNode;
+
             switch (outerScope) {
                 case Scope::object:
                     innerNode = &outerNode->asObject<unsafe>().emplace(std::move(_key), Array{}).first->second;
@@ -432,6 +439,11 @@ namespace qc::json
                     *outerNode = Array{};
                     innerNode = outerNode;
             }
+
+            if (!_comment.empty()) {
+                innerNode->setComment(std::move(_comment));
+            }
+
             return innerNode;
         }
 
@@ -451,26 +463,43 @@ namespace qc::json
                 default:
                     break;
             }
+
+            _comment.clear();
         }
 
         template <typename T>
         void val(const T v, const Scope scope, Value * const node)
         {
+            Value * composedVal;
+
             switch (scope) {
                 case Scope::object:
-                    node->asObject<unsafe>().emplace(std::move(_key), v);
+                    composedVal = &node->asObject<unsafe>().emplace(std::move(_key), v).first->second;
                     break;
                 case Scope::array:
-                    node->asArray<unsafe>().emplace_back(v);
+                    composedVal = &node->asArray<unsafe>().emplace_back(v);
                     break;
                 default:
                     *node = v;
+                    composedVal = node;
+            }
+
+            if (!_comment.empty()) {
+                composedVal->setComment(std::move(_comment));
+            }
+        }
+
+        void comment(const string_view comment, const Scope, Value * const)
+        {
+            if (_comment.empty()) {
+                _comment = comment;
             }
         }
 
         private: //-------------------------------------------------------------
 
-        string _key;
+        string _key{};
+        string _comment{};
     };
 
     // Ensure size and alignment of `Value` are as expected

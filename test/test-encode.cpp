@@ -793,7 +793,7 @@ TEST(encode, general)
                 encoder << "Gluten Free"sv << false;
             encoder << end;
         encoder << end;
-        encoder << "Profit Margin"sv << nullptr;
+        encoder << comment("Pay no heed"sv) << "Profit Margin"sv << nullptr;
         encoder << "Ha\x03r Name"sv << "M\0\0n"sv;
         encoder << "Green Eggs and Ham"sv <<
 R"(I do not like them in a box
@@ -805,7 +805,7 @@ I do not like them anywhere
 I do not like green eggs and ham
 I do not like them Sam I am
 )";
-        encoder << "Magic Numbers"sv << array(Density::nospace) << hex(777) << octal(777u) << binary(777) << end;
+        encoder << comment("What could they mean?!"sv) << "Magic Numbers"sv << array(Density::nospace) << hex(777) << octal(777u) << binary(777) << end;
     encoder << end;
 
     EXPECT_EQ(R"(// Third quarter summary document
@@ -839,9 +839,11 @@ I do not like them Sam I am
             "Gluten Free": false
         }
     ],
+    // Pay no heed
     "Profit Margin": null,
     "Ha\x03r Name": "M\0\0n",
     "Green Eggs and Ham": "I do not like them in a box\nI do not like them with a fox\nI do not like them in a house\nI do not like them with a mouse\nI do not like them here or there\nI do not like them anywhere\nI do not like green eggs and ham\nI do not like them Sam I am\n",
+    // What could they mean?!
     "Magic Numbers": [0x309,0o1411,0b1100001001]
 })"s, encoder.finish());
 }

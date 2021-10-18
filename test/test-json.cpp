@@ -599,7 +599,7 @@ TEST(json, makeArray)
 
 TEST(json, comments)
 {
-    { // Object
+    { // Encode object
         Value json{qc::json::makeObject("a", 1, "b", 2, "c", 3)};
         json.setComment("Yada yada");
         Object & obj{json.asObject()};
@@ -622,7 +622,7 @@ so
 so
   incredible*/"c":3})"s, qc::json::encode(json, Density::nospace));
     }
-    { // Array
+    { // Encode array
         Value json{qc::json::makeArray(1, 2, 3)};
         json.setComment("Yada yada");
         Array & arr{json.asArray()};
@@ -645,11 +645,37 @@ so
 so
   incredible*/3])"s, qc::json::encode(json, Density::nospace));
     }
+    { // Decode
+        const Value json{decode(R"(// AAAAA
+// BBBBB
+/* CCCCC */
+[
+    /* DDDDD */
+    // EEEEE
+    [ /* FFFFF */ /* GGGGG */ 0, /* HHHHH */ 1, /* IIIII */ ], // JJJJJ
+    { /* KKKKK */ /* LLLLL */ "k": /* MMMMM */ "v" /* NNNNN */ } // OOOOO
+    /* PPPPP */
+] // QQQQQ)"sv)};
+        EXPECT_EQ("AAAAA\nBBBBB", *json.comment());
+        const Array & rootArr{json.asArray()};
+        EXPECT_EQ(2, rootArr.size());
+        EXPECT_EQ("DDDDD", *rootArr.at(0).comment());
+        const Array & innerArr{rootArr.at(0).asArray()};
+        EXPECT_EQ(2, innerArr.size());
+        EXPECT_EQ("FFFFF", *innerArr.at(0).comment());
+        EXPECT_EQ("HHHHH", *innerArr.at(1).comment());
+        EXPECT_EQ("JJJJJ", *rootArr.at(1).comment());
+        const Object & innerObj{rootArr.at(1).asObject()};
+        EXPECT_EQ(1, innerObj.size());
+        EXPECT_EQ("KKKKK", *innerObj.at("k").comment());
+    }
 }
 
 TEST(json, general)
 {
-    std::string json(R"({
+    std::string json(R"(// Third quarter summary document
+// Protected information, do not propagate!
+{
     "Dishes": [
         {
             "Gluten Free": false,
@@ -659,7 +685,7 @@ TEST(json, general)
         },
         {
             "Gluten Free": true,
-            "Ingredients": [ "Tuna" ],
+            "Ingredients": [ /* It's actually cod lmao */ "Tuna" ],
             "Name": "Two Tuna",
             "Price": -inf
         },
@@ -670,6 +696,7 @@ TEST(json, general)
             "Price": nan
         }
     ],
+    // Not necessarily up to date
     "Employees": [
         { "Age": 69, "Name": "Ol' Joe Fisher", "Title": "Fisherman" },
         { "Age": 41, "Name": "Mark Rower", "Title": "Cook" },
@@ -678,8 +705,10 @@ TEST(json, general)
     "Founded": 1964,
     "Green Eggs and Ham": "I do not like them in a box\nI do not like them with a fox\nI do not like them in a house\nI do not like them with a mouse\nI do not like them here or there\nI do not like them anywhere\nI do not like green eggs and ham\nI do not like them Sam I am\n",
     "Ha\x03r Name": "M\0\0n",
+    // What could they mean?!
     "Magic Numbers": [777,777,777],
     "Name": "Salt's Crust",
+    // Pay no heed
     "Profit Margin": null
 })"s);
     EXPECT_EQ(json, encode(decode(json)));

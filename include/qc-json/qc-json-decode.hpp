@@ -70,6 +70,7 @@ namespace qc::json
         DecodeError(const string_view msg, size_t position) noexcept;
     };
 
+    // TODO: replace with container
     enum class Scope
     {
         root,
@@ -92,6 +93,29 @@ namespace qc::json
     /// @param initialState the initial state object to be passed to the composer
     ///
     template <typename Composer, typename State> void decode(string_view json, Composer & composer, State initialState);
+
+    ///
+    /// An example composer whose operations are all no-ops
+    ///
+    /// Any custom composer must provide matching methods. This may be extended for baseline no-ops
+    ///
+    template <typename State = nullptr_t>
+    class DummyComposer
+    {
+        public: //--------------------------------------------------------------
+
+        State object(const Scope /*outerScope*/, State & /*outerState*/) { return State{}; }
+        State array(const Scope /*outerScope*/, State & /*outerState*/) { return State{}; }
+        void end(const Scope /*innerScope*/, const Density /*density*/, State && /*innerState*/, State & /*outerState*/) {}
+        void key(const std::string_view /*key*/, const Scope /*scope*/, State & /*state*/) {}
+        void val(const std::string_view /*val*/, const Scope /*scope*/, State & /*state*/) {}
+        void val(const int64_t /*val*/, const Scope /*scope*/, State & /*state*/) {}
+        void val(const uint64_t /*val*/, const Scope /*scope*/, State & /*state*/) {}
+        void val(const double /*val*/, const Scope /*scope*/, State & /*state*/) {}
+        void val(const bool /*val*/, const Scope /*scope*/, State & /*state*/) {}
+        void val(const std::nullptr_t, const Scope /*scope*/, State & /*state*/) {}
+        void comment(const std::string_view /*comment*/, const Scope /*scope*/, State & /*state*/) {}
+    };
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -125,13 +149,13 @@ namespace qc::json
 
         void operator()(State & initialState)
         {
-            _skipSpaceAndComments();
+            _skipSpaceAndIngestComments(Scope::root, initialState);
             _ingestValue(Scope::root, initialState);
-            _skipSpaceAndComments();
+            _skipSpaceAndIngestComments(Scope::root, initialState);
 
             // Allow trailing comma
             if (_tryConsumeChar(',')) {
-                _skipSpaceAndComments();
+                _skipSpaceAndIngestComments(Scope::root, initialState);
             }
 
             if (_pos != _end) {
@@ -149,37 +173,142 @@ namespace qc::json
         Composer & _composer;
         string _stringBuffer{};
 
-        Density _skipSpaceAndComments()
+        Density _skipWhitespace()
         {
             Density density{Density::nospace};
 
-            while (true) {
-                // Skip whitespace
-                while (_pos < _end) {
-                    if (std::isspace(uchar(*_pos))) {
-                        if (*_pos == '\n') density &= Density::multiline;
-                        else density &= Density::uniline;
-                        ++_pos;
-                    }
-                    else {
-                        break;
-                    }
+            while (_pos < _end) {
+                if (std::isspace(uchar(*_pos))) {
+                    if (*_pos == '\n') density &= Density::multiline;
+                    else density &= Density::uniline;
+                    ++_pos;
+                }
+                else {
+                    break;
+                }
+            }
+
+            return density;
+        }
+
+        Density _ingestLineComment(bool concat, const Scope scope, State & state)
+        {
+            // We already know we have `//`
+            _pos += 2;
+            const char * commentStart{_pos};
+
+            // Seek to end of line
+            while (_pos < _end && *_pos != '\n') {
+                ++_pos;
+            }
+            const char * commentEnd{_pos};
+
+            // Trim space after `//`
+            if (commentStart < commentEnd && *commentStart == ' ') {
+                ++commentStart;
+            }
+
+            // Trim `\r` from end
+            if (commentEnd[-1] == '\r') {
+                --commentEnd;
+            }
+
+            // If this is a continuation, add it to the buffer
+            if (concat) {
+                _stringBuffer.push_back('\n');
+                _stringBuffer.append(commentStart, commentEnd);
+            }
+
+            // Check for continuation on next line
+            bool isContinuation{false};
+            Density density{Density::nospace};
+
+            // This comment ended with a newline (as opposed to the end of the json)
+            if (_pos < _end) {
+                // Skip newline
+                ++_pos;
+                density = Density::multiline;
+
+                // There are no additional newlines
+                if (_skipWhitespace() > Density::multiline) {
+                    isContinuation = _pos + 2 < _end && _pos[0] == '/' && _pos[1] == '/';
+                }
+            }
+
+            // There is more comment to come
+            if (isContinuation) {
+                if (!concat) {
+                    _stringBuffer.assign(commentStart, commentEnd);
                 }
 
+                _ingestLineComment(true, scope, state);
+
+                if (!concat) {
+                    _composer.comment(string_view{_stringBuffer}, scope, state);
+                }
+            }
+            // This is the end of the comment
+            else {
+                if (!concat) {
+                    _composer.comment(string_view{commentStart, size_t(commentEnd - commentStart)}, scope, state);
+                }
+            }
+
+            return density;
+        }
+
+        void _ingestBlockComment(const Scope scope, State & state)
+        {
+            // We already know we have `/*`
+            _pos += 2;
+            const char * commentStart{_pos};
+
+            // Seek to `*/`
+            while (_pos + 1 < _end && !(_pos[0] == '*' && _pos[1] == '/')) {
+                ++_pos;
+            }
+
+            // If `*/` found
+            if (_pos + 1 < _end) {
+                const char * commentEnd{_pos};
+                _pos += 2;
+
+                // Trim space after `/*`
+                if (*commentStart == ' ') {
+                    ++commentStart;
+                }
+
+                // Trim space before `*/`
+                if (commentEnd > commentStart && commentEnd[-1] == ' ') {
+                    --commentEnd;
+                }
+
+                _composer.comment(string_view{commentStart, size_t(commentEnd - commentStart)}, scope, state);
+            }
+            else {
+                throw DecodeError{"Block comment is unterminated"sv, size_t(commentStart - 2 - _start)};
+            }
+        }
+
+        Density _skipSpaceAndIngestComments(const Scope scope, State & state)
+        {
+            // Skip whitespace
+            Density density{_skipWhitespace()};
+
+            while (true) {
+                // Check for comment
                 if (_pos + 1 < _end && _pos[0] == '/') {
-                    // Skip line comment
+                    // Ingest line comment
                     if (_pos[1] == '/') {
-                        _pos += 2;
-                        while (_pos < _end && *_pos != '\n') ++_pos;
+                        density &= _ingestLineComment(false, scope, state);
+                        // `_ingesetLineComment` skips trailing whitespace already
                         continue;
                     }
-                    // Skip block comment
+                    // Ingest block comment
                     else if (_pos[1] == '*') {
-                        const char * startOfComment{_pos};
-                        _pos += 2;
-                        while (_pos + 1 < _end && !(_pos[0] == '*' && _pos[1] == '/')) ++_pos;
-                        if (_pos + 1 < _end) _pos += 2;
-                        else throw DecodeError{"Block comment is unterminated"sv, size_t(startOfComment - _start)};
+                        _ingestBlockComment(scope, state);
+                        // Skip whitespace
+                        density &= _skipWhitespace();
                         continue;
                     }
                 }
@@ -311,7 +440,7 @@ namespace qc::json
             State innerState{_composer.object(outerScope, outerState)};
 
             ++_pos; // We already know we have `{`
-            Density density{_skipSpaceAndComments()};
+            Density density{_skipSpaceAndIngestComments(Scope::object, innerState)};
 
             if (!_tryConsumeChar('}')) {
                 while (true) {
@@ -322,20 +451,20 @@ namespace qc::json
                     const char c{*_pos};
                     const string_view key{(c == '"' || c == '\'') ? _consumeString(c) : _consumeIdentifier()};
                     _composer.key(key, Scope::object, innerState);
-                    density &= _skipSpaceAndComments();
+                    density &= _skipSpaceAndIngestComments(Scope::object, innerState);
 
                     _consumeChar(':');
-                    density &= _skipSpaceAndComments();
+                    density &= _skipSpaceAndIngestComments(Scope::object, innerState);
 
                     _ingestValue(Scope::object, innerState);
-                    density &= _skipSpaceAndComments();
+                    density &= _skipSpaceAndIngestComments(Scope::object, innerState);
 
                     if (_tryConsumeChar('}')) {
                         break;
                     }
                     else {
                         _consumeChar(',');
-                        density &= _skipSpaceAndComments();
+                        density &= _skipSpaceAndIngestComments(Scope::object, innerState);
 
                         // Allow trailing comma
                         if (_tryConsumeChar('}')) {
@@ -353,19 +482,19 @@ namespace qc::json
             State innerState{_composer.array(outerScope, outerState)};
 
             ++_pos; // We already know we have `[`
-            Density density{_skipSpaceAndComments()};
+            Density density{_skipSpaceAndIngestComments(Scope::array, innerState)};
 
             if (!_tryConsumeChar(']')) {
                 while (true) {
                     _ingestValue(Scope::array, innerState);
-                    density &= _skipSpaceAndComments();
+                    density &= _skipSpaceAndIngestComments(Scope::array, innerState);
 
                     if (_tryConsumeChar(']')) {
                         break;
                     }
                     else {
                         _consumeChar(',');
-                        density &= _skipSpaceAndComments();
+                        density &= _skipSpaceAndIngestComments(Scope::array, innerState);
 
                         // Allow trailing comma
                         if (_tryConsumeChar(']')) {
@@ -642,9 +771,34 @@ namespace qc::json
         position{position}
     {}
 
+    template <typename Composer, typename State> concept _ComposerHasObjectMethod = requires (Composer composer, const Scope scope, State state) { composer.object(scope, state); };
+    template <typename Composer, typename State> concept _ComposerHasArrayMethod = requires (Composer composer, const Scope scope, State state) { composer.array(scope, state); };
+    template <typename Composer, typename State> concept _ComposerHasEndMethod = requires (Composer composer, const Scope scope, const Density density, State innerState, State outerState) { composer.end(scope, density, std::move(innerState), outerState); };
+    template <typename Composer, typename State> concept _ComposerHasKeyMethod = requires (Composer composer, const std::string_view key, const Scope scope, State state) { composer.key(key, scope, state); };
+    template <typename Composer, typename State> concept _ComposerHasStringValMethod = requires (Composer composer, const std::string_view val, const Scope scope, State state) { composer.val(val, scope, state); };
+    template <typename Composer, typename State> concept _ComposerHasSignedIntegerValMethod = requires (Composer composer, const int64_t val, const Scope scope, State state) { composer.val(val, scope, state); };
+    template <typename Composer, typename State> concept _ComposerHasUnsignedIntegerValMethod = requires (Composer composer, const uint64_t val, const Scope scope, State state) { composer.val(val, scope, state); };
+    template <typename Composer, typename State> concept _ComposerHasFloaterValMethod = requires (Composer composer, const double val, const Scope scope, State state) { composer.val(val, scope, state); };
+    template <typename Composer, typename State> concept _ComposerHasBooleanValMethod = requires (Composer composer, const bool val, const Scope scope, State state) { composer.val(val, scope, state); };
+    template <typename Composer, typename State> concept _ComposerHasNullValMethod = requires (Composer composer, const Scope scope, State state) { composer.val(nullptr, scope, state); };
+    template <typename Composer, typename State> concept _ComposerHasCommentMethod = requires (Composer composer, const string_view comment, const Scope scope, State state) { composer.comment(comment, scope, state); };
+
     template <typename Composer, typename State>
     inline void decode(string_view json, Composer & composer, State initialState)
     {
+        // Much more understandable compile errors than just letting the template code fly
+        static_assert(_ComposerHasObjectMethod<Composer, State>);
+        static_assert(_ComposerHasArrayMethod<Composer, State>);
+        static_assert(_ComposerHasEndMethod<Composer, State>);
+        static_assert(_ComposerHasKeyMethod<Composer, State>);
+        static_assert(_ComposerHasStringValMethod<Composer, State>);
+        static_assert(_ComposerHasSignedIntegerValMethod<Composer, State>);
+        static_assert(_ComposerHasUnsignedIntegerValMethod<Composer, State>);
+        static_assert(_ComposerHasFloaterValMethod<Composer, State>);
+        static_assert(_ComposerHasBooleanValMethod<Composer, State>);
+        static_assert(_ComposerHasNullValMethod<Composer, State>);
+        static_assert(_ComposerHasCommentMethod<Composer, State>);
+
         return _Decoder<Composer, State>{json, composer}(initialState);
     }
 }
