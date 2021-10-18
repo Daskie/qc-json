@@ -31,6 +31,12 @@
 
 namespace qc::json
 {
+
+    ///
+    /// Required for low-order bit packing
+    ///
+    static_assert(__STDCPP_DEFAULT_NEW_ALIGNMENT__ >= 8);
+
     ///
     /// This will be thrown when attempting to access a value as the wrong type
     ///
@@ -48,23 +54,14 @@ namespace qc::json
     ///
     enum class Type : uint8_t
     {
-        null,
-        object,
-        array,
-        string,
-        number,
-        boolean
-    };
-
-    ///
-    /// The backing type for number values
-    ///
-    enum class NumberType : uint8_t
-    {
-        invalid,
-        signedInteger,
-        unsignedInteger,
-        floater
+        null     = 0b000u,
+        object   = 0b001u,
+        array    = 0b010u,
+        string   = 0b011u,
+        integer  = 0b100u,
+        unsigner = 0b101u,
+        floater  = 0b110u,
+        boolean  = 0b111u
     };
 
     class Value;
@@ -141,11 +138,6 @@ namespace qc::json
         void setDensity(Density density) noexcept;
 
         ///
-        /// @return the number type or `invalid` if not a number
-        ///
-        NumberType numberType() const noexcept;
-
-        ///
         /// @return whether the value is an object
         ///
         bool isObject() const noexcept;
@@ -168,12 +160,12 @@ namespace qc::json
         ///
         /// @return whether the value is a signed integer
         ///
-        bool isSignedInteger() const noexcept;
+        bool isInteger() const noexcept;
 
         ///
         /// @return whether the value is an unsigned integer
         ///
-        bool isUnsignedInteger() const noexcept;
+        bool isUnsigner() const noexcept;
 
         ///
         /// @return whether the value is a floater
@@ -228,16 +220,16 @@ namespace qc::json
         /// @return this value as a signed integer
         /// @throw `TypeError` if this value is not a signed integer and `isSafe` is true
         ///
-        template <Safety isSafe = safe> int64_t & asSignedInteger() noexcept(isSafe == unsafe);
-        template <Safety isSafe = safe> const int64_t & asSignedInteger() const noexcept(isSafe == unsafe);
+        template <Safety isSafe = safe> int64_t & asInteger() noexcept(isSafe == unsafe);
+        template <Safety isSafe = safe> const int64_t & asInteger() const noexcept(isSafe == unsafe);
 
         ///
         /// @tparam isSafe whether to check if this value is actually an unsigned integer
         /// @return this value as an unsigned integer
         /// @throw `TypeError` if this value is not an unsigned integer and `isSafe` is true
         ///
-        template <Safety isSafe = safe> uint64_t & asUnsignedInteger() noexcept(isSafe == unsafe);
-        template <Safety isSafe = safe> const uint64_t & asUnsignedInteger() const noexcept(isSafe == unsafe);
+        template <Safety isSafe = safe> uint64_t & asUnsigner() noexcept(isSafe == unsafe);
+        template <Safety isSafe = safe> const uint64_t & asUnsigner() const noexcept(isSafe == unsafe);
 
         ///
         /// @tparam isSafe whether to check if this value is actually a floater
@@ -315,11 +307,18 @@ namespace qc::json
 
         private: //-------------------------------------------------------------
 
-        Type _type{Type::null};
-        Density _density{Density::unspecified};
-        NumberType _numberType{NumberType::invalid};
-        void * _ptr{nullptr};
-        std::unique_ptr<string> _comment{};
+        union {
+            uintptr_t _ptrAndDensity;
+            string * _string;
+            int64_t _integer;
+            uint64_t _unsigner;
+            double _floater;
+            bool _boolean;
+            nullptr_t _null{};
+        };
+        uintptr_t _typeAndComment{};
+
+        template <typename T> void _setComment(T && str);
     };
 
     ///
@@ -502,31 +501,24 @@ namespace qc::json
         string _comment{};
     };
 
-    // Ensure size and alignment of `Value` are as expected
-    static_assert(sizeof(Value) == 3 * sizeof(void *));
-    static_assert(alignof(Value) == alignof(void *));
-
     inline Value::Value(Object && val, const Density density) noexcept :
-        _type{Type::object},
-        _density{density},
-        _ptr{new Object{std::move(val)}}
+        _ptrAndDensity{reinterpret_cast<uintptr_t>(new Object{std::move(val)}) | uintptr_t(density)},
+        _typeAndComment{uintptr_t(Type::object)}
     {}
 
     inline Value::Value(Array && val, const Density density) noexcept :
-        _type{Type::array},
-        _density{density},
-        _ptr{new Array{std::move(val)}}
+        _ptrAndDensity{reinterpret_cast<uintptr_t>(new Array{std::move(val)}) | uintptr_t(density)},
+        _typeAndComment{uintptr_t(Type::array)}
     {}
 
     inline Value::Value(string && val) noexcept :
-        _type{Type::string},
-        _density{Density::unspecified},
-        _ptr{new string{std::move(val)}}
+        _ptrAndDensity{reinterpret_cast<uintptr_t>(new string{std::move(val)})},
+        _typeAndComment{uintptr_t(Type::string)}
     {}
 
     inline Value::Value(const string_view val) noexcept :
-        _type{Type::string},
-        _ptr{new string{val}}
+        _ptrAndDensity{reinterpret_cast<uintptr_t>(new string{val})},
+        _typeAndComment{uintptr_t(Type::string)}
     {}
 
     inline Value::Value(const char * const val) :
@@ -542,9 +534,8 @@ namespace qc::json
     {}
 
     inline Value::Value(const int64_t val) noexcept :
-        _type{Type::number},
-        _numberType{NumberType::signedInteger},
-        _ptr{new int64_t{val}}
+        _integer{val},
+        _typeAndComment{uintptr_t(Type::integer)}
     {}
 
     inline Value::Value(const int32_t val) noexcept :
@@ -560,9 +551,8 @@ namespace qc::json
     {}
 
     inline Value::Value(const uint64_t val) noexcept :
-        _type{Type::number},
-        _numberType{NumberType::unsignedInteger},
-        _ptr{new uint64_t{val}}
+        _unsigner{val},
+        _typeAndComment{uintptr_t(Type::unsigner)}
     {}
 
     inline Value::Value(const uint32_t val) noexcept :
@@ -578,9 +568,8 @@ namespace qc::json
     {}
 
     inline Value::Value(const double val) noexcept :
-        _type{Type::number},
-        _numberType{NumberType::floater},
-        _ptr{new double{val}}
+        _floater{val},
+        _typeAndComment{uintptr_t(Type::floater)}
     {}
 
     inline Value::Value(const float val) noexcept :
@@ -588,8 +577,8 @@ namespace qc::json
     {}
 
     inline Value::Value(const bool val) noexcept :
-        _type{Type::boolean},
-        _ptr{new bool{val}}
+        _boolean{val},
+        _typeAndComment{uintptr_t(Type::boolean)}
     {}
 
     template <typename T>
@@ -598,105 +587,101 @@ namespace qc::json
     {}
 
     inline Value::Value(Value && other) noexcept :
-        _type{std::exchange(other._type, Type::null)},
-        _density{std::exchange(other._density, Density::unspecified)},
-        _numberType{std::exchange(other._numberType, NumberType::invalid)},
-        _ptr{std::exchange(other._ptr, nullptr)},
-        _comment{std::move(other._comment)}
+        _ptrAndDensity{std::exchange(other._ptrAndDensity, 0u)},
+        _typeAndComment{std::exchange(other._typeAndComment, 0u)}
     {}
 
     inline Value & Value::operator=(Value && other) noexcept
     {
-        _type = std::exchange(other._type, Type::null);
-        _density = std::exchange(other._density, Density::unspecified);
-        _numberType = std::exchange(other._numberType, NumberType::invalid);
-        _ptr = std::exchange(other._ptr, nullptr);
-        _comment = std::move(other._comment);
+        _ptrAndDensity = std::exchange(other._ptrAndDensity, 0u);
+        _typeAndComment = std::exchange(other._typeAndComment, 0u);
         return *this;
     }
 
     inline Value::~Value() noexcept
     {
-        switch (_type) {
+        switch (type()) {
             case Type::object: delete &asObject<unsafe>(); break;
             case Type::array: delete &asArray<unsafe>(); break;
-            case Type::string: delete &asString<unsafe>(); break;
-            case Type::number:
-                switch (_numberType) {
-                    case NumberType::invalid: break;
-                    case NumberType::signedInteger: delete &asSignedInteger<unsafe>(); break;
-                    case NumberType::unsignedInteger: delete &asUnsignedInteger<unsafe>(); break;
-                    case NumberType::floater: delete &asFloater<unsafe>(); break;
-                }
-                break;
-            case Type::boolean: delete &asBoolean<unsafe>(); break;
+            case Type::string: delete _string; break;
             default: break;
+        }
+
+        string * const comment{this->comment()};
+        if (comment) {
+            delete comment;
         }
     }
 
     inline Type Value::type() const noexcept
     {
-        return _type;
+        return Type(_typeAndComment & 0b111u);
     }
 
     inline Density Value::density() const noexcept
     {
-        return _density;
+        const Type type{this->type()};
+        if (type == Type::object || type == Type::array) {
+            return Density(_ptrAndDensity & 0b111u);
+        }
+        else {
+            return Density::unspecified;
+        }
     }
 
     inline void Value::setDensity(const Density density) noexcept
     {
-        _density = density;
-    }
-
-    inline NumberType Value::numberType() const noexcept
-    {
-        return _numberType;
+        const Type type{this->type()};
+        if (type == Type::object || type == Type::array) {
+            _ptrAndDensity &= ~uintptr_t{0b111u};
+            _ptrAndDensity |= uintptr_t(density);
+        }
     }
 
     inline bool Value::isObject() const noexcept
     {
-        return _type == Type::object;
+        return type() == Type::object;
     }
 
     inline bool Value::isArray() const noexcept
     {
-        return _type == Type::array;
+        return type() == Type::array;
     }
 
     inline bool Value::isString() const noexcept
     {
-        return _type == Type::string;
+        return type() == Type::string;
     }
 
     inline bool Value::isNumber() const noexcept
     {
-        return _type == Type::number;
+        const Type type{this->type()};
+        return type == Type::integer || type == Type::unsigner || type == Type::floater;
     }
 
-    inline bool Value::isSignedInteger() const noexcept
+    inline bool Value::isInteger() const noexcept
     {
-        return _numberType == NumberType::signedInteger;
+        return type() == Type::integer;
     }
 
-    inline bool Value::isUnsignedInteger() const noexcept
+    inline bool Value::isUnsigner() const noexcept
     {
-        return _numberType == NumberType::unsignedInteger;
+        return type() == Type::unsigner;
     }
 
     inline bool Value::isFloater() const noexcept
     {
-        return _numberType == NumberType::floater;
+        return type() == Type::floater;
     }
 
     inline bool Value::isBoolean() const noexcept
     {
-        return _type == Type::boolean;
+        return type() == Type::boolean;
     }
 
     inline bool Value::isNull() const noexcept
     {
-        return _type == Type::null;
+        return type() == Type::null;
     }
 
     template <typename T>
@@ -726,20 +711,20 @@ namespace qc::json
         }
         // Signed integer
         else if constexpr (std::is_integral_v<U> && std::is_signed_v<U>) {
-            switch (_numberType) {
-                case NumberType::signedInteger: {
+            switch (type()) {
+                case Type::integer: {
                     if constexpr (std::is_same_v<U, int64_t>) {
                         return true;
                     }
                     else {
-                        const int64_t val{asSignedInteger<unsafe>()};
+                        const int64_t val{asInteger<unsafe>()};
                         return val <= std::numeric_limits<U>::max() && val >= std::numeric_limits<U>::min();
                     }
                 }
-                case NumberType::unsignedInteger: {
-                    return asUnsignedInteger<unsafe>() <= uint64_t(std::numeric_limits<U>::max());
+                case Type::unsigner: {
+                    return asUnsigner<unsafe>() <= uint64_t(std::numeric_limits<U>::max());
                 }
-                case NumberType::floater: {
+                case Type::floater: {
                     const double val{asFloater<unsafe>()};
                     return double(U(val)) == val;
                 }
@@ -750,20 +735,20 @@ namespace qc::json
         }
         // Unsigned integer
         else if constexpr (std::is_integral_v<U> && std::is_unsigned_v<U>) {
-            switch (_numberType) {
-                case NumberType::signedInteger: {
-                    const int64_t val{asSignedInteger<unsafe>()};
+            switch (type()) {
+                case Type::integer: {
+                    const int64_t val{asInteger<unsafe>()};
                     return val >= 0 && uint64_t(val) <= std::numeric_limits<U>::max();
                 }
-                case NumberType::unsignedInteger: {
+                case Type::unsigner: {
                     if constexpr (std::is_same_v<U, uint64_t>) {
                         return true;
                     }
                     else {
-                        return asUnsignedInteger<unsafe>() <= std::numeric_limits<U>::max();
+                        return asUnsigner<unsafe>() <= std::numeric_limits<U>::max();
                     }
                 }
-                case NumberType::floater: {
+                case Type::floater: {
                     const double val{asFloater<unsafe>()};
                     return val >= 0.0 && double(U(val)) == val;
                 }
@@ -785,92 +770,92 @@ namespace qc::json
     template <Safety isSafe>
     inline Object & Value::asObject() noexcept(isSafe == unsafe)
     {
-        return const_cast<Object &>(static_cast<const Value &>(*this).asObject<isSafe>());
+        return const_cast<Object &>(static_cast<const Value *>(this)->asObject<isSafe>());
     }
 
     template <Safety isSafe>
     inline const Object & Value::asObject() const noexcept(isSafe == unsafe)
     {
         if constexpr (isSafe == safe) if (!isObject()) throw TypeError{};
-        return *static_cast<const Object *>(_ptr);
+        return *reinterpret_cast<const Object *>(_ptrAndDensity & ~uintptr_t{0b111u});
     }
 
     template <Safety isSafe>
     inline Array & Value::asArray() noexcept(isSafe == unsafe)
     {
-        return const_cast<Array &>(static_cast<const Value &>(*this).asArray<isSafe>());
+        return const_cast<Array &>(static_cast<const Value *>(this)->asArray<isSafe>());
     }
 
     template <Safety isSafe>
     inline const Array & Value::asArray() const noexcept(isSafe == unsafe)
     {
         if constexpr (isSafe == safe) if (!isArray()) throw TypeError{};
-        return *static_cast<const Array *>(_ptr);
+        return *reinterpret_cast<const Array *>(_ptrAndDensity & ~uintptr_t{0b111u});
     }
 
     template <Safety isSafe>
     inline string & Value::asString() noexcept(isSafe == unsafe)
     {
-        return const_cast<string &>(static_cast<const Value &>(*this).asString<isSafe>());
+        return const_cast<string &>(static_cast<const Value *>(this)->asString<isSafe>());
     }
 
     template <Safety isSafe>
     inline const string & Value::asString() const noexcept(isSafe == unsafe)
     {
         if constexpr (isSafe == safe) if (!isString()) throw TypeError{};
-        return *static_cast<const string *>(_ptr);
+        return *_string;
     }
 
     template <Safety isSafe>
-    inline int64_t & Value::asSignedInteger() noexcept(isSafe == unsafe)
+    inline int64_t & Value::asInteger() noexcept(isSafe == unsafe)
     {
-        return const_cast<int64_t &>(static_cast<const Value &>(*this).asSignedInteger<isSafe>());
+        return const_cast<int64_t &>(static_cast<const Value *>(this)->asInteger<isSafe>());
     }
 
     template <Safety isSafe>
-    inline const int64_t & Value::asSignedInteger() const noexcept(isSafe == unsafe)
+    inline const int64_t & Value::asInteger() const noexcept(isSafe == unsafe)
     {
-        if constexpr (isSafe == safe) if (!isSignedInteger()) throw TypeError{};
-        return *static_cast<const int64_t *>(_ptr);
+        if constexpr (isSafe == safe) if (!isInteger()) throw TypeError{};
+        return _integer;
     }
 
     template <Safety isSafe>
-    inline uint64_t & Value::asUnsignedInteger() noexcept(isSafe == unsafe)
+    inline uint64_t & Value::asUnsigner() noexcept(isSafe == unsafe)
     {
-        return const_cast<uint64_t &>(static_cast<const Value &>(*this).asUnsignedInteger<isSafe>());
+        return const_cast<uint64_t &>(static_cast<const Value *>(this)->asUnsigner<isSafe>());
     }
 
     template <Safety isSafe>
-    inline const uint64_t & Value::asUnsignedInteger() const noexcept(isSafe == unsafe)
+    inline const uint64_t & Value::asUnsigner() const noexcept(isSafe == unsafe)
     {
-        if constexpr (isSafe == safe) if (!isUnsignedInteger()) throw TypeError{};
-        return *static_cast<const uint64_t *>(_ptr);
+        if constexpr (isSafe == safe) if (!isUnsigner()) throw TypeError{};
+        return _unsigner;
     }
 
     template <Safety isSafe>
     inline double & Value::asFloater() noexcept(isSafe == unsafe)
     {
-        return const_cast<double &>(static_cast<const Value &>(*this).asFloater<isSafe>());
+        return const_cast<double &>(static_cast<const Value *>(this)->asFloater<isSafe>());
     }
 
     template <Safety isSafe>
     inline const double & Value::asFloater() const noexcept(isSafe == unsafe)
     {
         if constexpr (isSafe == safe) if (!isFloater()) throw TypeError{};
-        return *static_cast<const double *>(_ptr);
+        return _floater;
     }
 
     template <Safety isSafe>
     inline bool & Value::asBoolean() noexcept(isSafe == unsafe)
     {
-        return const_cast<bool &>(static_cast<const Value &>(*this).asBoolean<isSafe>());
+        return const_cast<bool &>(static_cast<const Value *>(this)->asBoolean<isSafe>());
     }
 
     template <Safety isSafe>
     inline const bool & Value::asBoolean() const noexcept(isSafe == unsafe)
     {
         if constexpr (isSafe == safe) if (!isBoolean()) throw TypeError{};
-        return *static_cast<const bool *>(_ptr);
+        return _boolean;
     }
 
     template <typename T, Safety isSafe>
@@ -906,10 +891,10 @@ namespace qc::json
         // Number
         else if constexpr (std::is_arithmetic_v<U>) {
             if constexpr (isSafe == safe) if (!is<U>()) throw TypeError{};
-            switch (_numberType) {
-                case NumberType::signedInteger: return U(asSignedInteger<unsafe>());
-                case NumberType::unsignedInteger: return U(asUnsignedInteger<unsafe>());
-                case NumberType::floater: return U(asFloater<unsafe>());
+            switch (type()) {
+                case Type::integer: return U(asInteger<unsafe>());
+                case Type::unsigner: return U(asUnsigner<unsafe>());
+                case Type::floater: return U(asFloater<unsafe>());
                 default: return {};
             }
         }
@@ -925,52 +910,52 @@ namespace qc::json
 
     inline bool Value::hasComment() const noexcept
     {
-        return bool(_comment);
+        return comment();
     }
 
     inline string * Value::comment() noexcept
     {
-        return _comment.get();
+        return const_cast<string *>(static_cast<const Value *>(this)->comment());
     }
 
     inline const string * Value::comment() const noexcept
     {
-        return _comment.get();
+        return reinterpret_cast<string *>(_typeAndComment & ~uintptr_t{0b111u});
     }
 
     inline void Value::setComment(string && str)
     {
-        if (!_comment) {
-            _comment = std::make_unique<string>(std::move(str));
-        }
-        else {
-            *_comment = std::move(str);
-        }
+        _setComment(std::move(str));
     }
 
     inline void Value::setComment(const string_view str)
     {
-        if (!_comment) {
-            _comment = std::make_unique<string>(str);
-        }
-        else {
-            *_comment = str;
-        }
+        _setComment(str);
     }
 
     inline void Value::setComment(const char * str)
     {
-        if (!_comment) {
-            _comment = std::make_unique<string>(str);
+        _setComment(str);
+    }
+
+    template <typename T>
+    inline void Value::_setComment(T && str)
+    {
+        string * const comment{this->comment()};
+        if (comment) {
+            *comment = std::forward<T>(str);
         }
         else {
-            *_comment = str;
+            _typeAndComment &= 0b111u;
+            _typeAndComment |= reinterpret_cast<uintptr_t>(new string{std::move(str)});
         }
     }
 
     inline std::unique_ptr<string> Value::removeComment() noexcept
     {
-        return std::move(_comment);
+        string * const comment{this->comment()};
+        _typeAndComment &= 0b111u;
+        return std::unique_ptr<string>{comment};
     }
 
     template <typename K, typename V, typename... MoreKVs>
@@ -1056,13 +1041,16 @@ namespace qc::json
                 encoder << val.asString<unsafe>();
                 break;
             }
-            case Type::number: {
-                switch (val.numberType()) {
-                    case NumberType::signedInteger: encoder << val.asSignedInteger<unsafe>(); break;
-                    case NumberType::unsignedInteger: encoder << val.asUnsignedInteger<unsafe>(); break;
-                    case NumberType::floater: encoder << val.asFloater<unsafe>(); break;
-                    default: break;
-                }
+            case Type::integer: {
+                encoder << val.asInteger<unsafe>();
+                break;
+            }
+            case Type::unsigner: {
+                encoder << val.asUnsigner<unsafe>();
+                break;
+            }
+            case Type::floater: {
+                encoder << val.asFloater<unsafe>();
                 break;
             }
             case Type::boolean: {

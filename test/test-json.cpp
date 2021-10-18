@@ -18,7 +18,6 @@ using namespace qc::json::tokens;
 using qc::json::Density;
 using qc::json::Safety::safe;
 using qc::json::Safety::unsafe;
-using qc::json::NumberType;
 
 struct CustomVal { int x, y; };
 
@@ -234,16 +233,16 @@ TEST(json, valueConstruction)
     EXPECT_EQ(Type::string, Value(const_cast<char *>("abc")).type());
     EXPECT_EQ(Type::string, Value('a').type());
     // Number
-    EXPECT_EQ(Type::number, Value(int64_t(0)).type());
-    EXPECT_EQ(Type::number, Value(int32_t(0)).type());
-    EXPECT_EQ(Type::number, Value(int16_t(0)).type());
-    EXPECT_EQ(Type::number, Value(int8_t(0)).type());
-    EXPECT_EQ(Type::number, Value(uint64_t(0)).type());
-    EXPECT_EQ(Type::number, Value(uint32_t(0)).type());
-    EXPECT_EQ(Type::number, Value(uint16_t(0)).type());
-    EXPECT_EQ(Type::number, Value(uint8_t(0)).type());
-    EXPECT_EQ(Type::number, Value(0.0).type());
-    EXPECT_EQ(Type::number, Value(0.0f).type());
+    EXPECT_EQ(Type::integer, Value(int64_t(0)).type());
+    EXPECT_EQ(Type::integer, Value(int32_t(0)).type());
+    EXPECT_EQ(Type::integer, Value(int16_t(0)).type());
+    EXPECT_EQ(Type::integer, Value(int8_t(0)).type());
+    EXPECT_EQ(Type::unsigner, Value(uint64_t(0)).type());
+    EXPECT_EQ(Type::unsigner, Value(uint32_t(0)).type());
+    EXPECT_EQ(Type::unsigner, Value(uint16_t(0)).type());
+    EXPECT_EQ(Type::unsigner, Value(uint8_t(0)).type());
+    EXPECT_EQ(Type::floater, Value(0.0).type());
+    EXPECT_EQ(Type::floater, Value(0.0f).type());
     // Boolean
     EXPECT_EQ(Type::boolean, Value(false).type());
     // Null
@@ -273,7 +272,6 @@ TEST(json, valueTypes)
         Value v(Object{}, Density::uniline);
         EXPECT_EQ(Type::object, v.type());
         EXPECT_EQ(Density::uniline, v.density());
-        EXPECT_EQ(NumberType::invalid, v.numberType());
         EXPECT_TRUE(v.isObject());
         EXPECT_TRUE(v.is<Object>());
         v.asObject<safe>();
@@ -283,7 +281,6 @@ TEST(json, valueTypes)
         Value v(Array{}, Density::multiline);
         EXPECT_EQ(Type::array, v.type());
         EXPECT_EQ(Density::multiline, v.density());
-        EXPECT_EQ(NumberType::invalid, v.numberType());
         EXPECT_TRUE(v.isArray());
         EXPECT_TRUE(v.is<Array>());
         v.asArray<safe>();
@@ -293,7 +290,6 @@ TEST(json, valueTypes)
         Value v("abc"sv);
         EXPECT_EQ(Type::string, v.type());
         EXPECT_EQ(Density::unspecified, v.density());
-        EXPECT_EQ(NumberType::invalid, v.numberType());
         EXPECT_TRUE(v.isString());
         EXPECT_TRUE(v.is<std::string>());
         EXPECT_TRUE(v.is<std::string_view>());
@@ -311,7 +307,6 @@ TEST(json, valueTypes)
         Value v('a');
         EXPECT_EQ(Type::string, v.type());
         EXPECT_EQ(Density::unspecified, v.density());
-        EXPECT_EQ(NumberType::invalid, v.numberType());
         EXPECT_TRUE(v.isString());
         EXPECT_TRUE(v.is<std::string>());
         EXPECT_TRUE(v.is<std::string_view>());
@@ -329,35 +324,32 @@ TEST(json, valueTypes)
     }
     { // Signed integer
         Value v(123);
-        EXPECT_EQ(Type::number, v.type());
+        EXPECT_EQ(Type::integer, v.type());
         EXPECT_EQ(Density::unspecified, v.density());
-        EXPECT_EQ(NumberType::signedInteger, v.numberType());
         EXPECT_TRUE(v.isNumber());
-        EXPECT_TRUE(v.isSignedInteger());
+        EXPECT_TRUE(v.isInteger());
         EXPECT_TRUE(v.is<int>());
-        v.asSignedInteger<safe>();
-        v.asSignedInteger<unsafe>();
+        v.asInteger<safe>();
+        v.asInteger<unsafe>();
         v.to<int, safe>();
         v.to<int, unsafe>();
     }
     { // Unsigned integer
         Value v(123u);
-        EXPECT_EQ(Type::number, v.type());
+        EXPECT_EQ(Type::unsigner, v.type());
         EXPECT_EQ(Density::unspecified, v.density());
-        EXPECT_EQ(NumberType::unsignedInteger, v.numberType());
         EXPECT_TRUE(v.isNumber());
-        EXPECT_TRUE(v.isUnsignedInteger());
+        EXPECT_TRUE(v.isUnsigner());
         EXPECT_TRUE(v.is<unsigned int>());
-        v.asUnsignedInteger<safe>();
-        v.asUnsignedInteger<unsafe>();
+        v.asUnsigner<safe>();
+        v.asUnsigner<unsafe>();
         v.to<int, safe>();
         v.to<int, unsafe>();
     }
     { // Floater
         Value v(123.0);
-        EXPECT_EQ(Type::number, v.type());
+        EXPECT_EQ(Type::floater, v.type());
         EXPECT_EQ(Density::unspecified, v.density());
-        EXPECT_EQ(NumberType::floater, v.numberType());
         EXPECT_TRUE(v.isNumber());
         EXPECT_TRUE(v.isFloater());
         EXPECT_TRUE(v.is<float>());
@@ -370,7 +362,6 @@ TEST(json, valueTypes)
         Value v(false);
         EXPECT_EQ(Type::boolean, v.type());
         EXPECT_EQ(Density::unspecified, v.density());
-        EXPECT_EQ(NumberType::invalid, v.numberType());
         EXPECT_TRUE(v.isBoolean());
         EXPECT_TRUE(v.is<bool>());
         v.asBoolean<safe>();
@@ -382,7 +373,6 @@ TEST(json, valueTypes)
         Value v(nullptr);
         EXPECT_EQ(Type::null, v.type());
         EXPECT_EQ(Density::unspecified, v.density());
-        EXPECT_EQ(NumberType::invalid, v.numberType());
         EXPECT_TRUE(v.isNull());
         v.to<nullptr_t, safe>();
         v.to<nullptr_t, unsafe>();
@@ -503,8 +493,8 @@ TEST(json, wrongValueType)
     EXPECT_THROW((Value().to<std::string_view, safe>()), TypeError);
     EXPECT_THROW((Value().to<const char *, safe>()), TypeError);
     EXPECT_THROW((Value().to<char, safe>()), TypeError);
-    EXPECT_THROW((Value().asSignedInteger<safe>()), TypeError);
-    EXPECT_THROW((Value().asUnsignedInteger<safe>()), TypeError);
+    EXPECT_THROW((Value().asInteger<safe>()), TypeError);
+    EXPECT_THROW((Value().asUnsigner<safe>()), TypeError);
     EXPECT_THROW((Value().asFloater<safe>()), TypeError);
     EXPECT_THROW((Value().to<int64_t, safe>()), TypeError);
     EXPECT_THROW((Value().to<int32_t, safe>()), TypeError);
@@ -529,8 +519,8 @@ TEST(json, wrongValueType)
     //Value().to<std::string_view, unsafe>();
     //Value().to<const char *, unsafe>();
     //Value().to<char, unsafe>();
-    Value().asSignedInteger<unsafe>();
-    Value().asUnsignedInteger<unsafe>();
+    Value().asInteger<unsafe>();
+    Value().asUnsigner<unsafe>();
     Value().asFloater<unsafe>();
     Value(true).to<int64_t, unsafe>();
     Value(true).to<int32_t, unsafe>();
@@ -566,7 +556,7 @@ TEST(json, makeObject)
         EXPECT_EQ(1u, obj2.size());
         const Object & innerObj{obj2.at("d").asObject()};
         EXPECT_EQ(3u, innerObj.size());
-        EXPECT_EQ(1, innerObj.at("a").asSignedInteger());
+        EXPECT_EQ(1, innerObj.at("a").asInteger());
         EXPECT_EQ(2.0, innerObj.at("b").asFloater());
         EXPECT_EQ(true, innerObj.at("c").asBoolean());
     }
@@ -586,7 +576,7 @@ TEST(json, makeArray)
         EXPECT_EQ("ok", arr2[0].asString());
         EXPECT_EQ(3u, arr2[1].asArray().size());
         EXPECT_EQ(3u, arr2[1].asArray().capacity());
-        EXPECT_EQ(1, arr2[1].asArray()[0].asSignedInteger());
+        EXPECT_EQ(1, arr2[1].asArray()[0].asInteger());
         EXPECT_EQ(2.0, arr2[1].asArray()[1].asFloater());
         EXPECT_EQ(true, arr2[1].asArray()[2].asBoolean());
     }
