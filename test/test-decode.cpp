@@ -14,7 +14,7 @@ using namespace std::string_view_literals;
 using qc::json::decode;
 using qc::json::DecodeError;
 using qc::json::Density;
-using qc::json::Scope;
+using qc::json::Container;
 
 static qc::json::DummyComposer dummyComposer{};
 
@@ -48,17 +48,17 @@ class ExpectantComposer
 
     using Element = std::variant<Object, Array, End, Key, String, SignedInteger, UnsignedInteger, Floater, Boolean, Null, Comment>;
 
-    std::nullptr_t object(Scope, std::nullptr_t) { assertNextIs(Object{}); return nullptr; }
-    std::nullptr_t array(Scope, std::nullptr_t) { assertNextIs(Array{}); return nullptr; }
-    void end(Scope, Density d, std::nullptr_t, std::nullptr_t) { assertNextIs(End{d}); }
-    void key(std::string_view k, Scope, std::nullptr_t) { assertNextIs(Key{k}); }
-    void val(std::string_view v, Scope, std::nullptr_t) { assertNextIs(String{v}); }
-    void val(int64_t v, Scope, std::nullptr_t) { assertNextIs(SignedInteger{v}); }
-    void val(uint64_t v, Scope, std::nullptr_t) { assertNextIs(UnsignedInteger{v}); }
-    void val(double v, Scope, std::nullptr_t) { assertNextIs(Floater{v}); }
-    void val(bool v, Scope, std::nullptr_t) { assertNextIs(Boolean{v}); }
-    void val(std::nullptr_t, Scope, std::nullptr_t) { assertNextIs(Null{}); }
-    void comment(std::string_view str, Scope, std::nullptr_t) { assertNextIs(Comment{str}); }
+    std::nullptr_t object(std::nullptr_t) { assertNextIs(Object{}); return nullptr; }
+    std::nullptr_t array(std::nullptr_t) { assertNextIs(Array{}); return nullptr; }
+    void end(Density d, std::nullptr_t, std::nullptr_t) { assertNextIs(End{d}); }
+    void key(std::string_view k, std::nullptr_t) { assertNextIs(Key{k}); }
+    void val(std::string_view v, std::nullptr_t) { assertNextIs(String{v}); }
+    void val(int64_t v, std::nullptr_t) { assertNextIs(SignedInteger{v}); }
+    void val(uint64_t v, std::nullptr_t) { assertNextIs(UnsignedInteger{v}); }
+    void val(double v, std::nullptr_t) { assertNextIs(Floater{v}); }
+    void val(bool v, std::nullptr_t) { assertNextIs(Boolean{v}); }
+    void val(std::nullptr_t, std::nullptr_t) { assertNextIs(Null{}); }
+    void comment(std::string_view str, std::nullptr_t) { assertNextIs(Comment{str}); }
 
     ExpectantComposer & expectObject() { m_sequence.emplace_back(Object{}); return *this; }
     ExpectantComposer & expectArray() { m_sequence.emplace_back(Array{}); return *this; }

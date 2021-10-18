@@ -45,6 +45,16 @@ namespace qc::json
     };
 
     ///
+    /// Simple enum representing a json container type
+    ///
+    enum class Container : int8_t
+    {
+        none,
+        object,
+        array
+    };
+
+    ///
     /// Pass with an object or array to specify its density
     ///
     enum class Density : int8_t
@@ -66,16 +76,6 @@ namespace qc::json
     struct EncodeError : Error
     {
         explicit EncodeError(const string_view msg) noexcept;
-    };
-
-    ///
-    /// Simple enum representing a json container type
-    ///
-    enum class Container : int8_t
-    {
-        none,
-        object,
-        array
     };
 
     // This weird struct/operator()/variable setup allows for both ` << object ` and ` << object(density) `

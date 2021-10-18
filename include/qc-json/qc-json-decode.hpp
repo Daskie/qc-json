@@ -45,6 +45,16 @@ namespace qc::json
     };
 
     ///
+    /// Simple enum representing a json container type
+    ///
+    enum class Container : int8_t
+    {
+        none,
+        object,
+        array
+    };
+
+    ///
     /// Pass with an object or array to specify its density
     ///
     enum class Density : int8_t
@@ -68,14 +78,6 @@ namespace qc::json
         size_t position; /// The index into the string where the error occurred
 
         DecodeError(const string_view msg, size_t position) noexcept;
-    };
-
-    // TODO: replace with container
-    enum class Scope
-    {
-        root,
-        object,
-        array
     };
 
     ///
@@ -104,17 +106,17 @@ namespace qc::json
     {
         public: //--------------------------------------------------------------
 
-        State object(const Scope /*outerScope*/, State & /*outerState*/) { return State{}; }
-        State array(const Scope /*outerScope*/, State & /*outerState*/) { return State{}; }
-        void end(const Scope /*innerScope*/, const Density /*density*/, State && /*innerState*/, State & /*outerState*/) {}
-        void key(const std::string_view /*key*/, const Scope /*scope*/, State & /*state*/) {}
-        void val(const std::string_view /*val*/, const Scope /*scope*/, State & /*state*/) {}
-        void val(const int64_t /*val*/, const Scope /*scope*/, State & /*state*/) {}
-        void val(const uint64_t /*val*/, const Scope /*scope*/, State & /*state*/) {}
-        void val(const double /*val*/, const Scope /*scope*/, State & /*state*/) {}
-        void val(const bool /*val*/, const Scope /*scope*/, State & /*state*/) {}
-        void val(const std::nullptr_t, const Scope /*scope*/, State & /*state*/) {}
-        void comment(const std::string_view /*comment*/, const Scope /*scope*/, State & /*state*/) {}
+        State object(State & /*outerState*/) { return State{}; }
+        State array(State & /*outerState*/) { return State{}; }
+        void end(const Density /*density*/, State && /*innerState*/, State & /*outerState*/) {}
+        void key(const std::string_view /*key*/, State & /*state*/) {}
+        void val(const std::string_view /*val*/, State & /*state*/) {}
+        void val(const int64_t /*val*/, State & /*state*/) {}
+        void val(const uint64_t /*val*/, State & /*state*/) {}
+        void val(const double /*val*/, State & /*state*/) {}
+        void val(const bool /*val*/, State & /*state*/) {}
+        void val(const std::nullptr_t, State & /*state*/) {}
+        void comment(const std::string_view /*comment*/, State & /*state*/) {}
     };
 }
 
@@ -149,13 +151,13 @@ namespace qc::json
 
         void operator()(State & initialState)
         {
-            _skipSpaceAndIngestComments(Scope::root, initialState);
-            _ingestValue(Scope::root, initialState);
-            _skipSpaceAndIngestComments(Scope::root, initialState);
+            _skipSpaceAndIngestComments(initialState);
+            _ingestValue(initialState);
+            _skipSpaceAndIngestComments(initialState);
 
             // Allow trailing comma
             if (_tryConsumeChar(',')) {
-                _skipSpaceAndIngestComments(Scope::root, initialState);
+                _skipSpaceAndIngestComments(initialState);
             }
 
             if (_pos != _end) {
@@ -191,7 +193,7 @@ namespace qc::json
             return density;
         }
 
-        Density _ingestLineComment(bool concat, const Scope scope, State & state)
+        Density _ingestLineComment(bool concat, State & state)
         {
             // We already know we have `//`
             _pos += 2;
@@ -241,23 +243,23 @@ namespace qc::json
                     _stringBuffer.assign(commentStart, commentEnd);
                 }
 
-                _ingestLineComment(true, scope, state);
+                _ingestLineComment(true, state);
 
                 if (!concat) {
-                    _composer.comment(string_view{_stringBuffer}, scope, state);
+                    _composer.comment(string_view{_stringBuffer}, state);
                 }
             }
             // This is the end of the comment
             else {
                 if (!concat) {
-                    _composer.comment(string_view{commentStart, size_t(commentEnd - commentStart)}, scope, state);
+                    _composer.comment(string_view{commentStart, size_t(commentEnd - commentStart)}, state);
                 }
             }
 
             return density;
         }
 
-        void _ingestBlockComment(const Scope scope, State & state)
+        void _ingestBlockComment(State & state)
         {
             // We already know we have `/*`
             _pos += 2;
@@ -283,14 +285,14 @@ namespace qc::json
                     --commentEnd;
                 }
 
-                _composer.comment(string_view{commentStart, size_t(commentEnd - commentStart)}, scope, state);
+                _composer.comment(string_view{commentStart, size_t(commentEnd - commentStart)}, state);
             }
             else {
                 throw DecodeError{"Block comment is unterminated"sv, size_t(commentStart - 2 - _start)};
             }
         }
 
-        Density _skipSpaceAndIngestComments(const Scope scope, State & state)
+        Density _skipSpaceAndIngestComments(State & state)
         {
             // Skip whitespace
             Density density{_skipWhitespace()};
@@ -300,13 +302,13 @@ namespace qc::json
                 if (_pos + 1 < _end && _pos[0] == '/') {
                     // Ingest line comment
                     if (_pos[1] == '/') {
-                        density &= _ingestLineComment(false, scope, state);
+                        density &= _ingestLineComment(false, state);
                         // `_ingesetLineComment` skips trailing whitespace already
                         continue;
                     }
                     // Ingest block comment
                     else if (_pos[1] == '*') {
-                        _ingestBlockComment(scope, state);
+                        _ingestBlockComment(state);
                         // Skip whitespace
                         density &= _skipWhitespace();
                         continue;
@@ -360,7 +362,7 @@ namespace qc::json
             }
         }
 
-        void _ingestValue(const Scope scope, State & state)
+        void _ingestValue(State & state)
         {
             if (_pos >= _end) {
                 throw DecodeError{"Expected value"sv, size_t(_pos - _start)};
@@ -372,19 +374,19 @@ namespace qc::json
 
             switch (c) {
                 case '{': {
-                    _ingestObject(scope, state);
+                    _ingestObject(state);
                     return;
                 }
                 case '[': {
-                    _ingestArray(scope, state);
+                    _ingestArray(state);
                     return;
                 }
                 case '"': {
-                    _ingestString('"', scope, state);
+                    _ingestString('"', state);
                     return;
                 }
                 case '\'': {
-                    _ingestString('\'', scope, state);
+                    _ingestString('\'', state);
                     return;
                 }
             }
@@ -403,15 +405,15 @@ namespace qc::json
             else {
                 // There was no sign, so we can check the non-number keywords
                 if (_tryConsumeChars("true"sv)) {
-                    _composer.val(true, scope, state);
+                    _composer.val(true, state);
                     return;
                 }
                 else if (_tryConsumeChars("false"sv)) {
-                    _composer.val(false, scope, state);
+                    _composer.val(false, state);
                     return;
                 }
                 else if (_tryConsumeChars("null"sv)) {
-                    _composer.val(nullptr, scope, state);
+                    _composer.val(nullptr, state);
                     return;
                 }
             }
@@ -419,15 +421,15 @@ namespace qc::json
             // At this point, we know it is a number (or invalid)
 
             if (std::isdigit(uchar(c)) || (c == '.' && _pos + 1 < _end && std::isdigit(_pos[1]))) {
-                _ingestNumber(sign, scope, state);
+                _ingestNumber(sign, state);
                 return;
             }
             else if (_tryConsumeChars("nan"sv) || _tryConsumeChars("NaN"sv)) {
-                _composer.val(std::numeric_limits<double>::quiet_NaN(), scope, state);
+                _composer.val(std::numeric_limits<double>::quiet_NaN(), state);
                 return;
             }
             else if (_tryConsumeChars("inf"sv) || _tryConsumeChars("Infinity"sv)){
-                _composer.val(sign < 0 ? -std::numeric_limits<double>::infinity() : std::numeric_limits<double>::infinity(), scope, state);
+                _composer.val(sign < 0 ? -std::numeric_limits<double>::infinity() : std::numeric_limits<double>::infinity(), state);
                 return;
             }
 
@@ -435,12 +437,12 @@ namespace qc::json
             throw DecodeError{"Unknown value"sv, size_t(_pos - _start)};
         }
 
-        void _ingestObject(const Scope outerScope, State & outerState)
+        void _ingestObject(State & outerState)
         {
-            State innerState{_composer.object(outerScope, outerState)};
+            State innerState{_composer.object(outerState)};
 
             ++_pos; // We already know we have `{`
-            Density density{_skipSpaceAndIngestComments(Scope::object, innerState)};
+            Density density{_skipSpaceAndIngestComments(innerState)};
 
             if (!_tryConsumeChar('}')) {
                 while (true) {
@@ -450,21 +452,21 @@ namespace qc::json
                     }
                     const char c{*_pos};
                     const string_view key{(c == '"' || c == '\'') ? _consumeString(c) : _consumeIdentifier()};
-                    _composer.key(key, Scope::object, innerState);
-                    density &= _skipSpaceAndIngestComments(Scope::object, innerState);
+                    _composer.key(key, innerState);
+                    density &= _skipSpaceAndIngestComments(innerState);
 
                     _consumeChar(':');
-                    density &= _skipSpaceAndIngestComments(Scope::object, innerState);
+                    density &= _skipSpaceAndIngestComments(innerState);
 
-                    _ingestValue(Scope::object, innerState);
-                    density &= _skipSpaceAndIngestComments(Scope::object, innerState);
+                    _ingestValue(innerState);
+                    density &= _skipSpaceAndIngestComments(innerState);
 
                     if (_tryConsumeChar('}')) {
                         break;
                     }
                     else {
                         _consumeChar(',');
-                        density &= _skipSpaceAndIngestComments(Scope::object, innerState);
+                        density &= _skipSpaceAndIngestComments(innerState);
 
                         // Allow trailing comma
                         if (_tryConsumeChar('}')) {
@@ -474,27 +476,27 @@ namespace qc::json
                 }
             }
 
-            _composer.end(Scope::object, density, std::move(innerState), outerState);
+            _composer.end(density, std::move(innerState), outerState);
         }
 
-        void _ingestArray(const Scope outerScope, State & outerState)
+        void _ingestArray(State & outerState)
         {
-            State innerState{_composer.array(outerScope, outerState)};
+            State innerState{_composer.array(outerState)};
 
             ++_pos; // We already know we have `[`
-            Density density{_skipSpaceAndIngestComments(Scope::array, innerState)};
+            Density density{_skipSpaceAndIngestComments(innerState)};
 
             if (!_tryConsumeChar(']')) {
                 while (true) {
-                    _ingestValue(Scope::array, innerState);
-                    density &= _skipSpaceAndIngestComments(Scope::array, innerState);
+                    _ingestValue(innerState);
+                    density &= _skipSpaceAndIngestComments(innerState);
 
                     if (_tryConsumeChar(']')) {
                         break;
                     }
                     else {
                         _consumeChar(',');
-                        density &= _skipSpaceAndIngestComments(Scope::array, innerState);
+                        density &= _skipSpaceAndIngestComments(innerState);
 
                         // Allow trailing comma
                         if (_tryConsumeChar(']')) {
@@ -504,12 +506,12 @@ namespace qc::json
                 }
             }
 
-            _composer.end(Scope::array, density, std::move(innerState), outerState);
+            _composer.end(density, std::move(innerState), outerState);
         }
 
-        void _ingestString(const char quote, const Scope scope, State & state)
+        void _ingestString(const char quote, State & state)
         {
-            _composer.val(_consumeString(quote), scope, state);
+            _composer.val(_consumeString(quote), state);
         }
 
         string_view _consumeString(const char quote)
@@ -662,7 +664,7 @@ namespace qc::json
             }
         }
 
-        void _ingestNumber(const int sign, const Scope scope, State & state)
+        void _ingestNumber(const int sign, State & state)
         {
             // Check if hex/octal/binary
             if (*_pos == '0' && _pos + 1 < _end) {
@@ -678,7 +680,7 @@ namespace qc::json
                         throw DecodeError{"Hex, octal, and binary numbers must not be signed"sv, size_t(_pos - _start)};
                     }
                     _pos += 2;
-                    _ingestHexOctalBinary(base, scope, state);
+                    _ingestHexOctalBinary(base, state);
                     return;
                 }
             }
@@ -686,18 +688,18 @@ namespace qc::json
             // Determine if integer or floater
             if (size_t length{_isInteger()}; length) {
                 if (sign < 0) {
-                    _ingestInteger<true>(length, scope, state);
+                    _ingestInteger<true>(length, state);
                 }
                 else {
-                    _ingestInteger<false>(length, scope, state);
+                    _ingestInteger<false>(length, state);
                 }
             }
             else {
-                _ingestFloater(sign < 0, scope, state);
+                _ingestFloater(sign < 0, state);
             }
         }
 
-        void _ingestHexOctalBinary(const int base, const Scope scope, State & state)
+        void _ingestHexOctalBinary(const int base, State & state)
         {
             uint64_t val;
             const std::from_chars_result res{std::from_chars(_pos, _end, val, base)};
@@ -709,11 +711,11 @@ namespace qc::json
 
             _pos = res.ptr;
 
-            _composer.val(val, scope, state);
+            _composer.val(val, state);
         }
 
         template <bool negative>
-        void _ingestInteger(const size_t length, const Scope scope, State & state)
+        void _ingestInteger(const size_t length, State & state)
         {
             std::conditional_t<negative, int64_t, uint64_t> val;
 
@@ -728,7 +730,7 @@ namespace qc::json
                 if (res.ec != std::errc{}) {
                     // If too large, parse as a floater instead
                     if (res.ec == std::errc::result_out_of_range) {
-                        _ingestFloater(negative, scope, state);
+                        _ingestFloater(negative, state);
                         return;
                     }
                     // Some other issue
@@ -743,15 +745,15 @@ namespace qc::json
             // If unsigned and the most significant bit is not set, we default to reporting it as signed
             if constexpr (!negative) {
                 if (!(val & 0x8000000000000000u)) {
-                    _composer.val(int64_t(val), scope, state);
+                    _composer.val(int64_t(val), state);
                     return;
                 }
             }
 
-            _composer.val(val, scope, state);
+            _composer.val(val, state);
         }
 
-        void _ingestFloater(const bool negative, const Scope scope, State & state)
+        void _ingestFloater(const bool negative, State & state)
         {
             double val;
             const std::from_chars_result res{std::from_chars(_pos - negative, _end, val)};
@@ -762,7 +764,7 @@ namespace qc::json
             }
 
             _pos = res.ptr;
-            _composer.val(val, scope, state);
+            _composer.val(val, state);
         }
     };
 
@@ -771,17 +773,17 @@ namespace qc::json
         position{position}
     {}
 
-    template <typename Composer, typename State> concept _ComposerHasObjectMethod = requires (Composer composer, const Scope scope, State state) { composer.object(scope, state); };
-    template <typename Composer, typename State> concept _ComposerHasArrayMethod = requires (Composer composer, const Scope scope, State state) { composer.array(scope, state); };
-    template <typename Composer, typename State> concept _ComposerHasEndMethod = requires (Composer composer, const Scope scope, const Density density, State innerState, State outerState) { composer.end(scope, density, std::move(innerState), outerState); };
-    template <typename Composer, typename State> concept _ComposerHasKeyMethod = requires (Composer composer, const std::string_view key, const Scope scope, State state) { composer.key(key, scope, state); };
-    template <typename Composer, typename State> concept _ComposerHasStringValMethod = requires (Composer composer, const std::string_view val, const Scope scope, State state) { composer.val(val, scope, state); };
-    template <typename Composer, typename State> concept _ComposerHasSignedIntegerValMethod = requires (Composer composer, const int64_t val, const Scope scope, State state) { composer.val(val, scope, state); };
-    template <typename Composer, typename State> concept _ComposerHasUnsignedIntegerValMethod = requires (Composer composer, const uint64_t val, const Scope scope, State state) { composer.val(val, scope, state); };
-    template <typename Composer, typename State> concept _ComposerHasFloaterValMethod = requires (Composer composer, const double val, const Scope scope, State state) { composer.val(val, scope, state); };
-    template <typename Composer, typename State> concept _ComposerHasBooleanValMethod = requires (Composer composer, const bool val, const Scope scope, State state) { composer.val(val, scope, state); };
-    template <typename Composer, typename State> concept _ComposerHasNullValMethod = requires (Composer composer, const Scope scope, State state) { composer.val(nullptr, scope, state); };
-    template <typename Composer, typename State> concept _ComposerHasCommentMethod = requires (Composer composer, const string_view comment, const Scope scope, State state) { composer.comment(comment, scope, state); };
+    template <typename Composer, typename State> concept _ComposerHasObjectMethod = requires (Composer composer, State state) { State{composer.object(state)}; };
+    template <typename Composer, typename State> concept _ComposerHasArrayMethod = requires (Composer composer, State state) { State{composer.array(state)}; };
+    template <typename Composer, typename State> concept _ComposerHasEndMethod = requires (Composer composer, const Density density, State innerState, State outerState) { composer.end(density, std::move(innerState), outerState); };
+    template <typename Composer, typename State> concept _ComposerHasKeyMethod = requires (Composer composer, const std::string_view key, State state) { composer.key(key, state); };
+    template <typename Composer, typename State> concept _ComposerHasStringValMethod = requires (Composer composer, const std::string_view val, State state) { composer.val(val, state); };
+    template <typename Composer, typename State> concept _ComposerHasSignedIntegerValMethod = requires (Composer composer, const int64_t val, State state) { composer.val(val, state); };
+    template <typename Composer, typename State> concept _ComposerHasUnsignedIntegerValMethod = requires (Composer composer, const uint64_t val, State state) { composer.val(val, state); };
+    template <typename Composer, typename State> concept _ComposerHasFloaterValMethod = requires (Composer composer, const double val, State state) { composer.val(val, state); };
+    template <typename Composer, typename State> concept _ComposerHasBooleanValMethod = requires (Composer composer, const bool val, State state) { composer.val(val, state); };
+    template <typename Composer, typename State> concept _ComposerHasNullValMethod = requires (Composer composer, State state) { composer.val(nullptr, state); };
+    template <typename Composer, typename State> concept _ComposerHasCommentMethod = requires (Composer composer, const string_view comment, State state) { composer.comment(comment, state); };
 
     template <typename Composer, typename State>
     inline void decode(string_view json, Composer & composer, State initialState)

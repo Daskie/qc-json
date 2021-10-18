@@ -400,64 +400,66 @@ namespace qc::json
     {
         public: //--------------------------------------------------------------
 
-        Value * object(const Scope outerScope, Value * const outerNode)
+        struct State { Value * node; Container container; };
+
+        State object(State & outerState)
         {
             Value * innerNode;
 
-            switch (outerScope) {
-                case Scope::object:
-                    innerNode = &outerNode->asObject<unsafe>().emplace(std::move(_key), Object{}).first->second;
+            switch (outerState.container) {
+                case Container::object:
+                    innerNode = &outerState.node->asObject<unsafe>().emplace(std::move(_key), Object{}).first->second;
                     break;
-                case Scope::array:
-                    innerNode = &outerNode->asArray<unsafe>().emplace_back(Object{});
+                case Container::array:
+                    innerNode = &outerState.node->asArray<unsafe>().emplace_back(Object{});
                     break;
                 default:
-                    *outerNode = Object{};
-                    innerNode = outerNode;
+                    *outerState.node = Object{};
+                    innerNode = outerState.node;
             }
 
             if (!_comment.empty()) {
                 innerNode->setComment(std::move(_comment));
             }
 
-            return innerNode;
+            return {innerNode, Container::object};
         }
 
-        Value * array(const Scope outerScope, Value * const outerNode)
+        State array(State & outerState)
         {
             Value * innerNode;
 
-            switch (outerScope) {
-                case Scope::object:
-                    innerNode = &outerNode->asObject<unsafe>().emplace(std::move(_key), Array{}).first->second;
+            switch (outerState.container) {
+                case Container::object:
+                    innerNode = &outerState.node->asObject<unsafe>().emplace(std::move(_key), Array{}).first->second;
                     break;
-                case Scope::array:
-                    innerNode = &outerNode->asArray<unsafe>().emplace_back(Array{});
+                case Container::array:
+                    innerNode = &outerState.node->asArray<unsafe>().emplace_back(Array{});
                     break;
                 default:
-                    *outerNode = Array{};
-                    innerNode = outerNode;
+                    *outerState.node = Array{};
+                    innerNode = outerState.node;
             }
 
             if (!_comment.empty()) {
                 innerNode->setComment(std::move(_comment));
             }
 
-            return innerNode;
+            return {innerNode, Container::array};
         }
 
-        void key(const string_view k, const Scope, Value * const)
+        void key(const string_view k, State & /*state*/)
         {
             _key = k;
         }
 
-        void end(const Scope innerScope, const Density density, Value * const innerNode, Value * const) {
-            switch (innerScope) {
-                case Scope::object:
-                    innerNode->setDensity(density);
+        void end(const Density density, State && innerState, State & /*outerState*/) {
+            switch (innerState.container) {
+                case Container::object:
+                    innerState.node->setDensity(density);
                     break;
-                case Scope::array:
-                    innerNode->setDensity(density);
+                case Container::array:
+                    innerState.node->setDensity(density);
                     break;
                 default:
                     break;
@@ -467,20 +469,20 @@ namespace qc::json
         }
 
         template <typename T>
-        void val(const T v, const Scope scope, Value * const node)
+        void val(const T v, State & state)
         {
             Value * composedVal;
 
-            switch (scope) {
-                case Scope::object:
-                    composedVal = &node->asObject<unsafe>().emplace(std::move(_key), v).first->second;
+            switch (state.container) {
+                case Container::object:
+                    composedVal = &state.node->asObject<unsafe>().emplace(std::move(_key), v).first->second;
                     break;
-                case Scope::array:
-                    composedVal = &node->asArray<unsafe>().emplace_back(v);
+                case Container::array:
+                    composedVal = &state.node->asArray<unsafe>().emplace_back(v);
                     break;
                 default:
-                    *node = v;
-                    composedVal = node;
+                    *state.node = v;
+                    composedVal = state.node;
             }
 
             if (!_comment.empty()) {
@@ -488,7 +490,7 @@ namespace qc::json
             }
         }
 
-        void comment(const string_view comment, const Scope, Value * const)
+        void comment(const string_view comment, State & /*state*/)
         {
             if (_comment.empty()) {
                 _comment = comment;
@@ -992,9 +994,10 @@ namespace qc::json
 
     inline Value decode(const string_view json)
     {
-        Value root;
-        _Composer composer;
-        decode(json, composer, &root);
+        Value root{};
+        _Composer::State rootState{&root, Container::none};
+        _Composer composer{};
+        decode(json, composer, rootState);
         return root;
     }
 
