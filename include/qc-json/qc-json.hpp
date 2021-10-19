@@ -257,8 +257,8 @@ namespace qc::json
         bool isNull() const noexcept;
 
         ///
-        /// Determines if the value type is compatible with `T`, which is to say calling `to<T>()` would be valid. See
-        /// the `to` method docs below for more details
+        /// Determines if the value type is compatible with `T`, which is to say calling `get<T>()` would be valid. See
+        /// the `get` method docs below for more details
         ///
         /// @tparam T the type in question, e.g. `int` or `std::string`
         /// @return whether the value type is compatible with type `T`
@@ -352,7 +352,7 @@ namespace qc::json
         /// If `T` is an unrecognized type, then we attempt to use the specialized `qc::json::valueTo` struct, details
         /// of which can be found below
         ///
-        template <typename T, Safety isSafe = safe> T to() const;
+        template <typename T, Safety isSafe = safe> T get() const;
 
         ///
         /// @return whether the value has a comment
@@ -1086,7 +1086,7 @@ namespace qc::json
     }
 
     template <typename T, Safety isSafe>
-    inline T Value::to() const
+    inline T Value::get() const
     {
         using U = std::decay_t<T>;
 

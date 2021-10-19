@@ -32,7 +32,7 @@ struct qc::json::valueTo<CustomVal, isSafe>
     CustomVal operator()(const Value & val) const
     {
         const Array & arr{val.asArray<isSafe>()};
-        return {arr.at(0).to<int, isSafe>(), arr.at(1).to<int, isSafe>()};
+        return {arr.at(0).get<int, isSafe>(), arr.at(1).get<int, isSafe>()};
     }
 };
 
@@ -73,43 +73,43 @@ TEST(json, encodeDecodeSignedInteger)
 {
     { // Zero
         int val{0};
-        EXPECT_EQ(val, decode(encode(val)).to<int>());
+        EXPECT_EQ(val, decode(encode(val)).get<int>());
     }
     { // Typical
         int val{123};
-        EXPECT_EQ(val, decode(encode(val)).to<int>());
+        EXPECT_EQ(val, decode(encode(val)).get<int>());
     }
     { // Max 64
         int64_t val{std::numeric_limits<int64_t>::max()};
-        EXPECT_EQ(val, decode(encode(val)).to<int64_t>());
+        EXPECT_EQ(val, decode(encode(val)).get<int64_t>());
     }
     { // Min 64
         int64_t val{std::numeric_limits<int64_t>::min()};
-        EXPECT_EQ(val, decode(encode(val)).to<int64_t>());
+        EXPECT_EQ(val, decode(encode(val)).get<int64_t>());
     }
     { // Max 32
         int32_t val{std::numeric_limits<int32_t>::max()};
-        EXPECT_EQ(val, decode(encode(val)).to<int32_t>());
+        EXPECT_EQ(val, decode(encode(val)).get<int32_t>());
     }
     { // Min 32
         int32_t val{std::numeric_limits<int32_t>::min()};
-        EXPECT_EQ(val, decode(encode(val)).to<int32_t>());
+        EXPECT_EQ(val, decode(encode(val)).get<int32_t>());
     }
     { // Max 16
         int16_t val{std::numeric_limits<int16_t>::max()};
-        EXPECT_EQ(val, decode(encode(val)).to<int16_t>());
+        EXPECT_EQ(val, decode(encode(val)).get<int16_t>());
     }
     { // Min 16
         int16_t val{std::numeric_limits<int16_t>::min()};
-        EXPECT_EQ(val, decode(encode(val)).to<int16_t>());
+        EXPECT_EQ(val, decode(encode(val)).get<int16_t>());
     }
     { // Max 8
         int8_t val{std::numeric_limits<int8_t>::max()};
-        EXPECT_EQ(val, decode(encode(val)).to<int8_t>());
+        EXPECT_EQ(val, decode(encode(val)).get<int8_t>());
     }
     { // Min 8
         int8_t val{std::numeric_limits<int8_t>::min()};
-        EXPECT_EQ(val, decode(encode(val)).to<int8_t>());
+        EXPECT_EQ(val, decode(encode(val)).get<int8_t>());
     }
 }
 
@@ -117,27 +117,27 @@ TEST(json, encodeDecodeUnsignedInteger)
 {
     { // Zero
         unsigned int val{0u};
-        EXPECT_EQ(val, decode(encode(val)).to<unsigned int>());
+        EXPECT_EQ(val, decode(encode(val)).get<unsigned int>());
     }
     { // Typical
         unsigned int val{123u};
-        EXPECT_EQ(val, decode(encode(val)).to<unsigned int>());
+        EXPECT_EQ(val, decode(encode(val)).get<unsigned int>());
     }
     { // Max 64
         uint64_t val{std::numeric_limits<uint64_t>::max()};
-        EXPECT_EQ(val, decode(encode(val)).to<uint64_t>());
+        EXPECT_EQ(val, decode(encode(val)).get<uint64_t>());
     }
     { // Max 32
         uint32_t val{std::numeric_limits<uint32_t>::max()};
-        EXPECT_EQ(val, decode(encode(val)).to<uint32_t>());
+        EXPECT_EQ(val, decode(encode(val)).get<uint32_t>());
     }
     { // Max 16
         uint16_t val{std::numeric_limits<uint16_t>::max()};
-        EXPECT_EQ(val, decode(encode(val)).to<uint16_t>());
+        EXPECT_EQ(val, decode(encode(val)).get<uint16_t>());
     }
     { // Max 8
         uint8_t val{std::numeric_limits<uint8_t>::max()};
-        EXPECT_EQ(val, decode(encode(val)).to<uint8_t>());
+        EXPECT_EQ(val, decode(encode(val)).get<uint8_t>());
     }
 }
 
@@ -148,54 +148,54 @@ TEST(json, encodeDecodeFloater)
 
     { // Zero
         double val{0.0};
-        EXPECT_EQ(val, decode(encode(val)).to<double>());
+        EXPECT_EQ(val, decode(encode(val)).get<double>());
     }
     { // Typical
         double val{123.45};
-        EXPECT_EQ(val, decode(encode(val)).to<double>());
+        EXPECT_EQ(val, decode(encode(val)).get<double>());
     }
     { // Max integer 64
         double val{reinterpret_cast<const double &>(val64 = 0b0'10000110011'1111111111111111111111111111111111111111111111111111u)};
-        EXPECT_EQ(val, decode(encode(val)).to<double>());
+        EXPECT_EQ(val, decode(encode(val)).get<double>());
     }
     { // Max integer 32
         double val{reinterpret_cast<const float &>(val32 = 0b0'10010110'11111111111111111111111u)};
-        EXPECT_EQ(val, decode(encode(val)).to<double>());
+        EXPECT_EQ(val, decode(encode(val)).get<double>());
     }
     { // Max 64
         double val{reinterpret_cast<const double &>(val64 = 0b0'11111111110'1111111111111111111111111111111111111111111111111111u)};
-        EXPECT_EQ(val, decode(encode(val)).to<double>());
+        EXPECT_EQ(val, decode(encode(val)).get<double>());
     }
     { // Max 32
         double val{reinterpret_cast<const float &>(val32 = 0b0'11111110'11111111111111111111111u)};
-        EXPECT_EQ(val, decode(encode(val)).to<double>());
+        EXPECT_EQ(val, decode(encode(val)).get<double>());
     }
     { // Min normal 64
         double val{reinterpret_cast<const double &>(val64 = 0b0'00000000001'0000000000000000000000000000000000000000000000000000u)};
-        EXPECT_EQ(val, decode(encode(val)).to<double>());
+        EXPECT_EQ(val, decode(encode(val)).get<double>());
     }
     { // Min normal 32
         double val{reinterpret_cast<const float &>(val32 = 0b0'00000001'00000000000000000000000u)};
-        EXPECT_EQ(val, decode(encode(val)).to<double>());
+        EXPECT_EQ(val, decode(encode(val)).get<double>());
     }
     { // Min subnormal 64
         double val{reinterpret_cast<const double &>(val64 = 0b0'00000000000'0000000000000000000000000000000000000000000000000001u)};
-        EXPECT_EQ(val, decode(encode(val)).to<double>());
+        EXPECT_EQ(val, decode(encode(val)).get<double>());
     }
     { // Min subnormal 32
         double val{reinterpret_cast<const float &>(val32 = 0b0'00000000'00000000000000000000001u)};
-        EXPECT_EQ(val, decode(encode(val)).to<double>());
+        EXPECT_EQ(val, decode(encode(val)).get<double>());
     }
     { // Positive infinity
         double val{std::numeric_limits<double>::infinity()};
-        EXPECT_EQ(val, decode(encode(val)).to<double>());
+        EXPECT_EQ(val, decode(encode(val)).get<double>());
     }
     { // Negative infinity
         double val{-std::numeric_limits<double>::infinity()};
-        EXPECT_EQ(val, decode(encode(val)).to<double>());
+        EXPECT_EQ(val, decode(encode(val)).get<double>());
     }
     { // NaN
-        EXPECT_TRUE(std::isnan(decode(encode(std::numeric_limits<double>::quiet_NaN())).to<double>()));
+        EXPECT_TRUE(std::isnan(decode(encode(std::numeric_limits<double>::quiet_NaN())).get<double>()));
     }
 }
 
@@ -215,7 +215,7 @@ TEST(json, encodeDecodeNull)
 TEST(json, encodeDecodeCustom)
 {
     CustomVal val{1, 2};
-    EXPECT_EQ(val, decode(encode(val)).to<CustomVal>());
+    EXPECT_EQ(val, decode(encode(val)).get<CustomVal>());
 }
 
 TEST(json, valueConstruction)
@@ -401,10 +401,10 @@ TEST(json, valueTypes)
         EXPECT_FALSE(v.is<char>());
         v.asString<safe>();
         v.asString<unsafe>();
-        v.to<std::string_view, safe>();
-        v.to<std::string_view, unsafe>();
-        v.to<const char *, safe>();
-        v.to<const char *, unsafe>();
+        v.get<std::string_view, safe>();
+        v.get<std::string_view, unsafe>();
+        v.get<const char *, safe>();
+        v.get<const char *, unsafe>();
     }
     { // Character
         Value v('a');
@@ -418,12 +418,12 @@ TEST(json, valueTypes)
         EXPECT_TRUE(v.is<char>());
         v.asString<safe>();
         v.asString<unsafe>();
-        v.to<std::string_view, safe>();
-        v.to<std::string_view, unsafe>();
-        v.to<const char *, safe>();
-        v.to<const char *, unsafe>();
-        v.to<char, safe>();
-        v.to<char, unsafe>();
+        v.get<std::string_view, safe>();
+        v.get<std::string_view, unsafe>();
+        v.get<const char *, safe>();
+        v.get<const char *, unsafe>();
+        v.get<char, safe>();
+        v.get<char, unsafe>();
     }
     { // Signed integer
         Value v(123);
@@ -434,8 +434,8 @@ TEST(json, valueTypes)
         EXPECT_TRUE(v.is<int>());
         v.asInteger<safe>();
         v.asInteger<unsafe>();
-        v.to<int, safe>();
-        v.to<int, unsafe>();
+        v.get<int, safe>();
+        v.get<int, unsafe>();
     }
     { // Unsigned integer
         Value v(123u);
@@ -446,8 +446,8 @@ TEST(json, valueTypes)
         EXPECT_TRUE(v.is<unsigned int>());
         v.asUnsigner<safe>();
         v.asUnsigner<unsafe>();
-        v.to<int, safe>();
-        v.to<int, unsafe>();
+        v.get<int, safe>();
+        v.get<int, unsafe>();
     }
     { // Floater
         Value v(123.0);
@@ -458,8 +458,8 @@ TEST(json, valueTypes)
         EXPECT_TRUE(v.is<float>());
         v.asFloater<safe>();
         v.asFloater<unsafe>();
-        v.to<float, safe>();
-        v.to<float, unsafe>();
+        v.get<float, safe>();
+        v.get<float, unsafe>();
     }
     { // Boolean
         Value v(false);
@@ -469,16 +469,16 @@ TEST(json, valueTypes)
         EXPECT_TRUE(v.is<bool>());
         v.asBoolean<safe>();
         v.asBoolean<unsafe>();
-        v.to<bool, safe>();
-        v.to<bool, unsafe>();
+        v.get<bool, safe>();
+        v.get<bool, unsafe>();
     }
     { // Null
         Value v(nullptr);
         EXPECT_EQ(Type::null, v.type());
         EXPECT_EQ(Density::unspecified, v.density());
         EXPECT_TRUE(v.isNull());
-        v.to<nullptr_t, safe>();
-        v.to<nullptr_t, unsafe>();
+        v.get<nullptr_t, safe>();
+        v.get<nullptr_t, unsafe>();
     }
 }
 
@@ -496,16 +496,16 @@ void testNumber(T v, bool isS64, bool isS32, bool isS16, bool isS08, bool isU64,
     EXPECT_EQ(isF64, val.is<  double>());
     EXPECT_EQ(isF32, val.is<   float>());
 
-    if (isS64) EXPECT_EQ( int64_t(v), val.to< int64_t>()); else EXPECT_THROW(val.to< int64_t>(), TypeError);
-    if (isS32) EXPECT_EQ( int32_t(v), val.to< int32_t>()); else EXPECT_THROW(val.to< int32_t>(), TypeError);
-    if (isS16) EXPECT_EQ( int16_t(v), val.to< int16_t>()); else EXPECT_THROW(val.to< int16_t>(), TypeError);
-    if (isS08) EXPECT_EQ(  int8_t(v), val.to<  int8_t>()); else EXPECT_THROW(val.to<  int8_t>(), TypeError);
-    if (isU64) EXPECT_EQ(uint64_t(v), val.to<uint64_t>()); else EXPECT_THROW(val.to<uint64_t>(), TypeError);
-    if (isU32) EXPECT_EQ(uint32_t(v), val.to<uint32_t>()); else EXPECT_THROW(val.to<uint32_t>(), TypeError);
-    if (isU16) EXPECT_EQ(uint16_t(v), val.to<uint16_t>()); else EXPECT_THROW(val.to<uint16_t>(), TypeError);
-    if (isU08) EXPECT_EQ( uint8_t(v), val.to< uint8_t>()); else EXPECT_THROW(val.to< uint8_t>(), TypeError);
-    if (isF64) EXPECT_EQ(  double(v), val.to<  double>()); else EXPECT_THROW(val.to<  double>(), TypeError);
-    if (isF32) EXPECT_EQ(   float(v), val.to<   float>()); else EXPECT_THROW(val.to<   float>(), TypeError);
+    if (isS64) EXPECT_EQ( int64_t(v), val.get< int64_t>()); else EXPECT_THROW(val.get< int64_t>(), TypeError);
+    if (isS32) EXPECT_EQ( int32_t(v), val.get< int32_t>()); else EXPECT_THROW(val.get< int32_t>(), TypeError);
+    if (isS16) EXPECT_EQ( int16_t(v), val.get< int16_t>()); else EXPECT_THROW(val.get< int16_t>(), TypeError);
+    if (isS08) EXPECT_EQ(  int8_t(v), val.get<  int8_t>()); else EXPECT_THROW(val.get<  int8_t>(), TypeError);
+    if (isU64) EXPECT_EQ(uint64_t(v), val.get<uint64_t>()); else EXPECT_THROW(val.get<uint64_t>(), TypeError);
+    if (isU32) EXPECT_EQ(uint32_t(v), val.get<uint32_t>()); else EXPECT_THROW(val.get<uint32_t>(), TypeError);
+    if (isU16) EXPECT_EQ(uint16_t(v), val.get<uint16_t>()); else EXPECT_THROW(val.get<uint16_t>(), TypeError);
+    if (isU08) EXPECT_EQ( uint8_t(v), val.get< uint8_t>()); else EXPECT_THROW(val.get< uint8_t>(), TypeError);
+    if (isF64) EXPECT_EQ(  double(v), val.get<  double>()); else EXPECT_THROW(val.get<  double>(), TypeError);
+    if (isF32) EXPECT_EQ(   float(v), val.get<   float>()); else EXPECT_THROW(val.get<   float>(), TypeError);
 }
 
 TEST(json, valueNumbers)
@@ -592,52 +592,52 @@ TEST(json, wrongValueType)
     EXPECT_THROW((Value().asObject<safe>()), TypeError);
     EXPECT_THROW((Value().asArray<safe>()), TypeError);
     EXPECT_THROW((Value().asString<safe>()), TypeError);
-    EXPECT_THROW((Value().to<std::string, safe>()), TypeError);
-    EXPECT_THROW((Value().to<std::string_view, safe>()), TypeError);
-    EXPECT_THROW((Value().to<const char *, safe>()), TypeError);
-    EXPECT_THROW((Value().to<char, safe>()), TypeError);
+    EXPECT_THROW((Value().get<std::string, safe>()), TypeError);
+    EXPECT_THROW((Value().get<std::string_view, safe>()), TypeError);
+    EXPECT_THROW((Value().get<const char *, safe>()), TypeError);
+    EXPECT_THROW((Value().get<char, safe>()), TypeError);
     EXPECT_THROW((Value().asInteger<safe>()), TypeError);
     EXPECT_THROW((Value().asUnsigner<safe>()), TypeError);
     EXPECT_THROW((Value().asFloater<safe>()), TypeError);
-    EXPECT_THROW((Value().to<int64_t, safe>()), TypeError);
-    EXPECT_THROW((Value().to<int32_t, safe>()), TypeError);
-    EXPECT_THROW((Value().to<int16_t, safe>()), TypeError);
-    EXPECT_THROW((Value().to<int8_t, safe>()), TypeError);
-    EXPECT_THROW((Value().to<uint64_t, safe>()), TypeError);
-    EXPECT_THROW((Value().to<uint32_t, safe>()), TypeError);
-    EXPECT_THROW((Value().to<uint16_t, safe>()), TypeError);
-    EXPECT_THROW((Value().to<uint8_t, safe>()), TypeError);
-    EXPECT_THROW((Value().to<double, safe>()), TypeError);
-    EXPECT_THROW((Value().to<float, safe>()), TypeError);
+    EXPECT_THROW((Value().get<int64_t, safe>()), TypeError);
+    EXPECT_THROW((Value().get<int32_t, safe>()), TypeError);
+    EXPECT_THROW((Value().get<int16_t, safe>()), TypeError);
+    EXPECT_THROW((Value().get<int8_t, safe>()), TypeError);
+    EXPECT_THROW((Value().get<uint64_t, safe>()), TypeError);
+    EXPECT_THROW((Value().get<uint32_t, safe>()), TypeError);
+    EXPECT_THROW((Value().get<uint16_t, safe>()), TypeError);
+    EXPECT_THROW((Value().get<uint8_t, safe>()), TypeError);
+    EXPECT_THROW((Value().get<double, safe>()), TypeError);
+    EXPECT_THROW((Value().get<float, safe>()), TypeError);
     EXPECT_THROW((Value().asBoolean<safe>()), TypeError);
-    EXPECT_THROW((Value().to<bool, safe>()), TypeError);
-    EXPECT_THROW((Value(1).to<nullptr_t, safe>()), TypeError);
+    EXPECT_THROW((Value().get<bool, safe>()), TypeError);
+    EXPECT_THROW((Value(1).get<nullptr_t, safe>()), TypeError);
 
     // Unsafe
     Value().asObject<unsafe>();
     Value().asArray<unsafe>();
     Value().asString<unsafe>();
     // Will cause SEH exception
-    //Value().to<std::string, unsafe>();
-    //Value().to<std::string_view, unsafe>();
-    //Value().to<const char *, unsafe>();
-    //Value().to<char, unsafe>();
+    //Value().get<std::string, unsafe>();
+    //Value().get<std::string_view, unsafe>();
+    //Value().get<const char *, unsafe>();
+    //Value().get<char, unsafe>();
     Value().asInteger<unsafe>();
     Value().asUnsigner<unsafe>();
     Value().asFloater<unsafe>();
-    Value(true).to<int64_t, unsafe>();
-    Value(true).to<int32_t, unsafe>();
-    Value(true).to<int16_t, unsafe>();
-    Value(true).to<int8_t, unsafe>();
-    Value(true).to<uint64_t, unsafe>();
-    Value(true).to<uint32_t, unsafe>();
-    Value(true).to<uint16_t, unsafe>();
-    Value(true).to<uint8_t, unsafe>();
-    Value(true).to<double, unsafe>();
-    Value(true).to<float, unsafe>();
+    Value(true).get<int64_t, unsafe>();
+    Value(true).get<int32_t, unsafe>();
+    Value(true).get<int16_t, unsafe>();
+    Value(true).get<int8_t, unsafe>();
+    Value(true).get<uint64_t, unsafe>();
+    Value(true).get<uint32_t, unsafe>();
+    Value(true).get<uint16_t, unsafe>();
+    Value(true).get<uint8_t, unsafe>();
+    Value(true).get<double, unsafe>();
+    Value(true).get<float, unsafe>();
     Value().asBoolean<unsafe>();
-    Value(1).to<bool, unsafe>();
-    Value(1).to<nullptr_t, unsafe>();
+    Value(1).get<bool, unsafe>();
+    Value(1).get<nullptr_t, unsafe>();
 }
 
 TEST(json, density)
