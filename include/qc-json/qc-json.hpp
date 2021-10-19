@@ -599,12 +599,12 @@ namespace qc::json
     {}
 
     inline Value::Value(string && val) noexcept :
-        _ptrAndDensity{reinterpret_cast<uintptr_t>(new string{std::move(val)})},
+        _string{new string{std::move(val)}},
         _typeAndComment{uintptr_t(Type::string)}
     {}
 
     inline Value::Value(const string_view val) noexcept :
-        _ptrAndDensity{reinterpret_cast<uintptr_t>(new string{val})},
+        _string{new string{val}},
         _typeAndComment{uintptr_t(Type::string)}
     {}
 
@@ -674,7 +674,7 @@ namespace qc::json
     {}
 
     inline Value::Value(Value && other) noexcept :
-        _ptrAndDensity{std::exchange(other._ptrAndDensity, 0u)},
+        _unsigner{std::exchange(other._unsigner, 0u)},
         _typeAndComment{std::exchange(other._typeAndComment, 0u)}
     {}
 
@@ -712,7 +712,7 @@ namespace qc::json
         else {
             _deleteValue();
             _setType(Type::string);
-            _ptrAndDensity = reinterpret_cast<uintptr_t>(new string{std::move(val)});
+            _string = new string{std::move(val)};
         }
         return *this;
     }
@@ -725,7 +725,7 @@ namespace qc::json
         else {
             _deleteValue();
             _setType(Type::string);
-            _ptrAndDensity = reinterpret_cast<uintptr_t>(new string{val});
+            _string = new string{val};
         }
         return *this;
     }
@@ -829,7 +829,7 @@ namespace qc::json
     {
         _deleteValue();
         _deleteComment();
-        _ptrAndDensity = std::exchange(other._ptrAndDensity, 0u);
+        _unsigner = std::exchange(other._unsigner, 0u);
         _typeAndComment = std::exchange(other._typeAndComment, 0u);
         return *this;
     }
@@ -944,16 +944,14 @@ namespace qc::json
                         return true;
                     }
                     else {
-                        const int64_t val{asInteger<unsafe>()};
-                        return val <= std::numeric_limits<U>::max() && val >= std::numeric_limits<U>::min();
+                        return _integer <= std::numeric_limits<U>::max() && _integer >= std::numeric_limits<U>::min();
                     }
                 }
                 case Type::unsigner: {
-                    return asUnsigner<unsafe>() <= uint64_t(std::numeric_limits<U>::max());
+                    return _unsigner <= uint64_t(std::numeric_limits<U>::max());
                 }
                 case Type::floater: {
-                    const double val{asFloater<unsafe>()};
-                    return double(U(val)) == val;
+                    return double(U(_floater)) == _floater;
                 }
                 default: {
                     return false;
@@ -964,20 +962,18 @@ namespace qc::json
         else if constexpr (std::is_integral_v<U> && std::is_unsigned_v<U>) {
             switch (type()) {
                 case Type::integer: {
-                    const int64_t val{asInteger<unsafe>()};
-                    return val >= 0 && uint64_t(val) <= std::numeric_limits<U>::max();
+                    return _integer >= 0 && uint64_t(_integer) <= std::numeric_limits<U>::max();
                 }
                 case Type::unsigner: {
                     if constexpr (std::is_same_v<U, uint64_t>) {
                         return true;
                     }
                     else {
-                        return asUnsigner<unsafe>() <= std::numeric_limits<U>::max();
+                        return _unsigner <= std::numeric_limits<U>::max();
                     }
                 }
                 case Type::floater: {
-                    const double val{asFloater<unsafe>()};
-                    return val >= 0.0 && double(U(val)) == val;
+                    return _floater >= 0.0 && double(U(_floater)) == _floater;
                 }
                 default: {
                     return false;
@@ -1119,9 +1115,9 @@ namespace qc::json
         else if constexpr (std::is_arithmetic_v<U>) {
             if constexpr (isSafe == safe) if (!is<U>()) throw TypeError{};
             switch (type()) {
-                case Type::integer: return U(asInteger<unsafe>());
-                case Type::unsigner: return U(asUnsigner<unsafe>());
-                case Type::floater: return U(asFloater<unsafe>());
+                case Type::integer: return U(_integer);
+                case Type::unsigner: return U(_unsigner);
+                case Type::floater: return U(_floater);
                 default: return {};
             }
         }

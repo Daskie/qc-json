@@ -751,15 +751,15 @@ so
 ] // QQQQQ)"sv)};
         EXPECT_EQ("AAAAA\nBBBBB", *json.comment());
         const Array & rootArr{json.asArray()};
-        EXPECT_EQ(2, rootArr.size());
+        EXPECT_EQ(2u, rootArr.size());
         EXPECT_EQ("DDDDD", *rootArr.at(0).comment());
         const Array & innerArr{rootArr.at(0).asArray()};
-        EXPECT_EQ(2, innerArr.size());
+        EXPECT_EQ(2u, innerArr.size());
         EXPECT_EQ("FFFFF", *innerArr.at(0).comment());
         EXPECT_EQ("HHHHH", *innerArr.at(1).comment());
         EXPECT_EQ("JJJJJ", *rootArr.at(1).comment());
         const Object & innerObj{rootArr.at(1).asObject()};
-        EXPECT_EQ(1, innerObj.size());
+        EXPECT_EQ(1u, innerObj.size());
         EXPECT_EQ("KKKKK", *innerObj.at("k").comment());
     }
 }
