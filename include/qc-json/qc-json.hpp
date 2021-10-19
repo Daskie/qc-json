@@ -18,6 +18,7 @@
 #include <cstring>
 
 #include <algorithm>
+#include <concepts>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -31,7 +32,6 @@
 
 namespace qc::json
 {
-
     ///
     /// Required for low-order bit packing
     ///
@@ -64,10 +64,59 @@ namespace qc::json
         boolean  = 0b111u
     };
 
+    // Forward declaration
     class Value;
 
+    ///
+    /// Convenience type alias
+    ///
+    /// The internal representation for objects is `std::map<string, qc::json::value>`
+    ///
     using Object = std::map<string, Value>;
+
+    ///
+    /// Convenience type alias
+    ///
+    /// The internal representation for arrays is `std::vector<qc::json::Value>`
+    ///
     using Array = std::vector<Value>;
+
+    ///
+    /// Specialize `qc::json::valueFrom` to enable `Value` construction from custom types
+    ///
+    /// Example:
+    ///     template <>
+    ///     struct qc::json::valueFrom<std::pair<int, int>> {
+    ///         qc::json::Value operator()(const std::pair<int, int> & v) {
+    ///             return qc::json::Array{v.first, f.second};
+    ///         }
+    ///     };
+    ///
+    template <typename T> struct valueFrom;
+
+    ///
+    /// Concept describing a type for which `qc::json::valueFrom` has been specialized
+    ///
+    template <typename T> concept ValueFromAble = requires (T v) { { ::qc::json::valueFrom<T>{}(v) } -> std::same_as<Value>; };
+
+    ///
+    /// Specialize `qc::json::valueTo` to enable `Value::as` for custom types
+    ///
+    /// Example:
+    ///     template <qc::json::Safety isSafe>
+    ///     struct qc::json::valueTo<std::pair<int, int>, isSafe> {
+    ///         std::pair<int, int> operator()(const qc::json::Value & v) {
+    ///             const qc::json::Array & arr{v.asArray<isSafe>()};
+    ///             return {arr.at(0u)->asInteger<isSafe>(), arr.at(1u)->asInteger<isSafe>()};
+    ///         }
+    ///     };
+    ///
+    template <typename T, Safety isSafe> struct valueTo;
+
+    ///
+    /// Concept describing a type for which `qc::json::valueTo` has been specialized
+    ///
+    template <typename T> concept ValueToAble = requires (Value v) { { ::qc::json::valueTo<T, ::qc::json::Safety::safe>{}(v) } -> std::same_as<T>; };
 
     ///
     /// Represents one JSON value, which can be an object, array, string, number, boolean, or null
@@ -110,7 +159,7 @@ namespace qc::json
         /// @tparam T the custom type
         /// @param val the custom type value
         ///
-        template <typename T> Value(const T & val);
+        template <ValueFromAble T> Value(const T & val);
 
         Value(const Value &) = delete;
         Value(Value && other) noexcept;
@@ -426,33 +475,6 @@ namespace qc::json
     /// @throw `EncodeError` if there was an issue encoding the JSON value
     ///
     Encoder & operator<<(Encoder & encoder, const Value & val);
-
-    ///
-    /// Specialize `qc::json::valueTo` to enable `Value::as` for custom types
-    ///
-    /// Example:
-    ///     template <qc::json::Safety isSafe>
-    ///     struct qc::json::valueTo<std::pair<int, int>, isSafe> {
-    ///         std::pair<int, int> operator()(const qc::json::Value & v) {
-    ///             const qc::json::Array & arr{v.asArray<isSafe>()};
-    ///             return {arr.at(0u)->asInteger<isSafe>(), arr.at(1u)->asInteger<isSafe>()};
-    ///         }
-    ///     };
-    ///
-    template <typename T, Safety isSafe> struct valueTo;
-
-    ///
-    /// Specialize `qc::json::valueFrom` to enable `Value` construction from custom types
-    ///
-    /// Example:
-    ///     template <>
-    ///     struct qc::json::valueFrom<std::pair<int, int>> {
-    ///         qc::json::Value operator()(const std::pair<int, int> & v) {
-    ///             return qc::json::Array{v.first, f.second};
-    ///         }
-    ///     };
-    ///
-    template <typename T> struct valueFrom;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -646,7 +668,7 @@ namespace qc::json
         _typeAndComment{uintptr_t(Type::boolean)}
     {}
 
-    template <typename T>
+    template <ValueFromAble T>
     inline Value::Value(const T & val) :
         Value{::qc::json::valueFrom<T>()(val)}
     {}
@@ -1109,6 +1131,7 @@ namespace qc::json
         }
         // Other
         else {
+            static_assert(ValueToAble<T>, "Must specialize `qc::json::valueTo` to convert to custom type");
             return ::qc::json::valueTo<U, isSafe>()(*this);
         }
     }
