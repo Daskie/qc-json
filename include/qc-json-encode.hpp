@@ -116,14 +116,14 @@ namespace qc::json
         ///
         /// Stream ` << binary(val) `, ` << octal(val) `, or ` << hex(val) ` to encode an unsigned integer in that base
         ///
-        constexpr struct { constexpr _BinaryToken operator()(uint64_t v) const noexcept { return _BinaryToken{v}; } } binary;
-        constexpr struct { constexpr  _OctalToken operator()(uint64_t v) const noexcept { return  _OctalToken{v}; } }  octal;
-        constexpr struct { constexpr    _HexToken operator()(uint64_t v) const noexcept { return    _HexToken{v}; } }    hex;
+        constexpr struct { constexpr _BinaryToken operator()(uint64_t v) const noexcept { return _BinaryToken{v}; } } binary{};
+        constexpr struct { constexpr  _OctalToken operator()(uint64_t v) const noexcept { return  _OctalToken{v}; } }  octal{};
+        constexpr struct { constexpr    _HexToken operator()(uint64_t v) const noexcept { return    _HexToken{v}; } }    hex{};
 
         ///
         /// Stream ` << comment(str) ` to encode a comment
         ///
-        constexpr struct { constexpr _CommentToken operator()(string_view str) const noexcept { return _CommentToken{str}; } } comment;
+        constexpr struct { constexpr _CommentToken operator()(string_view str) const noexcept { return _CommentToken{str}; } } comment{};
     }
 
     ///
@@ -134,20 +134,21 @@ namespace qc::json
         public: //--------------------------------------------------------------
 
         ///
-        /// Construct a new `Encoder`
+        /// Construct a new `Encoder` with the given options
         ///
         /// @param density the starting density for the JSON
+        /// @param indentSpaces the number of spaces to insert per level of indentation
         /// @param singleQuotes whether to use `'` instead of `"` for strings
         /// @param identifiers whether to encode all eligible keys as identifiers instead of strings
         ///
-        Encoder(Density density = Density::unspecified, bool singleQuotes = false, bool identifiers = false);
+        Encoder(Density density = Density::unspecified, size_t indentSpaces = 4u, bool singleQuotes = false, bool identifiers = false);
 
         Encoder(const Encoder &) = delete;
 
         ///
         /// Move constructor
         ///
-        /// @param other is not valid after moved
+        /// @param other is left in a valid but unspecified state
         /// @return this
         ///
         Encoder(Encoder && other) noexcept;
@@ -157,7 +158,7 @@ namespace qc::json
         ///
         /// Move assignment operator
         ///
-        /// @param other is not valid after moved
+        /// @param other is left in a valid but unspecified state
         /// @return this
         ///
         Encoder & operator=(Encoder && other) noexcept;
@@ -269,13 +270,16 @@ namespace qc::json
             int8_t densityDelta;
         };
 
-        char _quote{'"'};
-        bool _identifiers{false};
+        Density _baseDensity;
+        size_t _indentSpaces;
+        char _quote;
+        bool _useIdentifiers;
+
         std::string _str{};
         std::vector<_ScopeDelta> _scopeDeltas{};
         Container _container{Container::none};
-        Density _density{Density::unspecified};
-        int _indentation{0};
+        Density _density{_baseDensity};
+        size_t _indentation{0u};
         _Element _prevElement{_Element::none};
         bool _isContent{false};
 
@@ -321,35 +325,40 @@ namespace qc::json
         Error{msg}
     {}
 
-    inline Encoder::Encoder(const Density density, bool singleQuotes, bool preferIdentifiers) :
+    inline Encoder::Encoder(const Density density, const size_t indentSpaces, bool singleQuotes, bool preferIdentifiers) :
+        _baseDensity{density},
+        _indentSpaces{indentSpaces},
         _quote{singleQuotes ? '\'' : '"'},
-        _identifiers{preferIdentifiers},
-        _density{density}
+        _useIdentifiers{preferIdentifiers}
     {}
 
     inline Encoder::Encoder(Encoder && other) noexcept :
+        _baseDensity{other._baseDensity},
+        _indentSpaces{other._indentSpaces},
         _quote{other._quote},
-        _identifiers{other._identifiers},
+        _useIdentifiers{other._useIdentifiers},
         _str{std::move(other._str)},
         _scopeDeltas{std::move(other._scopeDeltas)},
-        _container{other._container},
-        _density{other._density},
-        _indentation{other._indentation},
-        _prevElement{other._prevElement},
-        _isContent{other._isContent}
+        _container{std::exchange(other._container, Container::none)},
+        _density{std::exchange(other._density, other._baseDensity)},
+        _indentation{std::exchange(other._indentation, 0u)},
+        _prevElement{std::exchange(other._prevElement, _Element::none)},
+        _isContent{std::exchange(other._isContent, false)}
     {}
 
     inline Encoder & Encoder::operator=(Encoder && other) noexcept
     {
+        _baseDensity = other._baseDensity;
+        _indentSpaces = other._indentSpaces;
         _quote = other._quote;
-        _identifiers = other._identifiers;
+        _useIdentifiers = other._useIdentifiers;
         _str = std::move(other._str);
         _scopeDeltas = std::move(other._scopeDeltas);
-        _container = other._container;
-        _density = other._density;
-        _indentation = other._indentation;
-        _prevElement = other._prevElement;
-        _isContent = other._isContent;
+        _container = std::exchange(other._container, Container::none);
+        _density = std::exchange(other._density, other._baseDensity);
+        _indentation = std::exchange(other._indentation, 0u);
+        _prevElement = std::exchange(other._prevElement, _Element::none);
+        _isContent = std::exchange(other._isContent, false);
 
         return *this;
     }
@@ -375,7 +384,7 @@ namespace qc::json
             throw EncodeError{"Cannot end object with a dangling key"sv};
         }
 
-        --_indentation;
+        _indentation -= _indentSpaces;
         if (_prevElement == _Element::val || _prevElement == _Element::comment) {
             _putSpace();
         }
@@ -609,7 +618,7 @@ namespace qc::json
         _scopeDeltas.push_back(_ScopeDelta{containerDelta, densityDelta});
         _container = container;
         _density = newDensity;
-        ++_indentation;
+        _indentation += _indentSpaces;
         _prevElement = _Element::start;
     }
 
@@ -633,7 +642,7 @@ namespace qc::json
     inline void Encoder::_key(const string_view key)
     {
         bool identifier{false};
-        if (_identifiers) {
+        if (_useIdentifiers) {
             if (key.empty()) {
                 throw EncodeError{"Identifier must not be empty"sv};
             }
@@ -673,9 +682,7 @@ namespace qc::json
 
     inline void Encoder::_indent()
     {
-        for (int i{0}; i < _indentation; ++i) {
-            _str += "    "sv;
-        }
+        _str.append(_indentation, ' ');
     }
 
     inline void Encoder::_putSpace()

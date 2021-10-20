@@ -462,10 +462,13 @@ namespace qc::json
     ///
     /// @param val the JSON value to encode
     /// @param density the base density of the encoded JSON string
+    /// @param indentSpaces the number of spaces to insert per level of indentation
+    /// @param singleQuotes whether to use `'` instead of `"` for strings
+    /// @param identifiers whether to encode all eligible keys as identifiers instead of strings
     /// @return an encoded JSON string of the given JSON value
     /// @throw `EncodeError` if there was an issue encoding the JSON
     ///
-    string encode(const Value & val, Density density = Density::multiline);
+    string encode(const Value & val, Density density = Density::multiline, size_t indentSpaces = 4u, bool singleQuotes = false, bool identifiers = false);
 
     ///
     /// Specialization of the encoder's `operator<<` for `Value`
@@ -1358,9 +1361,9 @@ namespace qc::json
         return root;
     }
 
-    inline string encode(const Value & val, const Density density)
+    inline string encode(const Value & val, const Density density, size_t indentSpaces, bool singleQuotes, bool identifiers)
     {
-        Encoder encoder{density};
+        Encoder encoder{density, indentSpaces, singleQuotes, identifiers};
         encoder << val;
         return encoder.finish();
     }

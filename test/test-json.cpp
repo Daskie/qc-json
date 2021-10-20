@@ -19,6 +19,9 @@ using qc::json::Density;
 using qc::json::Safety::safe;
 using qc::json::Safety::unsafe;
 
+using qc::json::makeObject;
+using qc::json::makeArray;
+
 struct CustomVal { int x, y; };
 
 bool operator==(const CustomVal & cv1, const CustomVal & cv2)
@@ -270,8 +273,8 @@ TEST(json, valueAssignAndEquality)
 {
     Value v{};
 
-    const Object objRef{qc::json::makeObject("a", 1, "b", "wow", "c", nullptr)};
-    v = qc::json::makeObject("a", 1, "b", "wow", "c", nullptr);
+    const Object objRef{makeObject("a", 1, "b", "wow", "c", nullptr)};
+    v = makeObject("a", 1, "b", "wow", "c", nullptr);
     EXPECT_EQ(Type::object, v.type());
     EXPECT_TRUE(v == objRef);
 
@@ -654,8 +657,8 @@ TEST(json, density)
 TEST(json, makeObject)
 {
     { // Generic
-        Object obj1{qc::json::makeObject("a", 1, "b"s, 2.0, "c"sv, true)};
-        Object obj2{qc::json::makeObject("d", std::move(obj1))};
+        Object obj1{makeObject("a", 1, "b"s, 2.0, "c"sv, true)};
+        Object obj2{makeObject("d", std::move(obj1))};
         EXPECT_EQ(1u, obj2.size());
         const Object & innerObj{obj2.at("d").asObject()};
         EXPECT_EQ(3u, innerObj.size());
@@ -664,7 +667,7 @@ TEST(json, makeObject)
         EXPECT_EQ(true, innerObj.at("c").asBoolean());
     }
     { // Empty array
-        Object obj{qc::json::makeObject()};
+        Object obj{makeObject()};
         EXPECT_TRUE(obj.empty());
     }
 }
@@ -693,7 +696,7 @@ TEST(json, makeArray)
 TEST(json, comments)
 {
     { // Encode object
-        Value json{qc::json::makeObject("a", 1, "b", 2, "c", 3)};
+        Value json{makeObject("a", 1, "b", 2, "c", 3)};
         json.setComment("Yada yada");
         Object & obj{json.asObject()};
         obj.at("a").setComment("How fascinating...");
@@ -762,6 +765,15 @@ so
         EXPECT_EQ(1u, innerObj.size());
         EXPECT_EQ("KKKKK", *innerObj.at("k").comment());
     }
+}
+
+TEST(json, encoderOptions)
+{
+    EXPECT_EQ(R"({
+  k: [
+    'v'
+  ]
+})", encode(makeObject("k", makeArray("v")), Density::multiline, 2u, true, true));
 }
 
 TEST(json, general)

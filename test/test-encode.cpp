@@ -193,7 +193,7 @@ TEST(encode, string)
         EXPECT_EQ(R"("a")"s, encoder.finish());
     }
     { // Double quotes
-        Encoder encoder{Density::uniline, false};
+        Encoder encoder{Density::uniline, 4u, false};
         std::string expected{};
         encoder << R"(s"t'r)";
         expected = R"("s\"t'r")"s;
@@ -206,7 +206,7 @@ TEST(encode, string)
         EXPECT_EQ(expected, encoder.finish());
     }
     { // Single quotes
-        Encoder encoder{Density::uniline, true};
+        Encoder encoder{Density::uniline, 4u, true};
         std::string expected{};
         encoder << R"(s"t'r)";
         expected = R"('s"t\'r')"s;
@@ -577,7 +577,7 @@ TEST(encode, density)
 
 TEST(encode, identifiers) {
     { // Valid identifiers
-        Encoder encoder{Density::uniline, false, true};
+        Encoder encoder{Density::uniline, 4u, false, true};
         encoder << object << "a" << "v" << end;
         EXPECT_EQ(R"({ a: "v" })"s, encoder.finish());
         encoder << object << "A" << "v" << end;
@@ -592,7 +592,7 @@ TEST(encode, identifiers) {
         EXPECT_EQ(R"({ _0a: "v" })"s, encoder.finish());
     }
     { // Invalid identifiers
-        Encoder encoder{Density::uniline, false, true};
+        Encoder encoder{Density::uniline, 4u, false, true};
         encoder << object << "w o a" << "v" << end;
         EXPECT_EQ(R"({ "w o a": "v" })"s, encoder.finish());
     }
@@ -602,7 +602,7 @@ TEST(encode, identifiers) {
         EXPECT_EQ(R"({ "k": "v" })"s, encoder.finish());
     }
     { // Empty key
-        Encoder encoder{Density::uniline, false, true};
+        Encoder encoder{Density::uniline, 4u, false, true};
         encoder << object;
         EXPECT_THROW(encoder << "", EncodeError);
     }
@@ -749,6 +749,55 @@ null)", encoder.finish());
         EXPECT_EQ("// a\n// b\n// c\nnull", encoder.finish());
         encoder << comment("\n\n\n") << nullptr;
         EXPECT_EQ("// \n// \n// \n// \nnull", encoder.finish());
+    }
+}
+
+TEST(encode, indentSpaces)
+{
+    { // 0
+        Encoder encoder{Density::multiline, 0u};
+        encoder << object;
+            encoder << "k" << array;
+                encoder << comment("c");
+                encoder << "v";
+            encoder << end;
+        encoder << end;
+        EXPECT_EQ(R"({
+"k": [
+// c
+"v"
+]
+})", encoder.finish());
+    }
+    { // 1
+        Encoder encoder{Density::multiline, 1u};
+        encoder << object;
+            encoder << "k" << array;
+                encoder << comment("c");
+                encoder << "v";
+            encoder << end;
+        encoder << end;
+        EXPECT_EQ(R"({
+ "k": [
+  // c
+  "v"
+ ]
+})", encoder.finish());
+    }
+    { // 7
+        Encoder encoder{Density::multiline, 7u};
+        encoder << object;
+            encoder << "k" << array;
+                encoder << comment("c");
+                encoder << "v";
+            encoder << end;
+        encoder << end;
+        EXPECT_EQ(R"({
+       "k": [
+              // c
+              "v"
+       ]
+})", encoder.finish());
     }
 }
 
