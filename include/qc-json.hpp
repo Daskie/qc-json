@@ -27,8 +27,8 @@
 #include <utility>
 #include <variant>
 
-#include <qc-json/qc-json-decode.hpp>
-#include <qc-json/qc-json-encode.hpp>
+#include <qc-json-decode.hpp>
+#include <qc-json-encode.hpp>
 
 namespace qc::json
 {

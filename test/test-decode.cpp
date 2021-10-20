@@ -6,7 +6,7 @@
 
 #include <gtest/gtest.h>
 
-#include <qc-json/qc-json-decode.hpp>
+#include <qc-json-decode.hpp>
 
 using namespace std::string_literals;
 using namespace std::string_view_literals;

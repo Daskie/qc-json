@@ -2,7 +2,7 @@
 
 #include <gtest/gtest.h>
 
-#include <qc-json/qc-json.hpp>
+#include <qc-json.hpp>
 
 using namespace std::string_literals;
 using namespace std::string_view_literals;
