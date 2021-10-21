@@ -748,35 +748,47 @@ namespace qc::json
 
     inline void Encoder::_encode(const _BinaryToken v)
     {
-        char buffer[64];
-        const std::to_chars_result res{std::to_chars(buffer, buffer + sizeof(buffer), v.val, 2)};
-        _str += "0b"sv;
+        char buffer[66];
+        buffer[0] = '0';
+        buffer[1] = 'b';
+        const std::to_chars_result res{std::to_chars(buffer + 2, buffer + sizeof(buffer), v.val, 2)};
         _str.append(buffer, size_t(res.ptr - buffer));
     }
 
     inline void Encoder::_encode(const _OctalToken v)
     {
-        char buffer[24];
-        const std::to_chars_result res{std::to_chars(buffer, buffer + sizeof(buffer), v.val, 8)};
-        _str += "0o"sv;
+        char buffer[26];
+        buffer[0] = '0';
+        buffer[1] = 'o';
+        const std::to_chars_result res{std::to_chars(buffer + 2, buffer + sizeof(buffer), v.val, 8)};
         _str.append(buffer, size_t(res.ptr - buffer));
     }
 
     inline void Encoder::_encode(const _HexToken v)
     {
-        char buffer[16];
-        const std::to_chars_result res{std::to_chars(buffer, buffer + sizeof(buffer), v.val, 16)};
-        const size_t length{size_t(res.ptr - buffer)};
+        // We're hand rolling this because `std::to_chars` doesn't support uppercase hex
+        static constexpr char hexTable[16]{
+            '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'
+        };
 
-        // Manually convert to uppercase hex because apparently `std::to_chars` doesn't have an option for that
-        for (size_t i{0u}; i < length; ++i) {
-            if (buffer[i] >= 'a') {
-                buffer[i] -= ('a' - 'A');
-            }
+        uint64_t val{v.val};
+        char buffer[18];
+        size_t bufferI{sizeof(buffer)};
+
+        if (val) {
+            do {
+                buffer[--bufferI] = hexTable[val & 0xFu];
+                val >>= 4;
+            } while (val);
+        }
+        else {
+            buffer[--bufferI] = '0';
         }
 
-        _str += "0x"sv;
-        _str.append(buffer, length);
+        buffer[--bufferI] = 'x';
+        buffer[--bufferI] = '0';
+
+        _str.append(buffer + bufferI, sizeof(buffer) - bufferI);
     }
 
     inline void Encoder::_encode(const double v)
