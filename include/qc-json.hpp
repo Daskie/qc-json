@@ -8,7 +8,7 @@
 /// https://github.com/Daskie/qc-json
 ///
 /// Provides an interface for decoding a JSON strings to JSON objects, creating/manipulating JSON objects, and encoding
-///   JSON objects to a JSON string
+/// JSON objects to a JSON string
 ///
 /// Uses `qc-json-encode.hpp` to do the encoding and `qc-json-decode.hpp` to do the decoding
 ///
@@ -1371,7 +1371,7 @@ namespace qc::json
     inline Encoder & operator<<(Encoder & encoder, const Value & val)
     {
         if (val.hasComment() && encoder.container() != Container::object) {
-            encoder << tokens::comment(*val.comment());
+            encoder << comment(*val.comment());
         }
 
         switch (val.type()) {
@@ -1380,24 +1380,22 @@ namespace qc::json
                 break;
             }
             case Type::object: {
-                const Object & object{val.asObject<unsafe>()};
-                encoder << tokens::object(val.density());
-                for (const auto & [key, v] : object) {
+                encoder << object(val.density());
+                for (const auto & [key, v] : val.asObject<unsafe>()) {
                     if (v.hasComment()) {
-                        encoder << tokens::comment(*v.comment());
+                        encoder << comment(*v.comment());
                     }
                     encoder << key << v;
                 }
-                encoder << tokens::end;
+                encoder << end;
                 break;
             }
             case Type::array: {
-                const Array & array{val.asArray<unsafe>()};
-                encoder << tokens::array(val.density());
-                for (const auto & v : array) {
+                encoder << array(val.density());
+                for (const auto & v : val.asArray<unsafe>()) {
                     encoder << v;
                 }
-                encoder << tokens::end;
+                encoder << end;
                 break;
             }
             case Type::string: {

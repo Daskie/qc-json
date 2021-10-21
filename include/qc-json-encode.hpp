@@ -94,9 +94,9 @@ namespace qc::json
 
     ///
     /// Namespace provided to allow the user to `using namespace qc::json::tokens` to avoid the verbosity of fully
-    ///   qualifying the tokens namespace
+    /// qualifying the tokens namespace
     ///
-    namespace tokens
+    inline namespace tokens
     {
         ///
         /// Stream this `object` variable to start a new object. Optionally specify a density
@@ -188,8 +188,8 @@ namespace qc::json
 
         ///
         /// Set the numeric base of the next number to be encoded. If this is anything other than decimal, the number
-        ///   will be represented in raw, unsigned, two's-compliment form. Negative numbers are encoded as if they were
-        ///   positive. Floating point numbers are unaffected
+        /// will be represented in raw, unsigned, two's-compliment form. Negative numbers are encoded as if they were
+        /// positive. Floating point numbers are unaffected
         ///
         /// This flag is defaulted back to decimal after ANY value is streamed
         ///
@@ -202,8 +202,8 @@ namespace qc::json
 
         ///
         /// Insert a comment. Comments always logically precede a value. Comments will be in line form (`// ...`) in
-        ///   multiline contexts, block form (`/* ... */`) in uniline contexts, and nospace block form (`/*...*/`) in
-        ///   nospace contexts
+        /// multiline contexts, block form (`/* ... */`) in uniline contexts, and nospace block form (`/*...*/`) in
+        /// nospace contexts
         ///
         /// @param v the comment
         /// @return this
@@ -243,7 +243,7 @@ namespace qc::json
 
         ///
         /// Collapses the internal string stream into the encoded JSON string. This function resets the internal state
-        ///   of the encoder to a "clean slate" such that it can be safely reused
+        /// of the encoder to a "clean slate" such that it can be safely reused
         ///
         /// @return the encoded JSON string
         ///
