@@ -1,6 +1,474 @@
 # QC JSON
 
-###### Clean, quick, and simple JSON library for C++20
+###### Quick and clean [JSON5](https://json5.org) header library for C++20
+
+### Contents
+- [Setup / Installation](#setup--installation)
+- [qc-json-encode.hpp (SAX encoding)](#qc-json-encodehppincludeqc-json-encodehpp)
+  - [Simple Example](#simple-example)
+  - [The Six Types](#the-six-types)
+  - [Density](#density)
+  - [Indentation Spaces](#indentation-spaces)
+  - [Single Quote Strings](#single-quote-strings)
+  - [Identifiers](#identifiers)
+  - [Binary, Octal, and Hexadecimal](#binary-octal-and-hexadecimal)
+  - [Infinity and NaN](#infinity-and-nan)
+  - [Comments](#comments)
+  - [Standalone Values](#standalone-values)
+  - [Encoder Reuse](#encoder-reuse)
+- [qc-json-decode.hpp (SAX decoding)](#qc-json-decodehppincludeqc-json-decodehpp)
+- [qc-json.hpp (DOM encoding and decoding)](#qc-jsonhppincludeqc-jsonhpp)
+
+## Setup / Installation
+
+### Method 1: Download the Header file(s)
+
+As this is a header-only library with no dependencies outside the STL, you may simply copy/download the header(s) you
+need into your project repo, `/usr/include`, or anywhere else your code can include from.
+
+- [include/qc-json-encode.hpp](include/qc-json-encode.hpp) for SAX-style encoding
+- [include/qc-json-decode.hpp](include/qc-json-decode.hpp) for SAX-style decoding
+- [include/qc-json.hpp](include/qc-json.hpp) for DOM-style encoding and decoding (also requires the above two)
+
+### Method 2: CMake via `FetchContent`
+
+If using CMake, the latest version of this library can be automatically downloaded at config-time using the
+`FetchContent` module.
+
+```cmake
+include(FetchContent)
+FetchContent_Declare(qc-cmake GIT_REPOSITORY https://github.com/daskie/qc-json.git)
+FetchContent_MakeAvailable(qc-json)
+...
+target_link_libraries(my-project PRIVATE qc-json::qc-json)
+```
+
+### Method 3: CMake via `find_package`
+
+If using CMake, you can instead pre-install the library to avoid the config-time overhead and build directory bloat.
+
+First install the package (there are many options for this) and then use `find_package` to link it into your build.
+
+```cmake
+find_package(qc-json REQUIRED)
+...
+target_link_libraries(my-project PRIVATE qc-json::qc-json)
+```
+
+## [qc-json-encode.hpp](include/qc-json-encode.hpp)
+
+This is a standalone header which provides a SAX-style interface for encoding JSON5. All standard features are
+supported, plus a few extras.
+
+### Simple Example
+
+```c++
+// Allows `qc::json::` to be omitted for code stream tokens such as `object`, `array`, and `end`
+using namespace qc::json::tokens;
+
+// Create an encoder to start. May specify certain options that will be described later
+qc::json::Encoder encoder{};
+
+    // Start an object
+    encoder << object;
+    
+    // Insert a key/value pair
+    encoder << "Name" << "18 Leg Bouquet";
+    
+    // And another, this time a number
+    encoder << "Price" << 17.99;
+    
+    // And an array, all on one line just for fun
+    encoder << "Ingredients" << array << "Crab" << "Octopus" << "Breadcrubs" << end;
+
+// End the object
+encoder << end;
+
+// Now print the encoded string
+std::cout << encoder.finish();
+```
+```json5
+{
+    "Name": "18 Leg Bouquet",
+    "Price": 17.99,
+    "Ingredients": [
+        "Crab",
+        "Octopus",
+        "Breadcrubs"
+    ]
+}
+```
+
+### The Six Types
+
+```c++
+using namespace qc::json::tokens;
+
+qc::json::Encoder encoder{};
+encoder << array;
+
+    encoder << object << end; // Object
+    encoder << array << end; // Array
+    encoder << "abc"; // String
+    encoder << 123; // Number
+    encoder << true; // Boolean
+    encoder << nullptr; // Null
+
+encoder << end;
+std::cout << encoder.finish();
+```
+```json5
+[
+  {},
+  [],
+  "abc",
+  true,
+  null
+]
+```
+
+### Density
+
+Objects and arrays may optionally specify a density which controls how much whitespace is generated.
+
+Additionally, a root-level density may be provided as an option to the encoder.
+
+There are four density levels:
+1. `unspecified`: the default, same as `multiline`
+2. `multiline`: newlines and indentation
+3. `uniline`: single space between elements
+4. `nospace`: no whitespace whatsoever
+
+```c++
+using namespace qc::json::tokens;
+using qc::json::Density;
+
+qc::json::Encoder encoder{Density::multiline}; // A root density may be specified to the encoder
+
+encoder << array; // No density provided, defaults to `unspecified`
+
+    // Objects
+    encoder << object(Density::multiline) << "a" << 1 << "b" << 2 << end;
+    encoder << object(Density::uniline)   << "c" << 3 << "d" << 4 << end;
+    encoder << object(Density::nospace)   << "e" << 5 << "f" << 6 << end;
+    
+    // Arrays
+    encoder << array(Density::multiline) << 1 << 2 << end;
+    encoder << array(Density::uniline)   << 3 << 4 << end;
+    encoder << array(Density::nospace)   << 5 << 6 << end;
+
+encoder << end;
+
+std::cout << encoder.finish();
+```
+```json5
+[
+    {
+        "a": 1,
+        "b": 2
+    },
+    { "c":  3, "d":  4 },
+    {"e":5,"f":6},
+    [
+        1,
+        2
+    ],
+    [ 3, 4 ],
+    [5,6]
+]
+```
+
+Density propagates into sub-containers maximally. For example, a `multiline` container inside a `nospace` parent
+container will still be encoded as `nospace`, since `nospace` is "denser" than `multiline`.
+
+```c++
+using namespace qc::json::tokens;
+using qc::json::Density;
+
+qc::json::Encoder encoder{};
+
+encoder << array(Density::uniline); // Parent container has `uniline` density
+
+    // Objects
+    encoder << object(Density::multiline) << "a" << 1 << "b" << 2 << end;
+    encoder << object(Density::uniline)   << "c" << 3 << "d" << 4 << end;
+    encoder << object(Density::nospace)   << "e" << 5 << "f" << 6 << end;
+    
+    // Arrays
+    encoder << array(Density::multiline) << 1 << 2 << end;
+    encoder << array(Density::uniline)   << 3 << 4 << end;
+    encoder << array(Density::nospace)   << 5 << 6 << end;
+
+encoder << end;
+
+std::cout << encoder.finish();
+```
+```json5
+[ { "a": 1, "b": 2 }, { "c":  3, "d":  4 }, {"e":5,"f":6}, [ 1, 2 ], [ 3, 4 ], [5,6] ]
+```
+
+### Indentation Spaces
+
+The number of spaces per level of indentation may be provided as an option to the encoder. By default, four spaces are
+used.
+
+```c++
+using namespace qc::json::tokens;
+
+qc::json::Encoder encoder{
+    qc::json::Density::multiline, // Root density
+    2u // Indent spaces <---
+};
+
+encoder << object;
+    encoder << "by" << array;
+        encoder << "gones";
+        encoder << "zantine";
+        encoder << "ob";
+    encoder << end;
+encoder << end;
+
+std::cout << encoder.finish();
+```
+```json5
+{
+  "by": [
+    "gones",
+    "zantine",
+    "ob"
+  ]
+}
+```
+
+### Single Quote Strings
+
+The option to use single quotes instead of double quotes for strings may be provided as an option to the encoder.
+
+```c++
+using namespace qc::json::tokens;
+
+qc::json::Encoder encoder{
+    qc::json::Density::multiline, // Root density
+    4u,  // Indent spaces
+    true // Use single quotes <---
+};
+
+encoder << object;
+    encoder << "run" << "ran";
+    encoder << "jump" << "jumped";
+    encoder << "fly" << "flew";
+encoder << end;
+
+std::cout << encoder.finish();
+```
+```json5
+{
+    'run': 'ran',
+    'jump': 'jumped',
+    'fly': 'flew'
+}
+```
+
+### Identifiers
+
+The option to drop the quotes from key string that contain strictly word characters (alphanumeric and underscore) may be
+provided as an option to the encoder.
+
+If any other character appears in the key, it will be quoted.
+
+```c++
+using namespace qc::json::tokens;
+
+qc::json::Encoder encoder{
+    qc::json::Density::multiline, // Root density
+    4u,    // Indent spaces
+    false, // Use single quotes
+    true   // Use identifiers <---
+};
+
+encoder << object;
+    encoder << "abc" << "valid";
+    encoder << "10" << "also valid";
+    encoder << "_" << "believe it or not, valid";
+    encoder << "$" << "still needs quotes";
+encoder << end;
+
+std::cout << encoder.finish();
+```
+```json5
+{
+    abc: "valid",
+    10: "also valid",
+    _: "believe it or not, valid",
+    "$": "still needs quotes"
+}
+```
+
+### Binary, Octal, and Hexadecimal
+
+Unsigned integers may be encoded in binary, octal, or hexadecimal using the `bin`, `oct`, or `hex` tokens, respectively.
+
+```c++
+using namespace qc::json::tokens;
+
+qc::json::Encoder encoder{};
+
+const uint64_t val{7911u};
+
+encoder << object;
+    encoder << "dec" << val;
+    encoder << "bin" << bin(val);
+    encoder << "oct" << oct(val);
+    encoder << "hex" << hex(val);
+encoder << end;
+
+std::cout << encoder.finish();
+```
+```json5
+{
+    "dec": 7911,
+    "bin": 0b1111011100111,
+    "oct": 0o17347,
+    "hex": 0x1EE7
+}
+```
+
+### Infinity and NaN
+
+Positive infinity, negative infinity, and NaN are encoded to `inf`, `-inf`, and `nan`, respectively.
+
+```c++
+using namespace qc::json::tokens;
+
+qc::json::Encoder encoder{};
+
+encoder << array(qc::json::Density::uniline);
+    encoder << std::numeric_limits<float>::infinity();
+    encoder << -std::numeric_limits<float>::infinity();
+    encoder << std::numeric_limits<float>::quiet_NaN();
+encoder << end;
+
+std::cout << encoder.finish();
+```
+```json5
+[ inf, -inf, nan ]
+```
+
+### Comments
+
+Comments may be encoded directly into the JSON using the `comment` token.
+
+In a `multiline` context, a line comment is generated: `// A comment ...`
+
+In a `uniline` context or in a `multiline` context between a key and value, a block comment with spaces is
+generated: `/* A comment ... */`
+
+In a `nospace` context, a block comment without spaces is generated: `/*A comment ...*/`
+
+Note that commas are always placed after values followed by comments. This may generate dangling commas if the value is
+the last in a container. As dangling commas are legal in JSON5, we accept this as an alternative to the extra code
+complexity that would be necessary to avoid them.
+
+```c++
+using namespace qc::json::tokens;
+using qc::json::Density;
+
+qc::json::Encoder encoder{};
+
+encoder << comment("Comments may occur anywhere in the JSON");
+encoder << object;
+    encoder << "Here's a comment before a value";
+    encoder << "Of course, you can have multiple in succession";
+    encoder << "Name" << "Odracir";
+    encoder << "Age" << comment("This one's between a key and value") << 81;
+    encoder << "Favorite foods" << array(Density::uniline);
+        encoder << comment("Before");
+        encoder << "Beer";
+        encoder << comment("Between");
+        encoder << "More beer";
+        encoder << comment("After");
+    encoder << end;
+    encoder << comment("A comment with newlines\nis split into multiple lines\r\nand \\r\\n is supported");
+encoder << end;
+encoder << "One last comment, just to round it out";
+
+std::cout << encoder.finish();
+```
+```json5
+// Comments may occur anywhere in the JSON
+{
+    // Here's a comment before a value
+    // Of course, you can have multiple in succession
+    "Name": "Odracir",
+    "Age": /* This one's between a key and value */ 81,
+    "Favorite foods": [ /* Before */ "Beer", /* Between */ "More beer", /* After */ ],
+    // A comment with newlines
+    // is split into multiple lines
+    // and \r\n is supported
+},
+// One last comment, just to round it out
+```
+
+### Standalone Values
+
+A single json element may be encoded on its own without needing to be within an object or array.
+
+Of course, trying to add more than one element to the root of the JSON is an error.
+
+```c++
+qc::json::Encoder encoder{};
+
+encoder << "alone";
+
+std::cout << encoder.finish();
+```
+```json5
+"alone"
+```
+
+### Encoder Reuse
+
+Calling `finish()` on an `qc::json::Encoder` leaves the encoder in valid, **empty** state, ready to be reused.
+
+A single json element may be encoded on its own without needing to be within an object or array.
+
+Of course, trying to add more than one element to the root of the JSON is an error.
+
+```c++
+using namespace qc::json::tokens;
+using qc::json::Density;
+
+qc::json::Encoder encoder{};
+
+encoder << object;
+    encoder << "the" << "first";
+encoder << end;
+
+std::cout << encoder.finish() << '\n';
+
+encoder << array(Density::uniline) << "the" << "second" << end;
+
+std::cout << encoder.finish() << '\n';
+
+encoder << "third";
+
+std::cout << encoder.finish();
+```
+```json5
+{
+    "the": "first"
+}
+[ "the", "second" ]
+"third"
+```
+
+## [qc-json-decode.hpp](include/qc-json-decode.hpp)
+
+## [qc-json.hpp](include/qc-json.hpp)
+
+---
+---
+---
 
 ### Some JSON
 
