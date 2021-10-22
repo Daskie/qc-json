@@ -17,6 +17,9 @@
   - [Standalone Values](#standalone-values)
   - [Encoder Reuse](#encoder-reuse)
 - [qc-json-decode.hpp (SAX decoding)](#qc-json-decodehppincludeqc-json-decodehpp)
+  - [Decode](#decode)
+  - [State](#state)
+  - [Composer](#composer)
 - [qc-json.hpp (DOM encoding and decoding)](#qc-jsonhppincludeqc-jsonhpp)
 
 ## Setup / Installation
@@ -57,7 +60,7 @@ target_link_libraries(my-project PRIVATE qc-json::qc-json)
 
 ## [qc-json-encode.hpp](include/qc-json-encode.hpp)
 
-This is a standalone header which provides a SAX-style interface for encoding JSON5. All standard features are
+This standalone header provides a SAX-style interface for encoding JSON5. All standard features are
 supported, plus a few extras.
 
 ### Simple Example
@@ -464,7 +467,166 @@ std::cout << encoder.finish();
 
 ## [qc-json-decode.hpp](include/qc-json-decode.hpp)
 
+This standalone header provides a SAX-style interface for decoding JSON5. All standard features are
+supported, plus a few extras.
+
+### Decode
+
+A JSON string may be decoded using the `qc::json::decode` function: 
+
+```c++
+template <typename Composer, typename State> void decode(string_view json, Composer & composer, State & initialState);
+template <typename Composer, typename State> void decode(string_view json, Composer & composer, State && initialState);
+```
+
+`json` is the JSON5 string to decode. `composer` and `initialState` are explained below.
+
+### State
+
+When composing decoded JSON, it is useful, or even necessary, to track certain information relative to the scope of the
+JSON being decoded. For example, when the JSON contains nested objects or arrays, it may be necessary to store and later
+retrieve data of the parent container when starting/ending the child container.
+
+`qc-json` provides a simple and efficient solution to this problem by keeping track of state for the user. In this way, the
+data simply exists on the stack, without the need for additional containers or memory allocatoin.
+
+When calling `decode`, the user provides the initial state, which will be passed to the callback for the JSON root
+element.
+
+### Composer
+
+The composer is a user-provided class with callback methods for each JSON5 element type. For each element decoded, the
+corresponding callback is called, along with the current state.
+
+An example composer class:
+```c++
+class MyComposer
+{
+    // Need not be an inner class
+    struct State { ... };
+    
+    public:
+    
+    ///
+    /// Callback for an object
+    ///
+    /// @param outerState the state containing the object
+    /// @return the new state to be used within the object
+    ///
+    State object(State & outerState);
+    
+    ///
+    /// Callback for an array
+    ///
+    /// @param outerState the state containing the array
+    /// @return the new state to be used within the array
+    ///
+    State array(State & outerState);
+    
+    ///
+    /// Callback for the end of an object or array
+    ///
+    /// Density is determined by the whitespace found within the container or its children, not including the contents
+    /// of comments and strings
+    ///   - `multiline` if any newlines were encountered
+    ///   - `uniline` if any other whitespace was encountered
+    ///   - `compact` if no whitespace was encountered
+    ///
+    /// @param density the determined density of the array
+    /// @param innerState the state of the array that ended
+    /// @param outerState the state containing the array
+    ///
+    void end(const Density density, State && innerState, State & outerState);
+    
+    ///
+    /// Callback for an object key
+    ///
+    /// @param key the key string. *Note: this view becomes invalid upon return*
+    /// @param state the state containing the key
+    ///
+    void key(const std::string_view key, State & state);
+    
+    ///
+    /// Callback for a string value
+    ///
+    /// @param val the value. *Note: this view becomes invalid upon return*
+    /// @param state the state containing the value
+    ///
+    void val(const std::string_view val, State & state);
+    
+    ///
+    /// Callback for a number that can be exactly represented as a 64 bit signed integer
+    ///
+    /// @param val the value
+    /// @param state the state containing the value
+    ///
+    void val(const int64_t val, State & state);
+    
+    ///
+    /// Callback for a number that can be exactly represented as an unsigned 64 bit integer, but is too large for a
+    /// signed 64 bit integer
+    ///
+    /// @param val the value
+    /// @param state the state containing the value
+    ///
+    void val(const uint64_t val, State & state);
+    
+    ///
+    /// Callback for a number that cannot be exactly represented as a signed or unsigned 64 bit integer
+    ///
+    /// @param val the value
+    /// @param state the state containing the value
+    ///
+    void val(const double val, State & state);
+    
+    ///
+    /// Callback for a boolean
+    ///
+    /// @param val the value
+    /// @param state the state containing the value
+    ///
+    void val(const bool val, State & state);
+    
+    ///
+    /// Callback for null
+    ///
+    /// @param state the state containing the value
+    ///
+    void val(const std::nullptr_t, State & state);
+    
+    ///
+    /// Callback for a comment
+    ///
+    /// Multiple line comments (`//` style) in succession will result in a single callback with their contents joined
+    /// with newlines
+    ///
+    /// @param comment the comment string. *Note: this view becomes invalid upon return*
+    /// @param state the state containing the comment
+    ///
+    void comment(const std::string_view comment, State & state);
+}
+```
+
+The signatures of these callbacks for user provided composer classes are enforced using concepts, resulting in direct
+and understandable error messages should they be ill-formed.
+
+A dummy base class `qc::json::DummyComposer` is proved which the user may extend to avoid implementing all callbacks.
+
 ## [qc-json.hpp](include/qc-json.hpp)
+
+## Future Work
+
+- Implement a stream-style decoder such that the user may do something like
+```c++
+std::string jsonStr{"[ 1, 2, 3 ]"};
+StreamDecoder json{jsonStr};
+int x, y, z;
+json >> array >> x >> y >> z >> end;
+```
+
+- Fuzz testing
+
+- Performance profiling
 
 ---
 ---
