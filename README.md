@@ -3,7 +3,7 @@
 ###### Quick and clean [JSON5](https://json5.org) header library for C++20
 
 ### Contents
-- [Setup / Installation](#setup--installation)
+- [Setup](#setup)
 - [qc-json-encode.hpp (SAX encoding)](#qc-json-encodehppincludeqc-json-encodehpp)
   - [Simple Example](#simple-example)
   - [The Six Types](#the-six-types)
@@ -16,13 +16,17 @@
   - [Comments](#comments)
   - [Standalone Values](#standalone-values)
   - [Encoder Reuse](#encoder-reuse)
+  - [Encode Errors](#encode-errors)
 - [qc-json-decode.hpp (SAX decoding)](#qc-json-decodehppincludeqc-json-decodehpp)
-  - [Decode](#decode)
+  - [Decode Function](#decode-function)
   - [State](#state)
   - [Composer](#composer)
+  - [Decode Errors](#decode-errors)
 - [qc-json.hpp (DOM encoding and decoding)](#qc-jsonhppincludeqc-jsonhpp)
 
-## Setup / Installation
+---
+
+## Setup
 
 ### Method 1: Download the Header file(s)
 
@@ -57,6 +61,8 @@ find_package(qc-json REQUIRED)
 ...
 target_link_libraries(my-project PRIVATE qc-json::qc-json)
 ```
+
+---
 
 ## [qc-json-encode.hpp](include/qc-json-encode.hpp)
 
@@ -465,12 +471,31 @@ std::cout << encoder.finish();
 "third"
 ```
 
+### Encode Errors
+
+If streaming something to an encoder would cause an illegal state, a `qc::json::EncodeError` exception is thrown.
+
+The following (at least) will cause an error:
+- Trying to put two keys for a single object element
+- Not putting a key for an object element
+- Ending a container that doesn't exist
+- Ending an object given a key before giving a value
+- An identifier containing invalid characters
+- An identifier that is empty
+- Putting a comment between a key and value
+- A comment containing unsupported characters
+- A would-be block comment containing `*/`
+- Finishing before all containers have been ended
+- Attempting to add a second root value
+
+---
+
 ## [qc-json-decode.hpp](include/qc-json-decode.hpp)
 
 This standalone header provides a SAX-style interface for decoding JSON5. All standard features are
 supported, plus a few extras.
 
-### Decode
+### Decode Function
 
 A JSON string may be decoded using the `qc::json::decode` function: 
 
@@ -610,11 +635,173 @@ class MyComposer
 The signatures of these callbacks for user provided composer classes are enforced using concepts, resulting in direct
 and understandable error messages should they be ill-formed.
 
-A dummy base class `qc::json::DummyComposer` is proved which the user may extend to avoid implementing all callbacks.
+A dummy base class `qc::json::DummyComposer` is provided which the user may extend to avoid implementing all callbacks.
+
+### Decode Errors
+
+If the decoder encounters any issues decoding the JSON string, a `qc::json::DecodeError` will be thrown which contains
+an index to approximately the first character which caused the problem.
 
 ## [qc-json.hpp](include/qc-json.hpp)
 
-## Future Work
+This header includes both `qc-json-encode.hpp` and `qc-json-decode.hpp` and provides a DOM-style interface for encoding,
+decoding, and manipulating JSON5.
+
+### DOM example
+
+Let's say we have some JSON string `jsonStr`.
+
+```json5
+{
+    "Name": "18 Leg Bouquet",
+    "Price": 17.99,
+    // Owner's note: make this gluten free
+    "Ingredients":["Crab","Octopus","Breadcrumbs"]
+}
+```
+
+To decode this, we pass it to the `qc::json::decode` function.
+
+```c++
+qc::json::Value rootVal{qc::json::decode(jsonStr)};
+```
+
+This returns us a `qc::json::Value`, which represents a single JSON "thing".
+
+Next let's get a reference to our top level object.
+
+```c++
+// `qc::json::Object` is an alias for `std::map<std::string, qc::json::Value>`
+qc::json::Object & rootObj{rootVal.asObject()};
+```
+
+We'll demonstrate basic access by type checking and printing the name.
+
+```c++
+qc::json::Value & nameVal{rootObj.at("Name")};
+
+if (nameVal.type() == qc::json::Type::string) {
+    std::cout << "Name: " << nameVal.asString();
+}
+```
+
+> Name: 18 Leg Bouquet
+
+Now let's modify some JSON by fulfilling the owner's request to make the dish gluten-free.
+
+First we'll remove breadcrumbs from the ingredients list.
+
+```c++
+// We'll be reusing this later
+qc::json::Value & ingredientsVal{rootObjec.at("Ingredients")};
+
+// Get reference to ingredients array
+// `qc::json::Array` is an alias for `std::vector<qc::json::Array>`
+qc::json::Array & ingredients{ingredientsVal.asArray()};
+
+// If "Breadcrumbs" is present, remove it
+// This is just `std::vector` manipulation
+auto it{ingredients.find("Breadcrumbs")};
+if (it != ingredients.end()) {
+    ingredients.erase(it);
+}
+```
+
+Next, we update the price to reflect the change.
+
+```c++
+rootObj.at("Price").asFloater() -= 0.5;
+```
+
+We really shouldn't be storing prices as floating point, so let's add a comment.
+
+```c++
+rootObj.at("Price").setComment("Consider storing prices as cent integers");
+```
+
+Anyway, we'll next add a gluten-free tag.
+
+```c++
+// This constructs a new `qc::json::Value` defaulting to type Null, then assigns a bool converting it to type Boolean
+rootObj["Gluten-free"] = true;
+
+// Alternatively, we could directly create a Boolean value
+rootObj.emplace("Gluten-free", true);
+```
+
+Last thing is to remove the gluten comment.
+
+```c++
+ingredientsVal.removeComment();
+```
+
+Finally, let's give the ingredients array a little breathing room.
+
+```c++
+ingredientsVal.setDensity(qc::json::Density::uniline);
+```
+
+Encoding back to a string yields our results.
+
+```c++
+jsonStr = qc::json::encode(rootVal);
+```
+```json5
+{
+    "Gluten-free": true,
+    "Ingredients": [ "Crab", "Octopus" ],
+    "Name": "18 Leg Bouquet",
+    // Consider storing prices as cent integers
+    "Price": 17.49
+}
+```
+
+Note the reorganization of elements into alphabetical order. This is expected an currently unnavoidable due to using
+`std::map` as the backing container. Consideration of alternatives is on the backlog.
+
+### Safe vs Unsafe Access
+
+### Type Exceptions
+
+### Automatic Conversion between Custom Types and `qc::json::Value`
+
+### Checking Type
+
+### Retrieving Value
+
+### Creating a Value
+
+### Modifying a Value
+
+### Equality of Values
+
+### Handling Comments
+
+### Handling Density
+
+### `makeObject` and `makeArray`
+
+### Decoding JSON string to `qc::json::Value`
+
+### Encoding `qc::json::Value` to JSON string
+
+---
+
+## Miscellaneous
+
+### Strings and `std::string_view`
+
+### Supported Characters and Escape Sequences
+
+### Number Formats
+
+### Number Storage
+
+### `char` is Special
+
+---
+
+## TODO
 
 - Implement a stream-style decoder such that the user may do something like
 ```c++
@@ -628,111 +815,11 @@ json >> array >> x >> y >> z >> end;
 
 - Performance profiling
 
+- Consider preserving order of elements in objects
+
 ---
 ---
 ---
-
-### Some JSON
-
-```json
-{
-    "Name": "18 Leg Bouquet",
-    "Price": 17.99,
-    "Ingredients": [ "Crab", "Octopus", "Breadcrumbs" ],
-    "Sold": 68
-}
-```
-
-Let's say it's in a string, `jsonStr`
-
-### Decode some JSON
-
-```c++
-qc::json::Value jsonVal{qc::json::decode(jsonStr)};
-```
-
-Let's get a reference to our top level object for easy access
-
-```c++
-qc::json::Object & obj{jsonVal.asObject()};
-```
-
-Print the name
-
-```c++
-std::cout << "Name: " << obj.at("Name").asString() << std::endl;
-```
-
-> Name: 18 Leg Bouquet
-
-Print the price
-
-```c++
-std::cout << "Price: " << obj.at("Price").asFloater() << std::endl;
-```
-
-> Price: 17.99
-
-List the ingredients
-
-```c++
-std::cout << "Ingredients:";
-for (qc::json::Value & val : obj.at("Ingredients").asArray()) {
-    std::cout << " " << val.asString();
-}
-std::cout << std::endl;
-```
-
-> Ingredients: Crab Octopus Breadcrumbs
-
-Print the quantity sold
-
-```c++
-std::cout << "Sold: " << obj.at("Sold").asInteger() << std::endl;
-```
-
-> Sold: 68
-
-### Modify some JSON
-
-Increment the quantity sold
-
-```c++
-++obj.at("Sold").asInteger();
-```
-
-Remove breadcrumbs from the ingredients list
-
-```c++
-obj.at("Ingredients").asArray().remove(2); // Here, 2 is the array index
-```
-
-Add a new "Gluten Free" field
-
-```c++
-obj.add("Gluten Free", false);
-```
-
-### Encode some JSON
-
-```c++
-std::string newJsonStr{qc::json::encode(jsonVal)};
-```
-
-`newJsonStr` will contain:
-
-```json
-{
-    "Gluten Free": true,
-    "Ingredients": [
-        "Crab",
-        "Octopus"
-    ],
-    "Name": "18 Leg Bouquet",
-    "Price": 17.99,
-    "Sold": 69
-}
-```
 
 ### Alternatively, encode some JSON directly
 
