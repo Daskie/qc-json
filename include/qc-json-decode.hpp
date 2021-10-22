@@ -94,12 +94,13 @@ namespace qc::json
     /// @param composer the contents of the JSON are decoded in order and passed to this to do something with
     /// @param initialState the initial state object to be passed to the composer
     ///
-    template <typename Composer, typename State> void decode(string_view json, Composer & composer, State initialState);
+    template <typename Composer, typename State> void decode(string_view json, Composer & composer, State & initialState);
+    template <typename Composer, typename State> void decode(string_view json, Composer & composer, State && initialState);
 
     ///
     /// An example composer whose operations are all no-ops
     ///
-    /// Any custom composer must provide matching methods. This may be extended for baseline no-ops
+    /// Any custom composer must provide matching methods. This class may be extended for baseline no-ops
     ///
     template <typename State = nullptr_t>
     class DummyComposer
@@ -786,7 +787,7 @@ namespace qc::json
     template <typename Composer, typename State> concept _ComposerHasCommentMethod = requires (Composer composer, const string_view comment, State state) { composer.comment(comment, state); };
 
     template <typename Composer, typename State>
-    inline void decode(string_view json, Composer & composer, State initialState)
+    inline void decode(string_view json, Composer & composer, State & initialState)
     {
         // Much more understandable compile errors than just letting the template code fly
         static_assert(_ComposerHasObjectMethod<Composer, State>);
@@ -802,5 +803,11 @@ namespace qc::json
         static_assert(_ComposerHasCommentMethod<Composer, State>);
 
         return _Decoder<Composer, State>{json, composer}(initialState);
+    }
+
+    template <typename Composer, typename State>
+    inline void decode(string_view json, Composer & composer, State && initialState)
+    {
+        return decode(json, composer, initialState);
     }
 }
