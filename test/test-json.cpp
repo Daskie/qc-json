@@ -277,79 +277,98 @@ TEST(json, valueAssignAndEquality)
     v = makeObject("a", 1, "b", "wow", "c", nullptr);
     EXPECT_EQ(Type::object, v.type());
     EXPECT_TRUE(v == objRef);
+    EXPECT_FALSE(v != objRef);
 
     const Array arrRef{qc::json::makeArray(0, "a", true)};
     v = qc::json::makeArray(0, "a", true);
     EXPECT_EQ(Type::array, v.type());
     EXPECT_TRUE(v == arrRef);
+    EXPECT_FALSE(v != arrRef);
 
     v = "hello"s;
     EXPECT_EQ(Type::string, v.type());
     EXPECT_TRUE(v == "hello"s);
+    EXPECT_FALSE(v != "hello"s);
 
     v = "hellu"sv;
     EXPECT_EQ(Type::string, v.type());
     EXPECT_TRUE(v == "hellu"sv);
+    EXPECT_FALSE(v != "hellu"sv);
 
     v = "helli";
     EXPECT_EQ(Type::string, v.type());
     EXPECT_TRUE(v == "helli");
+    EXPECT_FALSE(v != "helli");
 
     v = const_cast<char *>("hella");
     EXPECT_EQ(Type::string, v.type());
     EXPECT_TRUE(v == const_cast<char *>("hella"));
+    EXPECT_FALSE(v != const_cast<char *>("hella"));
 
     v = 'h';
     EXPECT_EQ(Type::string, v.type());
     EXPECT_TRUE(v == 'h');
+    EXPECT_FALSE(v != 'h');
 
     v = int64_t(5);
     EXPECT_EQ(Type::integer, v.type());
     EXPECT_TRUE(v == int64_t(5));
+    EXPECT_FALSE(v != int64_t(5));
 
     v = int32_t(6);
     EXPECT_EQ(Type::integer, v.type());
     EXPECT_TRUE(v == int32_t(6));
+    EXPECT_FALSE(v != int32_t(6));
 
     v = int16_t(7);
     EXPECT_EQ(Type::integer, v.type());
     EXPECT_TRUE(v == int16_t(7));
+    EXPECT_FALSE(v != int16_t(7));
 
     v = int8_t(8);
     EXPECT_EQ(Type::integer, v.type());
     EXPECT_TRUE(v == int8_t(8));
+    EXPECT_FALSE(v != int8_t(8));
 
     v = uint64_t(10u);
     EXPECT_EQ(Type::unsigner, v.type());
     EXPECT_TRUE(v == uint64_t(10u));
+    EXPECT_FALSE(v != uint64_t(10u));
 
     v = uint32_t(11u);
     EXPECT_EQ(Type::unsigner, v.type());
     EXPECT_TRUE(v == uint32_t(11u));
+    EXPECT_FALSE(v != uint32_t(11u));
 
     v = uint16_t(12u);
     EXPECT_EQ(Type::unsigner, v.type());
     EXPECT_TRUE(v == uint16_t(12u));
+    EXPECT_FALSE(v != uint16_t(12u));
 
     v = uint8_t(13u);
     EXPECT_EQ(Type::unsigner, v.type());
     EXPECT_TRUE(v == uint8_t(13u));
+    EXPECT_FALSE(v != uint8_t(13u));
 
     v = 7.7;
     EXPECT_EQ(Type::floater, v.type());
     EXPECT_TRUE(v == 7.7);
+    EXPECT_FALSE(v != 7.7);
 
     v = 7.7f;
     EXPECT_EQ(Type::floater, v.type());
     EXPECT_TRUE(v == 7.7f);
+    EXPECT_FALSE(v != 7.7f);
 
     v = true;
     EXPECT_EQ(Type::boolean, v.type());
     EXPECT_TRUE(v == true);
+    EXPECT_FALSE(v != true);
 
     v = nullptr;
     EXPECT_EQ(Type::null, v.type());
     EXPECT_TRUE(v == nullptr);
+    EXPECT_FALSE(v != nullptr);
 }
 
 TEST(json, swap)
@@ -488,6 +507,7 @@ TEST(json, valueTypes)
 template <typename T>
 void testNumber(T v, bool isS64, bool isS32, bool isS16, bool isS08, bool isU64, bool isU32, bool isU16, bool isU08, bool isF64, bool isF32) {
     Value val(v);
+
     EXPECT_EQ(isS64, val.is< int64_t>());
     EXPECT_EQ(isS32, val.is< int32_t>());
     EXPECT_EQ(isS16, val.is< int16_t>());
@@ -774,6 +794,113 @@ TEST(json, encoderOptions)
     'v'
   ]
 })", encode(makeObject("k", makeArray("v")), Density::multiline, 2u, true, true));
+}
+
+TEST(json, numberEquality)
+{
+    { // Signed integer
+        Value val{10};
+        EXPECT_TRUE(val == 10);
+        EXPECT_TRUE(val == 10u);
+        EXPECT_TRUE(val == 10.0);
+        EXPECT_FALSE(val != 10);
+        EXPECT_FALSE(val != 10u);
+        EXPECT_FALSE(val != 10.0);
+        EXPECT_TRUE(10 == val);
+        EXPECT_TRUE(10u == val);
+        EXPECT_TRUE(10.0 == val);
+        EXPECT_FALSE(10 != val);
+        EXPECT_FALSE(10u != val);
+        EXPECT_FALSE(10.0 != val);
+        EXPECT_FALSE(val == 11);
+        EXPECT_FALSE(val == 11u);
+        EXPECT_FALSE(val == 11.0);
+        EXPECT_TRUE(val != 11);
+        EXPECT_TRUE(val != 11u);
+        EXPECT_TRUE(val != 11.0);
+        EXPECT_FALSE(11 == val);
+        EXPECT_FALSE(11u == val);
+        EXPECT_FALSE(11.0 == val);
+        EXPECT_TRUE(11 != val);
+        EXPECT_TRUE(11u != val);
+        EXPECT_TRUE(11.0 != val);
+    }
+    { // Unsigned integer
+        Value val{10u};
+        EXPECT_TRUE(val == 10);
+        EXPECT_TRUE(val == 10u);
+        EXPECT_TRUE(val == 10.0);
+        EXPECT_FALSE(val != 10);
+        EXPECT_FALSE(val != 10u);
+        EXPECT_FALSE(val != 10.0);
+        EXPECT_TRUE(10 == val);
+        EXPECT_TRUE(10u == val);
+        EXPECT_TRUE(10.0 == val);
+        EXPECT_FALSE(10 != val);
+        EXPECT_FALSE(10u != val);
+        EXPECT_FALSE(10.0 != val);
+        EXPECT_FALSE(val == 11);
+        EXPECT_FALSE(val == 11u);
+        EXPECT_FALSE(val == 11.0);
+        EXPECT_TRUE(val != 11);
+        EXPECT_TRUE(val != 11u);
+        EXPECT_TRUE(val != 11.0);
+        EXPECT_FALSE(11 == val);
+        EXPECT_FALSE(11u == val);
+        EXPECT_FALSE(11.0 == val);
+        EXPECT_TRUE(11 != val);
+        EXPECT_TRUE(11u != val);
+        EXPECT_TRUE(11.0 != val);
+    }
+    { // Floater
+        Value val{10.0};
+        EXPECT_TRUE(val == 10);
+        EXPECT_TRUE(val == 10u);
+        EXPECT_TRUE(val == 10.0);
+        EXPECT_FALSE(val != 10);
+        EXPECT_FALSE(val != 10u);
+        EXPECT_FALSE(val != 10.0);
+        EXPECT_TRUE(10 == val);
+        EXPECT_TRUE(10u == val);
+        EXPECT_TRUE(10.0 == val);
+        EXPECT_FALSE(10 != val);
+        EXPECT_FALSE(10u != val);
+        EXPECT_FALSE(10.0 != val);
+        EXPECT_FALSE(val == 11);
+        EXPECT_FALSE(val == 11u);
+        EXPECT_FALSE(val == 11.0);
+        EXPECT_TRUE(val != 11);
+        EXPECT_TRUE(val != 11u);
+        EXPECT_TRUE(val != 11.0);
+        EXPECT_FALSE(11 == val);
+        EXPECT_FALSE(11u == val);
+        EXPECT_FALSE(11.0 == val);
+        EXPECT_TRUE(11 != val);
+        EXPECT_TRUE(11u != val);
+        EXPECT_TRUE(11.0 != val);
+    }
+    { // Special cases
+        Value val{std::numeric_limits<uint64_t>::max()};
+        EXPECT_FALSE(val == -1);
+
+        val = -1;
+        EXPECT_FALSE(val == std::numeric_limits<uint64_t>::max());
+
+        val = std::numeric_limits<int64_t>::max();
+        EXPECT_FALSE(val == double(std::numeric_limits<int64_t>::max()));
+
+        val = std::numeric_limits<uint64_t>::max();
+        EXPECT_FALSE(val == double(std::numeric_limits<uint64_t>::max()));
+
+        val = std::numeric_limits<double>::infinity();
+        EXPECT_TRUE(val == std::numeric_limits<double>::infinity());
+        EXPECT_FALSE(val == std::numeric_limits<int64_t>::max());
+        EXPECT_FALSE(val == std::numeric_limits<uint64_t>::max());
+
+        val = std::numeric_limits<double>::quiet_NaN();
+        EXPECT_FALSE(val == std::numeric_limits<double>::quiet_NaN());
+        EXPECT_TRUE(val != std::numeric_limits<double>::quiet_NaN());
+    }
 }
 
 TEST(json, general)

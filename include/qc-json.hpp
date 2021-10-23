@@ -1187,21 +1187,15 @@ namespace qc::json
 
     inline bool Value::operator==(const Value & other) const noexcept
     {
-        const Type type{this->type()};
-
-        if (other.type() != type) {
-            return false;
-        }
-
-        switch (type) {
-            case Type::null: return true;
-            case Type::object: return asObject<unsafe>() == other.asObject<unsafe>();
-            case Type::array: return asArray<unsafe>() == other.asArray<unsafe>();
-            case Type::string: return asString<unsafe>() == other.asString<unsafe>();
-            case Type::integer: return _integer == other._integer;
-            case Type::unsigner: return _unsigner == other._unsigner;
-            case Type::floater: return _floater == other._floater;
-            case Type::boolean: return _boolean == other._boolean;
+        switch (other.type()) {
+            case Type::null: return *this == other._null;
+            case Type::object: return *this == other.asObject<unsafe>();
+            case Type::array: return *this == other.asArray<unsafe>();
+            case Type::string: return *this == other.asString<unsafe>();
+            case Type::integer: return *this == other._integer;
+            case Type::unsigner: return *this == other._unsigner;
+            case Type::floater: return *this == other._floater;
+            case Type::boolean: return *this == other._boolean;
             default: return false;
         }
     }
@@ -1238,7 +1232,12 @@ namespace qc::json
 
     inline bool Value::operator==(const int64_t val) const noexcept
     {
-        return type() == Type::integer && _integer == val;
+        switch (type()) {
+            case Type::integer: return _integer == val;
+            case Type::unsigner: return val >= 0 && _unsigner == uint64_t(val);
+            case Type::floater: return _floater == double(val) && int64_t(_floater) == val;
+            default: return false;
+        }
     }
 
     inline bool Value::operator==(const int32_t val) const noexcept
@@ -1258,7 +1257,12 @@ namespace qc::json
 
     inline bool Value::operator==(const uint64_t val) const noexcept
     {
-        return type() == Type::unsigner && _unsigner == val;
+        switch (type()) {
+            case Type::integer: return _integer >= 0 && uint64_t(_integer) == val;
+            case Type::unsigner: return _unsigner == val;
+            case Type::floater: return _floater == double(val) && uint64_t(_floater) == val;
+            default: return false;
+        }
     }
 
     inline bool Value::operator==(const uint32_t val) const noexcept
@@ -1278,7 +1282,12 @@ namespace qc::json
 
     inline bool Value::operator==(const double val) const noexcept
     {
-        return type() == Type::floater && _floater == val;
+        switch (type()) {
+            case Type::integer: return double(_integer) == val && _integer == int64_t(val);
+            case Type::unsigner: return double(_unsigner) == val && _unsigner == uint64_t(val);
+            case Type::floater: return _floater == val;
+            default: return false;
+        }
     }
 
     inline bool Value::operator==(const float val) const noexcept
