@@ -30,7 +30,7 @@ bool operator==(const CustomVal & cv1, const CustomVal & cv2)
 }
 
 template <qc::json::Safety isSafe>
-struct qc::json::valueTo<CustomVal, isSafe>
+struct qc::json::ValueTo<CustomVal, isSafe>
 {
     CustomVal operator()(const Value & val) const
     {
@@ -40,7 +40,7 @@ struct qc::json::valueTo<CustomVal, isSafe>
 };
 
 template <>
-struct qc::json::valueFrom<CustomVal>
+struct qc::json::ValueFrom<CustomVal>
 {
     Value operator()(const CustomVal & v) const
     {
