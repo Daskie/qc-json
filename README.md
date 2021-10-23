@@ -759,31 +759,232 @@ jsonStr = qc::json::encode(rootVal);
 Note the reorganization of elements into alphabetical order. This is expected an currently unnavoidable due to using
 `std::map` as the backing container. Consideration of alternatives is on the backlog.
 
-### Safe vs Unsafe Access
-
-### Type Exceptions
-
-### Automatic Conversion between Custom Types and `qc::json::Value`
-
-### Checking Type
-
-### Retrieving Value
-
 ### Creating a Value
 
-### Modifying a Value
+Constructing a value via `qc::json::Value{...}` creates a new JSON value depending on the type passed:
 
-### Equality of Values
+ Constructed With Type | Value Type | Stored Internally As
+:---:|:---:|:---:
+`qc::json::Object` | `object` | `qc::json::Object`
+`qc::json::Array` | `array` | `qc::json::Array`
+`std::string`, `std::string_view`, `const char *`, `char` | `string` | `std::string`
+`int8_t`, `int16_t`, `int32_t`, `int64_t` | `integer` | `int64_t`
+`uint8_t`, `uint16_t`, `uint32_t`, `uint64_t` | `unsigner` | `uint64_t`
+`float`, `double` | `floater` | `double`
+`bool` | `boolean` | `bool`
+`nullptr_t` or nothing | `null` | `nullptr_t`
 
-### Handling Comments
+Note: `qc::json::Object` is an alias for `std::map<std::string, qc::json::Value>`, and  `qc::json::Array` is an alias
+for `std::vector<qc::json::Value>`
 
-### Handling Density
+Any other type may be passed to the constructor, in which case `qc::json::ValueFrom` is called.
+See [Value To/From Custom Type](#value-tofrom-custom-type).
 
 ### `makeObject` and `makeArray`
 
-### Decoding JSON string to `qc::json::Value`
+Objects and arrays may be constructed "manually" using the standard `std::map`/`std::vector` API, but in certain cases
+this proves tedious.
 
-### Encoding `qc::json::Value` to JSON string
+Two helper functions, `qc::json::makeObject` and `qc::json::makeArray` are provided as a short-hand alternatives.
+
+```c++
+// An even number of arguments alternating between key and value are forwarded to `std::map::emplace`
+qc::json::Value objVal{qc::json::makeObject("a", 123, "b", true, "c", nullptr)};
+
+// Arguments are each forwarded to `std::vector::emplace_back`
+qc::json::Value arrVal{qc::json::makeArray(123, true, nullptr)};
+```
+```json5
+// `objVal`
+{
+    "a": 123,
+    "b": true,
+    "c": null
+}
+
+// `arrVal`
+[
+    123,
+    true,
+    null
+]
+```
+
+### Modifying a Value
+
+An existing `qc::json::Value` may be modified in two ways.
+
+A mutable reference to the contained value may be accessed and manipulated using using the `as...` methods.
+
+```c++
+qc::json::Value val{0};
+++val.asInteger(); // Directly increments the internal value to `1`
+```
+
+Alternatively, the `qc::json::Value` itself may be directly assigned a new value.
+
+```c++
+qc::json::Value val{0};
+val = 1; // Assigns the internal value to `1`
+val = "abc"; // The old internal value is destructed and a new internal value is constructed as the string "abc"
+```
+
+### Checking Type
+
+Type may be checked by the `is` methods, of which there are direct and templated versions.
+
+`qc::json::Type` | Direct Method | Template Method | Internal Type
+:---:|:---:|:---:|:---:
+`object` | `isObject` | `is<qc::json::Object>` | `qc::json::Object`
+`array` | `isArray` | `is<qc::json::Array>` | `qc::json::Array`
+`string` | `isString` | `is<std::string>`, `is<std::string_view>`, `is<const char *>`, `is<char>`* | `std::string`
+`integer` | `isInteger` | ** | `int64_t`
+`unsigner` | `isUnsigner` | ** | `uint64_t`
+`floater` | `isFloater` | ** | `double`
+`boolean` | `isBoolean` | `is<bool>` | `bool`
+`null` | `isNull` | `is<nullptr_t>` | `nullptr_t`
+
+\* `is<char>` checks not only that the type is `string`, but also that the length of the string is `1`.
+
+** The direct numeric methods `isInteger`, `isUnsigner`, and `isFloater` simply check for a match in type. On the other
+hand, the template numeric methods `is<...>` check not just the type, but also the value of the number. Basically, they
+return true if the value can be exactly represented by the given type. For example, a value `13` may be stored
+internally as a `int64_t` with type `integer`, but all `is<int>`, `is<unsigned int>`, and `is<float>` would all return
+true, since `13` can be exactly represented in each case. On the other hand, were the value `-13`, `is<int>` and
+`is<float>` would return true, but `is<unsigned int>` would return false.
+
+### Accessing Stored Value
+
+The internal value of a `qc::json::Value` can be retrieved by two means.
+
+First, a reference to the value is returned via the `as...` methods: `asObject`, `asArray`, `asString`, `asInteger`,
+`asUnsigner`, `asFloater`, `asBoolean`.
+
+Second, a copy of the value is returned via the `get<...>` method. For example, `get<short>` will return the value as a
+`short`.
+
+In both cases, if the type requested does not match the type of the value, or, in the case of numbers, the type
+requested cannot exactly represent the value, a `qc::json::TypeError` is thrown.
+
+If the type is known ahead of time, a little performance can be gained by bypassing these checks with the "unsafe"
+specializations of these functions.
+
+For example, this is a common pattern:
+```c++
+qc::json::Value val; // Defined somewhere
+
+// Check the type of the value
+if (val.isBoolean()) {
+    // We know it's a boolean, so this is okay
+    doSomething(val.asBoolean<qc::json::unsafe>());
+}
+else if (val.is<const char *>()) {
+    // We know it's a string, so this is okay
+    doSomethingElse(val.get<const char *, qc::json::unsafe>());
+}
+```
+
+Be warned, using these unsafe methods erroneously is a first class ticket to segfault city.
+
+### Value Equality
+
+Two values can be compared with `==` and `!=`.
+
+```c++
+qc::json::Value val1, val2; // Defined somewhere
+
+val1 == val2; // Whether the values are equivalent
+val1 != val2; // Whether the values are not equivalent
+```
+
+Alternatively, a value can be compared directly.
+
+```c++
+qc::json::Value val; // Defined somewhere
+qc::json::Object obj; // Defined somewhere
+
+val == true; // Whether `val` is a boolean with value `true`
+val != obj; // Whether `val` isn't an object or is an object that isn't equivalent to `obj`
+```
+
+For numbers, the type does not need to match so long as the values are exactly the same.
+
+```c++
+qc::json::Value val{-1}; // A signed integer
+val == -1.0; // True - different types but exactly the same number
+val == -1.1; // False - the fractional component is considered
+val == -1u; // False - the unsigned value has the same binary representation but is a different number
+```
+
+### Value To/From Custom Type
+
+User defined types can be implicitly converted to or from a `qc::json::Value` by means of the `qc::json::ValueFrom` and
+`qc::json::ValueTo` struct specializations.
+
+For example, let's enable automatic conversion between a `std::pair<int, int>` and an array of two numbers.
+
+```c++
+// Specializing `qc::json::ValueFrom` for `std::pair<int, int>`
+template <>
+struct qc::json::ValueFrom<std::pair<int, int>> {
+    qc::json::Value operator()(const std::pair<int, int> & v) const {
+        return qc::json::makeArray(v.first, f.second);
+    }
+};
+```
+
+```c++
+// Specializing `qc::json::ValueTo` for `std::pair<int, int>`
+template <>
+struct qc::json::ValueTo<std::pair<int, int>> {
+    std::pair<int, int> operator()(const qc::json::Value & v) const {
+        const qc::json::Array & arr{v.asArray()};
+        return {arr.at(0u)->get<int>(), arr.at(1u)->get<int>()};
+    }
+};
+```
+
+This now enables us to write code such as:
+
+```c++
+std::pair<int, int> pair{1, 2};
+
+// `ValueFrom` is called to inmplicity convert `pair` to `qc::json::Value`
+qc::json::Value pairVal{pair};
+
+// The same implicit conversion happens and then the new `qc::json::Value` is assigned to `pairVal`
+pairVal = pair;
+
+// The same implicit conversion happens and then the new `qc::json::Value` is compared to `pairVal`
+pairVal == pair;
+
+// `ValueTo` is called to convert `pairVal` to `std::pair<int, int>`
+pair = pairVal.get<pairVal>();
+```
+
+### Handling Comments
+
+
+
+### Handling Density
+
+
+
+### Decoding JSON String to Value
+
+
+
+### Encoding Value to JSON string
+
+
+
+### Type Exceptions
+
+
+
+### Optimizations
+
+
 
 ---
 
