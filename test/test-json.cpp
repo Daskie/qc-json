@@ -221,6 +221,30 @@ TEST(json, encodeDecodeCustom)
     EXPECT_EQ(val, decode(encode(val)).get<CustomVal>());
 }
 
+TEST(json, valueToFromCustom)
+{
+    CustomVal c{1, 2};
+
+    Value cVal{c};
+    EXPECT_EQ(Type::array, cVal.type());
+    EXPECT_EQ(2u, cVal.asArray().size());
+    EXPECT_EQ(1, cVal.asArray().at(0u));
+    EXPECT_EQ(2, cVal.asArray().at(1u));
+
+    cVal = nullptr;
+
+    cVal = c;
+    EXPECT_EQ(Type::array, cVal.type());
+    EXPECT_EQ(2u, cVal.asArray().size());
+    EXPECT_EQ(1, cVal.asArray().at(0u));
+    EXPECT_EQ(2, cVal.asArray().at(1u));
+
+    CustomVal c2{cVal.get<CustomVal>()};
+    EXPECT_EQ(c, c2);
+
+    EXPECT_EQ(c, cVal);
+}
+
 TEST(json, valueConstruction)
 {
     // Default
