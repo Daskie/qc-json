@@ -29,13 +29,13 @@ bool operator==(const CustomVal & cv1, const CustomVal & cv2)
     return cv1.x == cv2.x && cv1.y == cv2.y;
 }
 
-template <qc::json::Safety isSafe>
-struct qc::json::ValueTo<CustomVal, isSafe>
+template <>
+struct qc::json::ValueTo<CustomVal>
 {
     CustomVal operator()(const Value & val) const
     {
-        const Array & arr{val.asArray<isSafe>()};
-        return {arr.at(0).get<int, isSafe>(), arr.at(1).get<int, isSafe>()};
+        const Array & arr{val.asArray()};
+        return {arr.at(0).get<int>(), arr.at(1).get<int>()};
     }
 };
 

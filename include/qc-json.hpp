@@ -87,8 +87,8 @@ namespace qc::json
     /// Example:
     ///     template <>
     ///     struct qc::json::ValueFrom<std::pair<int, int>> {
-    ///         qc::json::Value operator()(const std::pair<int, int> & v) {
-    ///             return qc::json::Array{v.first, f.second};
+    ///         qc::json::Value operator()(const std::pair<int, int> & v) const {
+    ///             return qc::json::makeArray(v.first, f.second);
     ///         }
     ///     };
     ///
@@ -103,20 +103,20 @@ namespace qc::json
     /// Specialize `qc::json::ValueTo` to enable `Value::as` for custom types
     ///
     /// Example:
-    ///     template <qc::json::Safety isSafe>
-    ///     struct qc::json::ValueTo<std::pair<int, int>, isSafe> {
-    ///         std::pair<int, int> operator()(const qc::json::Value & v) {
-    ///             const qc::json::Array & arr{v.asArray<isSafe>()};
-    ///             return {arr.at(0u)->asInteger<isSafe>(), arr.at(1u)->asInteger<isSafe>()};
+    ///     template <>
+    ///     struct qc::json::ValueTo<std::pair<int, int>> {
+    ///         std::pair<int, int> operator()(const qc::json::Value & v) const {
+    ///             const qc::json::Array & arr{v.asArray()};
+    ///             return {arr.at(0)->get<int>(), arr.at(1)->get<int>()};
     ///         }
     ///     };
     ///
-    template <typename T, Safety isSafe> struct ValueTo;
+    template <typename T> struct ValueTo;
 
     ///
     /// Concept describing a type for which `qc::json::ValueTo` has been specialized
     ///
-    template <typename T> concept ValueToAble = requires (Value v) { { ::qc::json::ValueTo<T, ::qc::json::Safety::safe>{}(v) } -> std::same_as<T>; };
+    template <typename T> concept ValueToAble = requires (Value v) { { ::qc::json::ValueTo<T>{}(v) } -> std::same_as<T>; };
 
     ///
     /// Represents one JSON value, which can be an object, array, string, number, boolean, or null
@@ -266,65 +266,65 @@ namespace qc::json
         template <typename T> bool is() const noexcept;
 
         ///
-        /// @tparam isSafe whether to check if this value is actually an object
+        /// @tparam safety whether to check if this value is actually an object
         /// @return this value as an object
-        /// @throw `TypeError` if this value is not an object and `isSafe` is true
+        /// @throw `TypeError` if this value is not an object and safety is enabled
         ///
-        template <Safety isSafe = safe> Object & asObject() noexcept(isSafe == unsafe);
-        template <Safety isSafe = safe> const Object & asObject() const noexcept(isSafe == unsafe);
+        template <Safety safety = safe> Object & asObject() noexcept(safety == unsafe);
+        template <Safety safety = safe> const Object & asObject() const noexcept(safety == unsafe);
 
         ///
-        /// @tparam isSafe whether to check if this value is actually an array
+        /// @tparam safety whether to check if this value is actually an array
         /// @return this value as an array
-        /// @throw `TypeError` if this value is not an array and `isSafe` is true
+        /// @throw `TypeError` if this value is not an array and safety is enabled
         ///
-        template <Safety isSafe = safe> Array & asArray() noexcept(isSafe == unsafe);
-        template <Safety isSafe = safe> const Array & asArray() const noexcept(isSafe == unsafe);
+        template <Safety safety = safe> Array & asArray() noexcept(safety == unsafe);
+        template <Safety safety = safe> const Array & asArray() const noexcept(safety == unsafe);
 
         ///
-        /// @tparam isSafe whether to check if this value is actually a string
+        /// @tparam safety whether to check if this value is actually a string
         /// @return this value as a string
-        /// @throw `TypeError` if this value is not a string and `isSafe` is true
+        /// @throw `TypeError` if this value is not a string and safety is enabled
         ///
-        template <Safety isSafe = safe> string & asString() noexcept(isSafe == unsafe);
-        template <Safety isSafe = safe> const string & asString() const noexcept(isSafe == unsafe);
+        template <Safety safety = safe> string & asString() noexcept(safety == unsafe);
+        template <Safety safety = safe> const string & asString() const noexcept(safety == unsafe);
 
         ///
-        /// @tparam isSafe whether to check if this value is actually a signed integer
+        /// @tparam safety whether to check if this value is actually a signed integer
         /// @return this value as a signed integer
-        /// @throw `TypeError` if this value is not a signed integer and `isSafe` is true
+        /// @throw `TypeError` if this value is not a signed integer and safety is enabled
         ///
-        template <Safety isSafe = safe> int64_t & asInteger() noexcept(isSafe == unsafe);
-        template <Safety isSafe = safe> const int64_t & asInteger() const noexcept(isSafe == unsafe);
+        template <Safety safety = safe> int64_t & asInteger() noexcept(safety == unsafe);
+        template <Safety safety = safe> const int64_t & asInteger() const noexcept(safety == unsafe);
 
         ///
-        /// @tparam isSafe whether to check if this value is actually an unsigned integer
+        /// @tparam safety whether to check if this value is actually an unsigned integer
         /// @return this value as an unsigned integer
-        /// @throw `TypeError` if this value is not an unsigned integer and `isSafe` is true
+        /// @throw `TypeError` if this value is not an unsigned integer and safety is enabled
         ///
-        template <Safety isSafe = safe> uint64_t & asUnsigner() noexcept(isSafe == unsafe);
-        template <Safety isSafe = safe> const uint64_t & asUnsigner() const noexcept(isSafe == unsafe);
+        template <Safety safety = safe> uint64_t & asUnsigner() noexcept(safety == unsafe);
+        template <Safety safety = safe> const uint64_t & asUnsigner() const noexcept(safety == unsafe);
 
         ///
-        /// @tparam isSafe whether to check if this value is actually a floater
+        /// @tparam safety whether to check if this value is actually a floater
         /// @return this value as a floater
-        /// @throw `TypeError` if this value is not a floater and `isSafe` is true
+        /// @throw `TypeError` if this value is not a floater and safety is enabled
         ///
-        template <Safety isSafe = safe> double & asFloater() noexcept(isSafe == unsafe);
-        template <Safety isSafe = safe> const double & asFloater() const noexcept(isSafe == unsafe);
+        template <Safety safety = safe> double & asFloater() noexcept(safety == unsafe);
+        template <Safety safety = safe> const double & asFloater() const noexcept(safety == unsafe);
 
         ///
-        /// @tparam isSafe whether to check if this value is actually a boolean
+        /// @tparam safety whether to check if this value is actually a boolean
         /// @return this value as a boolean
-        /// @throw `TypeError` if this value is not a boolean and `isSafe` is true
+        /// @throw `TypeError` if this value is not a boolean and safety is enabled
         ///
-        template <Safety isSafe = safe> bool & asBoolean() noexcept(isSafe == unsafe);
-        template <Safety isSafe = safe> const bool & asBoolean() const noexcept(isSafe == unsafe);
+        template <Safety safety = safe> bool & asBoolean() noexcept(safety == unsafe);
+        template <Safety safety = safe> const bool & asBoolean() const noexcept(safety == unsafe);
 
         ///
         /// Retrieves the value as the given type
         ///
-        /// If the actual type does not match the requested type and `isSafe` is true, a `TypeError` is thrown
+        /// If the actual type does not match the requested type and safety is enabled, a `TypeError` is thrown
         ///
         /// If `T` is `std::string`, this call is equivalent to `asString`, except a copy of the string is returnsd
         ///
@@ -352,7 +352,7 @@ namespace qc::json
         /// If `T` is an unrecognized type, then we attempt to use the specialized `qc::json::ValueTo` struct, details
         /// of which can be found below
         ///
-        template <typename T, Safety isSafe = safe> T get() const;
+        template <typename T, Safety safety = safe> T get() const;
 
         ///
         /// @return whether the value has a comment
@@ -673,7 +673,7 @@ namespace qc::json
 
     template <ValueFromAble T>
     inline Value::Value(const T & val) :
-        Value{::qc::json::ValueFrom<T>()(val)}
+        Value{::qc::json::ValueFrom<T>{}(val)}
     {}
 
     inline Value::Value(Value && other) noexcept :
@@ -993,98 +993,98 @@ namespace qc::json
         }
     }
 
-    template <Safety isSafe>
-    inline Object & Value::asObject() noexcept(isSafe == unsafe)
+    template <Safety safety>
+    inline Object & Value::asObject() noexcept(safety == unsafe)
     {
-        return const_cast<Object &>(static_cast<const Value *>(this)->asObject<isSafe>());
+        return const_cast<Object &>(static_cast<const Value *>(this)->asObject<safety>());
     }
 
-    template <Safety isSafe>
-    inline const Object & Value::asObject() const noexcept(isSafe == unsafe)
+    template <Safety safety>
+    inline const Object & Value::asObject() const noexcept(safety == unsafe)
     {
-        if constexpr (isSafe == safe) if (!isObject()) throw TypeError{};
+        if constexpr (safety == safe) if (!isObject()) throw TypeError{};
         return *reinterpret_cast<const Object *>(_ptrAndDensity & ~uintptr_t{0b111u});
     }
 
-    template <Safety isSafe>
-    inline Array & Value::asArray() noexcept(isSafe == unsafe)
+    template <Safety safety>
+    inline Array & Value::asArray() noexcept(safety == unsafe)
     {
-        return const_cast<Array &>(static_cast<const Value *>(this)->asArray<isSafe>());
+        return const_cast<Array &>(static_cast<const Value *>(this)->asArray<safety>());
     }
 
-    template <Safety isSafe>
-    inline const Array & Value::asArray() const noexcept(isSafe == unsafe)
+    template <Safety safety>
+    inline const Array & Value::asArray() const noexcept(safety == unsafe)
     {
-        if constexpr (isSafe == safe) if (!isArray()) throw TypeError{};
+        if constexpr (safety == safe) if (!isArray()) throw TypeError{};
         return *reinterpret_cast<const Array *>(_ptrAndDensity & ~uintptr_t{0b111u});
     }
 
-    template <Safety isSafe>
-    inline string & Value::asString() noexcept(isSafe == unsafe)
+    template <Safety safety>
+    inline string & Value::asString() noexcept(safety == unsafe)
     {
-        return const_cast<string &>(static_cast<const Value *>(this)->asString<isSafe>());
+        return const_cast<string &>(static_cast<const Value *>(this)->asString<safety>());
     }
 
-    template <Safety isSafe>
-    inline const string & Value::asString() const noexcept(isSafe == unsafe)
+    template <Safety safety>
+    inline const string & Value::asString() const noexcept(safety == unsafe)
     {
-        if constexpr (isSafe == safe) if (!isString()) throw TypeError{};
+        if constexpr (safety == safe) if (!isString()) throw TypeError{};
         return *_string;
     }
 
-    template <Safety isSafe>
-    inline int64_t & Value::asInteger() noexcept(isSafe == unsafe)
+    template <Safety safety>
+    inline int64_t & Value::asInteger() noexcept(safety == unsafe)
     {
-        return const_cast<int64_t &>(static_cast<const Value *>(this)->asInteger<isSafe>());
+        return const_cast<int64_t &>(static_cast<const Value *>(this)->asInteger<safety>());
     }
 
-    template <Safety isSafe>
-    inline const int64_t & Value::asInteger() const noexcept(isSafe == unsafe)
+    template <Safety safety>
+    inline const int64_t & Value::asInteger() const noexcept(safety == unsafe)
     {
-        if constexpr (isSafe == safe) if (!isInteger()) throw TypeError{};
+        if constexpr (safety == safe) if (!isInteger()) throw TypeError{};
         return _integer;
     }
 
-    template <Safety isSafe>
-    inline uint64_t & Value::asUnsigner() noexcept(isSafe == unsafe)
+    template <Safety safety>
+    inline uint64_t & Value::asUnsigner() noexcept(safety == unsafe)
     {
-        return const_cast<uint64_t &>(static_cast<const Value *>(this)->asUnsigner<isSafe>());
+        return const_cast<uint64_t &>(static_cast<const Value *>(this)->asUnsigner<safety>());
     }
 
-    template <Safety isSafe>
-    inline const uint64_t & Value::asUnsigner() const noexcept(isSafe == unsafe)
+    template <Safety safety>
+    inline const uint64_t & Value::asUnsigner() const noexcept(safety == unsafe)
     {
-        if constexpr (isSafe == safe) if (!isUnsigner()) throw TypeError{};
+        if constexpr (safety == safe) if (!isUnsigner()) throw TypeError{};
         return _unsigner;
     }
 
-    template <Safety isSafe>
-    inline double & Value::asFloater() noexcept(isSafe == unsafe)
+    template <Safety safety>
+    inline double & Value::asFloater() noexcept(safety == unsafe)
     {
-        return const_cast<double &>(static_cast<const Value *>(this)->asFloater<isSafe>());
+        return const_cast<double &>(static_cast<const Value *>(this)->asFloater<safety>());
     }
 
-    template <Safety isSafe>
-    inline const double & Value::asFloater() const noexcept(isSafe == unsafe)
+    template <Safety safety>
+    inline const double & Value::asFloater() const noexcept(safety == unsafe)
     {
-        if constexpr (isSafe == safe) if (!isFloater()) throw TypeError{};
+        if constexpr (safety == safe) if (!isFloater()) throw TypeError{};
         return _floater;
     }
 
-    template <Safety isSafe>
-    inline bool & Value::asBoolean() noexcept(isSafe == unsafe)
+    template <Safety safety>
+    inline bool & Value::asBoolean() noexcept(safety == unsafe)
     {
-        return const_cast<bool &>(static_cast<const Value *>(this)->asBoolean<isSafe>());
+        return const_cast<bool &>(static_cast<const Value *>(this)->asBoolean<safety>());
     }
 
-    template <Safety isSafe>
-    inline const bool & Value::asBoolean() const noexcept(isSafe == unsafe)
+    template <Safety safety>
+    inline const bool & Value::asBoolean() const noexcept(safety == unsafe)
     {
-        if constexpr (isSafe == safe) if (!isBoolean()) throw TypeError{};
+        if constexpr (safety == safe) if (!isBoolean()) throw TypeError{};
         return _boolean;
     }
 
-    template <typename T, Safety isSafe>
+    template <typename T, Safety safety>
     inline T Value::get() const
     {
         using U = std::decay_t<T>;
@@ -1100,23 +1100,23 @@ namespace qc::json
 
         // String
         if constexpr (std::is_same_v<U, string> || std::is_same_v<U, string_view>) {
-            return asString<isSafe>();
+            return asString<safety>();
         }
         else if constexpr (std::is_same_v<U, const char *>) {
-            return asString<isSafe>().c_str();
+            return asString<safety>().c_str();
         }
         // Character
         else if constexpr (std::is_same_v<U, char>) {
-            if constexpr (isSafe == safe) if (!is<char>()) throw TypeError{};
+            if constexpr (safety == safe) if (!is<char>()) throw TypeError{};
             return asString<unsafe>().front();
         }
         // Boolean
         else if constexpr (std::is_same_v<U, bool>) {
-            return asBoolean<isSafe>();
+            return asBoolean<safety>();
         }
         // Number
         else if constexpr (std::is_arithmetic_v<U>) {
-            if constexpr (isSafe == safe) if (!is<U>()) throw TypeError{};
+            if constexpr (safety == safe) if (!is<U>()) throw TypeError{};
             switch (type()) {
                 case Type::integer: return U(_integer);
                 case Type::unsigner: return U(_unsigner);
@@ -1125,13 +1125,13 @@ namespace qc::json
             }
         }
         else if constexpr (std::is_same_v<U, nullptr_t>) {
-            if constexpr (isSafe == safe) if (!isNull()) throw TypeError{};
+            if constexpr (safety == safe) if (!isNull()) throw TypeError{};
             return nullptr;
         }
         // Other
         else {
             static_assert(ValueToAble<T>, "Must specialize `qc::json::ValueTo` to convert to custom type");
-            return ::qc::json::ValueTo<U, isSafe>()(*this);
+            return ::qc::json::ValueTo<U>{}(*this);
         }
     }
 
