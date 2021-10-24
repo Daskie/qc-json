@@ -580,9 +580,7 @@ namespace qc::json
 
         void comment(const string_view comment, State & /*state*/)
         {
-            if (_comment.empty()) {
-                _comment = comment;
-            }
+            _comment = comment;
         }
 
         private: //-------------------------------------------------------------

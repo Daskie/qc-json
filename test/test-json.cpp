@@ -793,21 +793,22 @@ so
     /* DDDDD */
     // EEEEE
     [ /* FFFFF */ /* GGGGG */ 0, /* HHHHH */ 1, /* IIIII */ ], // JJJJJ
-    { /* KKKKK */ /* LLLLL */ "k": /* MMMMM */ "v" /* NNNNN */ } // OOOOO
-    /* PPPPP */
-] // QQQQQ)"sv)};
-        EXPECT_EQ("AAAAA\nBBBBB", *json.comment());
+    { /* KKKKK */ /* LLLLL */ "k1": /* MMMMM */ "v1", /* NNNNN */ /* OOOOO */ "k2": "v2" /* PPPPP */ } // QQQQQ
+    /* RRRRR */
+] // SSSSS)"sv)};
+        EXPECT_EQ("CCCCC", *json.comment());
         const Array & rootArr{json.asArray()};
         EXPECT_EQ(2u, rootArr.size());
-        EXPECT_EQ("DDDDD", *rootArr.at(0).comment());
+        EXPECT_EQ("EEEEE", *rootArr.at(0).comment());
         const Array & innerArr{rootArr.at(0).asArray()};
         EXPECT_EQ(2u, innerArr.size());
-        EXPECT_EQ("FFFFF", *innerArr.at(0).comment());
+        EXPECT_EQ("GGGGG", *innerArr.at(0).comment());
         EXPECT_EQ("HHHHH", *innerArr.at(1).comment());
         EXPECT_EQ("JJJJJ", *rootArr.at(1).comment());
         const Object & innerObj{rootArr.at(1).asObject()};
-        EXPECT_EQ(1u, innerObj.size());
-        EXPECT_EQ("KKKKK", *innerObj.at("k").comment());
+        EXPECT_EQ(2u, innerObj.size());
+        EXPECT_EQ("MMMMM", *innerObj.at("k1").comment());
+        EXPECT_EQ("OOOOO", *innerObj.at("k2").comment());
     }
 }
 
