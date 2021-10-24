@@ -916,7 +916,7 @@ val == -1.1; // False - the fractional component is considered
 val == -1u; // False - the unsigned value has the same binary representation but is a different number
 ```
 
-### Value To/From Custom Type
+### Custom Type Conversion
 
 User defined types can be implicitly converted to or from a `qc::json::Value` by means of the `qc::json::ValueFrom` and
 `qc::json::ValueTo` struct specializations.
@@ -964,31 +964,155 @@ pair = pairVal.get<pairVal>();
 
 ### Handling Comments
 
+Each JSON value may have one comment "attached" to it.
 
+#### Decoding Comments
+
+Each value will pick up the comment immediately preceding it.
+
+```json5
+// A comment
+[
+    // Multiple, contiguous line comments
+    // are combined into one
+    "val1",
+    
+    /* In the case of multiple separate comments */
+    // The last one is used
+    {
+        // A comment may precede the key
+        "key1": "val2",
+      
+        "key2": /* Or the value */ "val3"
+    }
+    
+    // But any comment not preceding a value is ignored
+]
+```
+```c++
+qc::json::Value rootVal{...}; // Decoded from the above string
+
+// Simply printing the comments...
+
+std::cout << *rootVal.comment() << std::endl;
+
+qc::json::Array & rootArr{rootVal.asArray()};
+std::cout << *rootArr.at(0).comment() << std::endl;
+std::cout << *rootArr.at(1).comment() << std::endl;
+
+qc::json::Object & innerObj{rootArr.at(1).asObject()};
+std::cout << *innerObj.at("key1").comment() << std::endl;
+std::cout << *innerObj.at("key2").comment() << std::endl;
+```
+> A comment<br>
+> Multiple, contiguous line comments are combined into one<br>
+> The last one is used<br>
+> A comment may precede the key<br>
+> Or the value
+
+#### DOM Structure Comments
+
+Use the `hasComment` method to check for the presence of a comment:
+```c++
+if (jsonVal.hasComment()) ...
+```
+
+Use the `comment` method to get a pointer to the comment string, or `nullptr` if the value has no comment:
+```c++
+std::string * commentStr{jsonVal.comment()};
+```
+
+Use the `setComment` method to add or override a comment:
+```c++
+jsonVal.setComment("Some incredible information")
+```
+
+Use the `removeComment` method to remove a comment and return its ownership:
+```c++
+std::unique_ptr<std::string> commentStr{jsonVal.removeComment()};
+```
+
+#### Encoding Comments
+
+Comment are placed immediately before each value.
+
+```json5
+[
+    // A line comment is used in multiline density
+    // with newlines preserved
+    "val1",
+    [ /* A block comment is used in uniline density */ "val2" ],
+    [/*A block comment without extra spaces is used in nospace density*/"val3"]
+]
+```
 
 ### Handling Density
 
+Use the `density` method to retrieve the current density of an object or array.
+```c++
+qc::json::Density density{jsonObj.density()};
+```
 
+Use the `setDensity` method to set the density for an object or array.
+```c++
+jsonObj.setDensity(qc::json::Density::uniline);
+```
 
-### Decoding JSON String to Value
+When a JSON string is decoded, density is detected and assigned per-container based on the whitespace within.
 
+```json5
+[
+    // Multiline density
+    [ /* Uniline density */ 1, 2, 3 ],
+    [/*Nospace density*/1,2,3]
+]
+```
 
+See the [density](#density) section for more info.
 
-### Encoding Value to JSON string
+### DOM Decoding
 
+A JSON string is decoded to a `Value` using the `qc::json::decode` function.
 
+```json5
+// Just a little JSON
+{
+    "key": "value"
+}
+```
+```c++
+qc::json::Value rootVal{qc::json::decode(jsonStr)};
+```
 
-### Type Exceptions
+### DOM Encoding
 
+A JSON string is encoded from a `Value` using the `qc::json::encode` function.
 
+Four optional parameters may be provided to specify the output format.
 
-### Optimizations
+Option | Description
+:---:|:---:
+`density` | The root density, will be overridden by containers of higher density
+`indentSpaces` | The number of spaces per level of indentation
+`singleQuotes` | Whether to use single or double quotes for strings
+`identifiers` | Whether keys containing only alphanumeric characters and underscores should be unquoted
 
-
+```c++
+jsonStr = qc::json::encode(rootVal,
+                           qc::json::Density::uniline, // Density
+                           4,                          // Indent spaces
+                           true,                       // Single quotes
+                           true);                      // Identifiers
+```
+```json5
+/* Just a little JSON */ { key: 'value' }
+```
 
 ---
 
 ## Miscellaneous
+
+### Optimizations
 
 ### Strings and `std::string_view`
 
