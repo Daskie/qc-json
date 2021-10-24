@@ -574,6 +574,7 @@ namespace qc::json
                 case 'r': return '\r';
                 case 'x': return _consumeCodePoint(2);
                 case 'u': return _consumeCodePoint(4);
+                case 'U': return _consumeCodePoint(8);
                 default:
                     if (std::isprint(uchar(c))) {
                         return c;

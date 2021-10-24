@@ -295,6 +295,12 @@ TEST(decode, string)
         decode(decodeStr, composer, nullptr);
         EXPECT_TRUE(composer.isDone());
     }
+    { // 'U' code point
+        ExpectantComposer composer{};
+        composer.expectString("\u0077\u00FF\u00FF");
+        decode(R"("\U00000077\U000000FF\UFFFFFFFF")", composer, nullptr);
+        EXPECT_TRUE(composer.isDone());
+    }
     { // Uppercase and lowercase code point hex digits
         ExpectantComposer composer{};
         composer.expectString("\u00AA\u00BB\u00CC\u00DD");
