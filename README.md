@@ -45,7 +45,7 @@
 - [Miscellaneous](#miscellaneous)
   - [Optimizations](#optimizations)
   - [Supported Characters and Escape Sequences](#supported-characters-and-escape-sequences)
-  - [Number Formate](#number-formats)
+  - [Number Formats](#number-formats)
   - [Number Storage](#number-storage)
   - [`char` is Special](#char-is-special)
 
