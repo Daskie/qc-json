@@ -4,7 +4,7 @@
 
 ### Contents
 - [Setup](#setup)
-- [`qc-json-encode.hpp` - SAX Encoding](#qc-json-encodehpp)
+- [SAX Encoding](#qc-json-encodehpp)
   - [Simple Example](#simple-example)
   - [The Six Types](#the-six-types)
   - [Density](#density)
@@ -17,12 +17,12 @@
   - [Standalone Values](#standalone-values)
   - [Encoder Reuse](#encoder-reuse)
   - [Encode Errors](#encode-errors)
-- [`qc-json-decode.hpp` - SAX Decoding](#qc-json-decodehpp)
+- [SAX Decoding](#qc-json-decodehpp)
   - [Decode Function](#decode-function)
   - [State](#state)
   - [Composer](#composer)
   - [Decode Errors](#decode-errors)
-- [`qc-json.hpp` - DOM Encoding and Decoding](#qc-jsonhpp)
+- [DOM Encoding and Decoding](#qc-jsonhpp)
   - [DOM Example](#dom-example)
   - [DOM Decoding](#dom-decoding)
   - [DOM Encoding](#dom-encoding)
