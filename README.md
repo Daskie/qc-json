@@ -4,9 +4,7 @@
 
 ### Contents
 - [Setup](#setup)
-
-
-- [qc-json-encode.hpp (SAX encoding)](#qc-json-encodehppincludeqc-json-encodehpp)
+- [`qc-json-encode.hpp` - SAX Encoding](#qc-json-encodehpp)
   - [Simple Example](#simple-example)
   - [The Six Types](#the-six-types)
   - [Density](#density)
@@ -19,16 +17,12 @@
   - [Standalone Values](#standalone-values)
   - [Encoder Reuse](#encoder-reuse)
   - [Encode Errors](#encode-errors)
-
-
-- [qc-json-decode.hpp (SAX decoding)](#qc-json-decodehppincludeqc-json-decodehpp)
+- [`qc-json-decode.hpp` - SAX Decoding](#qc-json-decodehpp)
   - [Decode Function](#decode-function)
   - [State](#state)
   - [Composer](#composer)
   - [Decode Errors](#decode-errors)
-
-
-- [qc-json.hpp (DOM encoding and decoding)](#qc-jsonhppincludeqc-jsonhpp)
+- [`qc-json.hpp` - DOM Encoding and Decoding](#qc-jsonhpp)
   - [DOM Example](#dom-example)
   - [DOM Decoding](#dom-decoding)
   - [DOM Encoding](#dom-encoding)
@@ -40,16 +34,12 @@
   - [Custom Type Conversion](#custom-type-conversion)
   - [Handling Comments](#handling-comments)
   - [Handling Density](#handling-density)
-
-
 - [Miscellaneous](#miscellaneous)
   - [Optimizations](#optimizations)
   - [Supported Characters and Escape Sequences](#supported-characters-and-escape-sequences)
   - [Number Formats](#number-formats)
   - [Number Storage](#number-storage)
   - [`char` is Special](#char-is-special)
-
-
 - [TODO](#todo)
 
 ---
