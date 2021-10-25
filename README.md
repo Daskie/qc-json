@@ -4,6 +4,8 @@
 
 ### Contents
 - [Setup](#setup)
+
+
 - [qc-json-encode.hpp (SAX encoding)](#qc-json-encodehppincludeqc-json-encodehpp)
   - [Simple Example](#simple-example)
   - [The Six Types](#the-six-types)
@@ -11,18 +13,44 @@
   - [Indentation Spaces](#indentation-spaces)
   - [Single Quote Strings](#single-quote-strings)
   - [Identifiers](#identifiers)
+  - [Comments](#comments)
   - [Binary, Octal, and Hexadecimal](#binary-octal-and-hexadecimal)
   - [Infinity and NaN](#infinity-and-nan)
-  - [Comments](#comments)
   - [Standalone Values](#standalone-values)
   - [Encoder Reuse](#encoder-reuse)
   - [Encode Errors](#encode-errors)
+
+
 - [qc-json-decode.hpp (SAX decoding)](#qc-json-decodehppincludeqc-json-decodehpp)
   - [Decode Function](#decode-function)
   - [State](#state)
   - [Composer](#composer)
   - [Decode Errors](#decode-errors)
+
+
 - [qc-json.hpp (DOM encoding and decoding)](#qc-jsonhppincludeqc-jsonhpp)
+  - [DOM Example](#dom-example)
+  - [DOM Decoding](#dom-decoding)
+  - [DOM Encoding](#dom-encoding)
+  - [Value Creation](#value-creation)
+  - [Value Modification](#value-modification)
+  - [Checking Type](#checking-type)
+  - [Value Access](#value-access)
+  - [Value Equality](#value-equality)
+  - [Custom Type Conversion](#custom-type-conversion)
+  - [Handling Comments](#handling-comments)
+  - [Handling Density](#handling-density)
+
+
+- [Miscellaneous](#miscellaneous)
+  - [Optimizations](#optimizations)
+  - [Supported Characters and Escape Sequences](#supported-characters-and-escape-sequences)
+  - [Number Formate](#number-formats)
+  - [Number Storage](#number-storage)
+  - [`char` is Special](#char-is-special)
+
+
+- [TODO](#todo)
 
 ---
 
@@ -633,10 +661,12 @@ and understandable error messages should they be ill-formed.
 
 A dummy base class `qc::json::DummyComposer` is provided which the user may extend to avoid implementing all callbacks.
 
-# Decode Errors
+### Decode Errors
 
 If the decoder encounters any issues decoding the JSON string, a `qc::json::DecodeError` will be thrown which contains
 an index to approximately the first character which caused the problem.
+
+---
 
 ## [qc-json.hpp](include/qc-json.hpp)
 
@@ -793,7 +823,7 @@ jsonStr = qc::json::encode(rootVal,
 /* Just a little JSON */ { key: 'value' }
 ```
 
-### Creating a Value
+### Value Creation
 
 Constructing a value via `qc::json::Value{...}` creates a new JSON value depending on the type passed:
 
@@ -845,7 +875,7 @@ qc::json::Value arrVal{qc::json::makeArray(123, true, nullptr)};
 ]
 ```
 
-### Modifying a Value
+### Value Modification
 
 An existing `qc::json::Value` may be modified in two ways.
 
@@ -888,7 +918,7 @@ true if the value can be exactly represented by the given type. For example, a v
 be exactly represented in each case. On the other hand, were the value `-13`, `is<int>` and `is<float>` would return
 true, but `is<unsigned int>` would return false.
 
-### Accessing Stored Value
+### Value Access
 
 The internal value of a `qc::json::Value` can be retrieved by two means.
 
