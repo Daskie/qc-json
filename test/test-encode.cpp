@@ -649,17 +649,18 @@ R"(// A comment
             encoder << 1;
             encoder << object;
                 encoder << comment(single);
-                encoder << "a" << 0;
+                encoder << "a" << comment(single) << 0;
                 encoder << comment(multi);
-                encoder << "b" << 1;
+                encoder << "b" << comment(multi) << 1;
                 encoder << comment(multi);
                 encoder << comment(multi);
-                encoder << "c" << 2;
-                encoder << "d" << array(Density::uniline) << comment(single) << 0 << comment(single) << comment(single) << array << comment(single) << end << comment(single) << end;
-                encoder << "e" << array;
+                encoder << "c" << comment(multi) << comment(multi) << 2;
+                encoder << "d" << object(Density::uniline) << comment(single) << "k1" << comment(single) << comment(multi) << 0 << comment(single) << comment(multi) << "k2" << array << comment(single) << comment(multi) << end << comment(multi) << end;
+                encoder << "e" << object(Density::nospace) << comment(single) << "k1" << comment(single) << comment(multi) << 0 << comment(single) << comment(multi) << "k2" << array << comment(single) << comment(multi) << end << comment(multi) << end;
+                encoder << "f" << array;
                     encoder << comment(single);
                 encoder << end;
-                encoder << "f" << array;
+                encoder << "g" << array;
                     encoder << comment(multi);
                 encoder << end;
                 encoder << comment(single);
@@ -680,20 +681,32 @@ R"(// A comment
     1,
     {
         // A comment
-        "a": 0,
+        "a": /* A comment */ 0,
         // A comment
         // and some more
-        "b": 1,
+        "b": /* A comment
+and some more */ 1,
         // A comment
         // and some more
         // A comment
         // and some more
-        "c": 2,
-        "d": [ /* A comment */ 0, /* A comment */ /* A comment */ [ /* A comment */ ], /* A comment */ ],
-        "e": [
+        "c": /* A comment
+and some more */ /* A comment
+and some more */ 2,
+        "d": { /* A comment */ "k1": /* A comment */ /* A comment
+and some more */ 0, /* A comment */ /* A comment
+and some more */ "k2": [ /* A comment */ /* A comment
+and some more */ ], /* A comment
+and some more */ },
+        "e": {/*A comment*/"k1":/*A comment*//*A comment
+and some more*/0,/*A comment*//*A comment
+and some more*/"k2":[/*A comment*//*A comment
+and some more*/],/*A comment
+and some more*/},
+        "f": [
             // A comment
         ],
-        "f": [
+        "g": [
             // A comment
             // and some more
         ],
@@ -705,11 +718,6 @@ R"(// A comment
 ],
 // A comment
 // and some more)"s, encoder.finish());
-    }
-    { // Comment between key and value
-        Encoder encoder{};
-        encoder << object << "k";
-        EXPECT_THROW(encoder << comment("nope"), EncodeError);
     }
     { // Escape sequence in block comment
         Encoder encoder{Density::uniline};

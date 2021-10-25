@@ -282,6 +282,7 @@ namespace qc::json
         size_t _indentation{0u};
         _Element _prevElement{_Element::none};
         bool _isContent{false};
+        bool _isKey{false};
 
         void _start(Container container, Density density);
 
@@ -343,7 +344,8 @@ namespace qc::json
         _density{std::exchange(other._density, other._baseDensity)},
         _indentation{std::exchange(other._indentation, 0u)},
         _prevElement{std::exchange(other._prevElement, _Element::none)},
-        _isContent{std::exchange(other._isContent, false)}
+        _isContent{std::exchange(other._isContent, false)},
+        _isKey{std::exchange(other._isKey, false)}
     {}
 
     inline Encoder & Encoder::operator=(Encoder && other) noexcept
@@ -359,6 +361,7 @@ namespace qc::json
         _indentation = std::exchange(other._indentation, 0u);
         _prevElement = std::exchange(other._prevElement, _Element::none);
         _isContent = std::exchange(other._isContent, false);
+        _isKey = std::exchange(other._isKey, false);
 
         return *this;
     }
@@ -380,7 +383,7 @@ namespace qc::json
         if (_container == Container::none) {
             throw EncodeError{"No object or array to end"sv};
         }
-        if (_prevElement == _Element::key) {
+        if (_isKey) {
             throw EncodeError{"Cannot end object with a dangling key"sv};
         }
 
@@ -418,9 +421,11 @@ namespace qc::json
 
     inline Encoder & Encoder::operator<<(const _CommentToken v)
     {
-        // Ensure comment does not come after key
-        if (_prevElement == _Element::key) {
-            throw EncodeError{"Comment can not come between key and value"sv};
+        Density commentDensity{_density};
+
+        // Comment between key and value must be dense
+        if (_isKey && commentDensity <= Density::multiline) {
+            commentDensity = Density::uniline;
         }
 
         size_t lineLength{v.comment.size()};
@@ -430,7 +435,7 @@ namespace qc::json
             const char c{v.comment[i]};
             if (!std::isprint(uchar(c))) {
                 if (c == '\n') {
-                    if (_density <= Density::multiline) {
+                    if (commentDensity <= Density::multiline) {
                         lineLength = i;
                         break;
                     }
@@ -443,10 +448,17 @@ namespace qc::json
 
         _prefix();
 
+        _prevElement = _Element::comment;
+
         // Line comment
-        if (_density <= Density::multiline) {
+        if (commentDensity <= Density::multiline) {
             _str += "// "sv;
             _str += v.comment.substr(0u, lineLength);
+
+            // Simply recurse to handle the remaining lines
+            if (lineLength < v.comment.size()) {
+                operator<<(_CommentToken{v.comment.substr(lineLength + 1)});
+            }
         }
         // Block comment
         else {
@@ -455,7 +467,7 @@ namespace qc::json
                 throw EncodeError{"Block comment must not contain `*/`"sv};
             }
 
-            if (_density == Density::uniline) {
+            if (commentDensity == Density::uniline) {
                 _str += "/* "sv;
                 _str += v.comment;
                 _str += " */"sv;
@@ -467,19 +479,12 @@ namespace qc::json
             }
         }
 
-        _prevElement = _Element::comment;
-
-        // Simply recurse to handle the remaining lines
-        if (lineLength < v.comment.size()) {
-            operator<<(_CommentToken{v.comment.substr(lineLength + 1)});
-        }
-
         return *this;
     }
 
     inline Encoder & Encoder::operator<<(const string_view v)
     {
-        if (_container == Container::object && _prevElement != _Element::key) {
+        if (_container == Container::object && !_isKey) {
             _key(v);
         }
         else {
@@ -605,7 +610,7 @@ namespace qc::json
         if (_container == Container::none && _isContent) {
             throw EncodeError{"Cannot add to complete JSON"sv};
         }
-        if (_container == Container::object && _prevElement != _Element::key) {
+        if (_container == Container::object && !_isKey) {
             throw EncodeError{"Cannot add to object without first providing a key"sv};
         }
 
@@ -620,6 +625,7 @@ namespace qc::json
         _density = newDensity;
         _indentation += _indentSpaces;
         _prevElement = _Element::start;
+        _isKey = false;
     }
 
     template <typename T>
@@ -628,7 +634,7 @@ namespace qc::json
         if (_container == Container::none && _isContent) {
             throw EncodeError{"Cannot add to complete JSON"sv};
         }
-        if (_container == Container::object && _prevElement != _Element::key) {
+        if (_container == Container::object && !_isKey) {
             throw EncodeError{"Cannot add to object without first providing a key"sv};
         }
 
@@ -637,6 +643,7 @@ namespace qc::json
 
         _prevElement = _Element::val;
         _isContent = true;
+        _isKey = false;
     }
 
     inline void Encoder::_key(const string_view key)
@@ -667,16 +674,24 @@ namespace qc::json
         _str += ':';
 
         _prevElement = _Element::key;
+        _isKey = true;
     }
 
     inline void Encoder::_prefix()
     {
-        switch (_prevElement) {
-            case _Element::none: break;
-            case _Element::key: if (_density < Density::nospace) _str += ' '; break;
-            case _Element::val: _str += ','; [[fallthrough]];
-            case _Element::start: [[fallthrough]];
-            case _Element::comment: _putSpace(); break;
+        if (_isKey) {
+            if (_density < Density::nospace) {
+                _str += ' ';
+            }
+        }
+        else {
+            switch (_prevElement) {
+                case _Element::none: break;
+                case _Element::key: break;
+                case _Element::val: _str += ','; [[fallthrough]];
+                case _Element::start: [[fallthrough]];
+                case _Element::comment: _putSpace(); break;
+            }
         }
     }
 
