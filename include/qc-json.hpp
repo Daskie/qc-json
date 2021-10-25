@@ -1,18 +1,19 @@
 #pragma once
 
 ///
-/// QC JSON 1.4.8
+/// QC JSON 2.0.0
+///
+/// Quick and clean JSON5 header library for C++20
 ///
 /// Austin Quick : 2019 - 2021
 ///
 /// https://github.com/Daskie/qc-json
 ///
-/// Provides an interface for decoding a JSON strings to JSON objects, creating/manipulating JSON objects, and encoding
-/// JSON objects to a JSON string
+/// This header provides a DOM interface for encoding and decoding JSON5
 ///
 /// Uses `qc-json-encode.hpp` to do the encoding and `qc-json-decode.hpp` to do the decoding
 ///
-/// See the README for more info and examples
+/// See the README for more info and examples!
 ///
 
 #include <cstring>

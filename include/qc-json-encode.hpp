@@ -1,15 +1,17 @@
 #pragma once
 
 ///
-/// QC JSON 1.4.8
+/// QC JSON 2.0.0
+///
+/// Quick and clean JSON5 header library for C++20
 ///
 /// Austin Quick : 2019 - 2021
 ///
 /// https://github.com/Daskie/qc-json
 ///
-/// Encodes data into a JSON string
+/// This standalone header provides a SAX interface for encoding JSON5
 ///
-/// See the README for more info and examples
+/// See the README for more info and examples!
 ///
 
 #include <cctype>
