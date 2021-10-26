@@ -1,8 +1,9 @@
 # QC JSON
 
-###### Quick and clean [JSON5](https://json5.org) header library for C++20
+###### Quick and clean JSON5 header library for C++20
 
 ### Contents
+- [Description](#description)
 - [Setup](#setup)
 - [SAX Encoding](#qc-json-encodehpp)
   - [Simple Example](#simple-example)
@@ -41,6 +42,34 @@
   - [Number Storage](#number-storage)
   - [`char` is Special](#char-is-special)
 - [TODO](#todo)
+
+---
+
+## Description
+
+QC JSON is a [JSON5](https://json5.org) header-only library for C++20 emphasizing usability, functionality, and
+simplicity.
+
+What sets QC JSON apart from other JSON libraries?
+- Supports all JSON5 features
+  - Comments
+  - Dangling commas
+  - Hexadecimal numbers
+  - Infinity and NaN
+  - Single quote strings
+  - Unquoted keys
+  - Additional escape sequences
+- DOM and SAX interfaces
+- Header-only for super easy setup
+- The concept of container "density" to control whitespace formatting
+- Comments and formatting are preserved when modifying a JSON document
+- Binary, octal, and hexadecimal number formats
+- Two, four, and eight byte unicode escape sequences (`\xHH`, `\uHHHH`, `\UHHHHHHHH`)
+- Uses C++17's [\<charconv\>](https://en.cppreference.com/w/cpp/header/charconv) library for fast and lossless floating
+  point encoding/decoding
+- C++20 features such as concepts improves compile-time information
+- Custom type conversion
+- Support for 32 and 64 bit platforms
 
 ---
 
