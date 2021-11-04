@@ -7,7 +7,7 @@
 ///
 /// Austin Quick : 2019 - 2021
 ///
-/// https://github.com/Daskie/qc-json
+/// https://github.com/daskie/qc-json
 ///
 /// This standalone header provides a SAX interface for decoding JSON5
 ///
