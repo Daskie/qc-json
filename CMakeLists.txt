@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.17)
+cmake_minimum_required(VERSION 3.20)
 
 project(qc-json)
 
@@ -13,12 +13,12 @@ qc_setup_general()
 
 ### QC-JSON ####################################################################
 
-qc_setup_target(
-    qc-json
-    INTERFACE_LIBRARY
-    INSTALLABLE
-)
+qc_setup_target(qc-json INTERFACE_LIBRARY)
 
 ### SUBDIRECTORIES #############################################################
 
 add_subdirectory(test EXCLUDE_FROM_ALL)
+
+### INSTALL ####################################################################
+
+qc_setup_install(TARGETS qc-json)

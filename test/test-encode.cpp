@@ -1,3 +1,5 @@
+// TODO: Remove me once MSVC brings <format> into c++20 properly
+#define __cpp_lib_format
 #include <format>
 
 #include <gtest/gtest.h>
