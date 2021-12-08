@@ -108,7 +108,7 @@ namespace qc::json
     ///     struct qc::json::ValueTo<std::pair<int, int>> {
     ///         std::pair<int, int> operator()(const qc::json::Value & v) const {
     ///             const qc::json::Array & arr{v.asArray()};
-    ///             return {arr.at(0)->get<int>(), arr.at(1)->get<int>()};
+    ///             return {arr.at(0).get<int>(), arr.at(1).get<int>()};
     ///         }
     ///     };
     ///
