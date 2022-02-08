@@ -382,15 +382,18 @@ namespace qc::json
 
     inline Encoder & Encoder::operator<<(const _EndToken)
     {
-        if (_container == Container::none) {
+        if (_container == Container::none)
+        {
             throw EncodeError{"No object or array to end"sv};
         }
-        if (_isKey) {
+        if (_isKey)
+        {
             throw EncodeError{"Cannot end object with a dangling key"sv};
         }
 
         _indentation -= _indentSpaces;
-        if (_prevElement == _Element::val || _prevElement == _Element::comment) {
+        if (_prevElement == _Element::val || _prevElement == _Element::comment)
+        {
             _putSpace();
         }
         _str += (_container == Container::object ? '}' : ']');
@@ -426,23 +429,29 @@ namespace qc::json
         Density commentDensity{_density};
 
         // Comment between key and value must be dense
-        if (_isKey && commentDensity <= Density::multiline) {
+        if (_isKey && commentDensity <= Density::multiline)
+        {
             commentDensity = Density::uniline;
         }
 
         size_t lineLength{v.comment.size()};
 
         // Check for invalid characters and determine first line length
-        for (size_t i{0u}; i < v.comment.size(); ++i) {
+        for (size_t i{0u}; i < v.comment.size(); ++i)
+        {
             const char c{v.comment[i]};
-            if (!std::isprint(uchar(c))) {
-                if (c == '\n') {
-                    if (commentDensity <= Density::multiline) {
+            if (!std::isprint(uchar(c)))
+            {
+                if (c == '\n')
+                {
+                    if (commentDensity <= Density::multiline)
+                    {
                         lineLength = i;
                         break;
                     }
                 }
-                else {
+                else
+                {
                     throw EncodeError{("Comment has invalid character `\\x"s += std::to_string(int(uchar(c)))) += '`'};
                 }
             }
@@ -453,28 +462,34 @@ namespace qc::json
         _prevElement = _Element::comment;
 
         // Line comment
-        if (commentDensity <= Density::multiline) {
+        if (commentDensity <= Density::multiline)
+        {
             _str += "// "sv;
             _str += v.comment.substr(0u, lineLength);
 
             // Simply recurse to handle the remaining lines
-            if (lineLength < v.comment.size()) {
-                operator<<(_CommentToken{v.comment.substr(lineLength + 1)});
+            if (lineLength < v.comment.size())
+            {
+                operator<<(_CommentToken{v.comment.substr(lineLength + 1u)});
             }
         }
         // Block comment
-        else {
+        else
+        {
             // Ensure block comment does not contain `*/`
-            if (v.comment.find("*/"sv) != string_view::npos) {
+            if (v.comment.find("*/"sv) != string_view::npos)
+            {
                 throw EncodeError{"Block comment must not contain `*/`"sv};
             }
 
-            if (commentDensity == Density::uniline) {
+            if (commentDensity == Density::uniline)
+            {
                 _str += "/* "sv;
                 _str += v.comment;
                 _str += " */"sv;
             }
-            else {
+            else
+            {
                 _str += "/*"sv;
                 _str += v.comment;
                 _str += "*/"sv;
@@ -486,10 +501,12 @@ namespace qc::json
 
     inline Encoder & Encoder::operator<<(const string_view v)
     {
-        if (_container == Container::object && !_isKey) {
+        if (_container == Container::object && !_isKey)
+        {
             _key(v);
         }
-        else {
+        else
+        {
             _val(v);
         }
 
@@ -583,7 +600,8 @@ namespace qc::json
 
     inline string Encoder::finish()
     {
-        if (_container != Container::none || !_isContent) {
+        if (_container != Container::none || !_isContent)
+        {
             throw EncodeError{"Cannot finish, JSON is not yet complete"sv};
         }
 
@@ -609,10 +627,12 @@ namespace qc::json
 
     inline void Encoder::_start(const Container container, const Density density)
     {
-        if (_container == Container::none && _isContent) {
+        if (_container == Container::none && _isContent)
+        {
             throw EncodeError{"Cannot add to complete JSON"sv};
         }
-        if (_container == Container::object && !_isKey) {
+        if (_container == Container::object && !_isKey)
+        {
             throw EncodeError{"Cannot add to object without first providing a key"sv};
         }
 
@@ -633,10 +653,12 @@ namespace qc::json
     template <typename T>
     inline void Encoder::_val(const T v)
     {
-        if (_container == Container::none && _isContent) {
+        if (_container == Container::none && _isContent)
+        {
             throw EncodeError{"Cannot add to complete JSON"sv};
         }
-        if (_container == Container::object && !_isKey) {
+        if (_container == Container::object && !_isKey)
+        {
             throw EncodeError{"Cannot add to object without first providing a key"sv};
         }
 
@@ -651,15 +673,19 @@ namespace qc::json
     inline void Encoder::_key(const string_view key)
     {
         bool identifier{false};
-        if (_useIdentifiers) {
-            if (key.empty()) {
+        if (_useIdentifiers)
+        {
+            if (key.empty())
+            {
                 throw EncodeError{"Identifier must not be empty"sv};
             }
 
             // Ensure the key has only alphanumeric and underscore characters
             identifier = true;
-            for (const char c : key) {
-                if (!std::isalnum(uchar(c)) && c != '_') {
+            for (const char c: key)
+            {
+                if (!std::isalnum(uchar(c)) && c != '_')
+                {
                     identifier = false;
                     break;
                 }
@@ -667,10 +693,12 @@ namespace qc::json
         }
 
         _prefix();
-        if (identifier) {
+        if (identifier)
+        {
             _str += key;
         }
-        else {
+        else
+        {
             _encode(key);
         }
         _str += ':';
@@ -681,13 +709,17 @@ namespace qc::json
 
     inline void Encoder::_prefix()
     {
-        if (_isKey) {
-            if (_density < Density::nospace) {
+        if (_isKey)
+        {
+            if (_density < Density::nospace)
+            {
                 _str += ' ';
             }
         }
-        else {
-            switch (_prevElement) {
+        else
+        {
+            switch (_prevElement)
+            {
                 case _Element::none: break;
                 case _Element::key: break;
                 case _Element::val: _str += ','; [[fallthrough]];
@@ -704,7 +736,8 @@ namespace qc::json
 
     inline void Encoder::_putSpace()
     {
-        switch (_density) {
+        switch (_density)
+        {
             case Density::unspecified: [[fallthrough]];
             case Density::multiline:
                 _str += '\n';
@@ -720,17 +753,21 @@ namespace qc::json
 
     inline void Encoder::_encode(const string_view v)
     {
-        static constexpr char hexChars[16]{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
+        static constexpr char hexChars[16u]{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
 
         _str += _quote;
 
-        for (const char c : v) {
-            if (std::isprint(uchar(c))) {
+        for (const char c : v)
+        {
+            if (std::isprint(uchar(c)))
+            {
                 if (c == _quote || c == '\\') _str += '\\';
                 _str += c;
             }
-            else {
-                switch (c) {
+            else
+            {
+                switch (c)
+                {
                     case '\0': _str += R"(\0)"; break;
                     case '\b': _str += R"(\b)"; break;
                     case '\t': _str += R"(\t)"; break;
@@ -751,21 +788,21 @@ namespace qc::json
 
     inline void Encoder::_encode(const int64_t v)
     {
-        char buffer[24];
+        char buffer[24u];
         const std::to_chars_result res{std::to_chars(buffer, buffer + sizeof(buffer), v)};
         _str.append(buffer, size_t(res.ptr - buffer));
     }
 
     inline void Encoder::_encode(const uint64_t v)
     {
-        char buffer[24];
+        char buffer[24u];
         const std::to_chars_result res{std::to_chars(buffer, buffer + sizeof(buffer), v)};
         _str.append(buffer, size_t(res.ptr - buffer));
     }
 
     inline void Encoder::_encode(const _BinaryToken v)
     {
-        char buffer[66];
+        char buffer[66u];
         buffer[0] = '0';
         buffer[1] = 'b';
         const std::to_chars_result res{std::to_chars(buffer + 2, buffer + sizeof(buffer), v.val, 2)};
@@ -774,7 +811,7 @@ namespace qc::json
 
     inline void Encoder::_encode(const _OctalToken v)
     {
-        char buffer[26];
+        char buffer[26u];
         buffer[0] = '0';
         buffer[1] = 'o';
         const std::to_chars_result res{std::to_chars(buffer + 2, buffer + sizeof(buffer), v.val, 8)};
@@ -784,21 +821,24 @@ namespace qc::json
     inline void Encoder::_encode(const _HexToken v)
     {
         // We're hand rolling this because `std::to_chars` doesn't support uppercase hex
-        static constexpr char hexTable[16]{
+        static constexpr char hexTable[16u]{
             '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'
         };
 
         uint64_t val{v.val};
-        char buffer[18];
+        char buffer[18u];
         size_t bufferI{sizeof(buffer)};
 
-        if (val) {
-            do {
+        if (val)
+        {
+            do
+            {
                 buffer[--bufferI] = hexTable[val & 0xFu];
                 val >>= 4;
             } while (val);
         }
-        else {
+        else
+        {
             buffer[--bufferI] = '0';
         }
 
@@ -810,7 +850,7 @@ namespace qc::json
 
     inline void Encoder::_encode(const double v)
     {
-        char buffer[24];
+        char buffer[24u];
         const std::to_chars_result res{std::to_chars(buffer, buffer + sizeof(buffer), v)};
         _str.append(buffer, size_t(res.ptr - buffer));
     }

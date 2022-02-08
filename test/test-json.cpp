@@ -529,7 +529,8 @@ TEST(json, valueTypes)
 }
 
 template <typename T>
-void testNumber(T v, bool isS64, bool isS32, bool isS16, bool isS08, bool isU64, bool isU32, bool isU16, bool isU08, bool isF64, bool isF32) {
+void testNumber(T v, bool isS64, bool isS32, bool isS16, bool isS08, bool isU64, bool isU32, bool isU16, bool isU08, bool isF64, bool isF32)
+{
     Value val(v);
 
     EXPECT_EQ(isS64, val.is< int64_t>());
@@ -915,7 +916,8 @@ TEST(json, numberEquality)
         EXPECT_FALSE(val == double(std::numeric_limits<int64_t>::max()));
 
         // TODO: Figure out why this doesn't work on x86
-        if constexpr (sizeof(size_t) >= 8) {
+        if constexpr (sizeof(size_t) >= 8)
+        {
             val = std::numeric_limits<uint64_t>::max();
             EXPECT_FALSE(val == double(std::numeric_limits<uint64_t>::max()));
         }

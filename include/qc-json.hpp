@@ -414,7 +414,8 @@ namespace qc::json
 
         private: //-------------------------------------------------------------
 
-        union {
+        union
+        {
             uintptr_t _ptrAndDensity;
             string * _string;
             int64_t _integer;
@@ -495,7 +496,8 @@ namespace qc::json
         {
             Value * innerNode;
 
-            switch (outerState.container) {
+            switch (outerState.container)
+            {
                 case Container::object:
                     innerNode = &outerState.node->asObject<unsafe>().emplace(std::move(_key), Object{}).first->second;
                     break;
@@ -507,7 +509,8 @@ namespace qc::json
                     innerNode = outerState.node;
             }
 
-            if (!_comment.empty()) {
+            if (!_comment.empty())
+            {
                 innerNode->setComment(std::move(_comment));
             }
 
@@ -518,7 +521,8 @@ namespace qc::json
         {
             Value * innerNode;
 
-            switch (outerState.container) {
+            switch (outerState.container)
+            {
                 case Container::object:
                     innerNode = &outerState.node->asObject<unsafe>().emplace(std::move(_key), Array{}).first->second;
                     break;
@@ -530,7 +534,8 @@ namespace qc::json
                     innerNode = outerState.node;
             }
 
-            if (!_comment.empty()) {
+            if (!_comment.empty())
+            {
                 innerNode->setComment(std::move(_comment));
             }
 
@@ -542,8 +547,10 @@ namespace qc::json
             _key = k;
         }
 
-        void end(const Density density, State && innerState, State & /*outerState*/) {
-            switch (innerState.container) {
+        void end(const Density density, State && innerState, State & /*outerState*/)
+        {
+            switch (innerState.container)
+            {
                 case Container::object:
                     innerState.node->setDensity(density);
                     break;
@@ -562,7 +569,8 @@ namespace qc::json
         {
             Value * composedVal;
 
-            switch (state.container) {
+            switch (state.container)
+            {
                 case Container::object:
                     composedVal = &state.node->asObject<unsafe>().emplace(std::move(_key), v).first->second;
                     break;
@@ -574,7 +582,8 @@ namespace qc::json
                     composedVal = state.node;
             }
 
-            if (!_comment.empty()) {
+            if (!_comment.empty())
+            {
                 composedVal->setComment(std::move(_comment));
             }
         }
@@ -682,10 +691,12 @@ namespace qc::json
 
     inline Value & Value::operator=(Object && val)
     {
-        if (type() == Type::object) {
+        if (type() == Type::object)
+        {
             asObject<unsafe>() = std::move(val);
         }
-        else {
+        else
+        {
             _deleteValue();
             _setType(Type::object);
             _ptrAndDensity = reinterpret_cast<uintptr_t>(new Object{std::move(val)});
@@ -695,10 +706,12 @@ namespace qc::json
 
     inline Value & Value::operator=(Array && val)
     {
-        if (type() == Type::array) {
+        if (type() == Type::array)
+        {
             asArray<unsafe>() = std::move(val);
         }
-        else {
+        else
+        {
             _deleteValue();
             _setType(Type::array);
             _ptrAndDensity = reinterpret_cast<uintptr_t>(new Array{std::move(val)});
@@ -708,10 +721,12 @@ namespace qc::json
 
     inline Value & Value::operator=(string && val)
     {
-        if (type() == Type::string) {
+        if (type() == Type::string)
+        {
             asString<unsafe>() = std::move(val);
         }
-        else {
+        else
+        {
             _deleteValue();
             _setType(Type::string);
             _string = new string{std::move(val)};
@@ -721,10 +736,12 @@ namespace qc::json
 
     inline Value & Value::operator=(const string_view val)
     {
-        if (type() == Type::string) {
+        if (type() == Type::string)
+        {
             asString<unsafe>() = val;
         }
-        else {
+        else
+        {
             _deleteValue();
             _setType(Type::string);
             _string = new string{val};
@@ -744,7 +761,8 @@ namespace qc::json
 
     inline Value & Value::operator=(const int64_t val)
     {
-        if (type() != Type::integer) {
+        if (type() != Type::integer)
+        {
             _deleteValue();
             _setType(Type::integer);
         }
@@ -769,7 +787,8 @@ namespace qc::json
 
     inline Value & Value::operator=(const uint64_t val)
     {
-        if (type() != Type::unsigner) {
+        if (type() != Type::unsigner)
+        {
             _deleteValue();
             _setType(Type::unsigner);
         }
@@ -794,7 +813,8 @@ namespace qc::json
 
     inline Value & Value::operator=(const double val)
     {
-        if (type() != Type::floater) {
+        if (type() != Type::floater)
+        {
             _deleteValue();
             _setType(Type::floater);
         }
@@ -809,7 +829,8 @@ namespace qc::json
 
     inline Value & Value::operator=(const bool val)
     {
-        if (type() != Type::boolean) {
+        if (type() != Type::boolean)
+        {
             _deleteValue();
             _setType(Type::boolean);
         }
@@ -819,7 +840,8 @@ namespace qc::json
 
     inline Value & Value::operator=(const nullptr_t)
     {
-        if (type() != Type::null) {
+        if (type() != Type::null)
+        {
             _deleteValue();
             _setType(Type::null);
         }
@@ -850,10 +872,12 @@ namespace qc::json
     inline Density Value::density() const noexcept
     {
         const Type type{this->type()};
-        if (type == Type::object || type == Type::array) {
+        if (type == Type::object || type == Type::array)
+        {
             return Density(_ptrAndDensity & 0b111u);
         }
-        else {
+        else
+        {
             return Density::unspecified;
         }
     }
@@ -861,7 +885,8 @@ namespace qc::json
     inline void Value::setDensity(const Density density) noexcept
     {
         const Type type{this->type()};
-        if (type == Type::object || type == Type::array) {
+        if (type == Type::object || type == Type::array)
+        {
             _ptrAndDensity &= ~uintptr_t{0b111u};
             _ptrAndDensity |= uintptr_t(density);
         }
@@ -919,75 +944,98 @@ namespace qc::json
         using U = std::decay_t<T>;
 
         // Object
-        if constexpr (std::is_same_v<U, Object>) {
+        if constexpr (std::is_same_v<U, Object>)
+        {
             return isObject();
         }
         // Array
-        else if constexpr (std::is_same_v<U, Array>) {
+        else if constexpr (std::is_same_v<U, Array>)
+        {
             return isArray();
         }
         // String
-        else if constexpr (std::is_same_v<U, string> || std::is_same_v<U, string_view> || std::is_same_v<U, const char *> || std::is_same_v<U, char *>) {
+        else if constexpr (std::is_same_v<U, string> || std::is_same_v<U, string_view> || std::is_same_v<U, const char *> || std::is_same_v<U, char *>)
+        {
             return isString();
         }
         // Character
-        else if constexpr (std::is_same_v<U, char>) {
+        else if constexpr (std::is_same_v<U, char>)
+        {
             return isString() && asString<unsafe>().size() == 1u;
         }
         // Boolean
-        else if constexpr (std::is_same_v<U, bool>) {
+        else if constexpr (std::is_same_v<U, bool>)
+        {
             return isBoolean();
         }
         // Signed integer
-        else if constexpr (std::is_integral_v<U> && std::is_signed_v<U>) {
-            switch (type()) {
-                case Type::integer: {
-                    if constexpr (std::is_same_v<U, int64_t>) {
+        else if constexpr (std::is_integral_v<U> && std::is_signed_v<U>)
+        {
+            switch (type())
+            {
+                case Type::integer:
+                {
+                    if constexpr (std::is_same_v<U, int64_t>)
+                    {
                         return true;
                     }
-                    else {
+                    else
+                    {
                         return _integer <= std::numeric_limits<U>::max() && _integer >= std::numeric_limits<U>::min();
                     }
                 }
-                case Type::unsigner: {
+                case Type::unsigner:
+                {
                     return _unsigner <= uint64_t(std::numeric_limits<U>::max());
                 }
-                case Type::floater: {
+                case Type::floater:
+                {
                     return double(U(_floater)) == _floater;
                 }
-                default: {
+                default:
+                {
                     return false;
                 }
             }
         }
         // Unsigned integer
-        else if constexpr (std::is_integral_v<U> && std::is_unsigned_v<U>) {
-            switch (type()) {
-                case Type::integer: {
+        else if constexpr (std::is_integral_v<U> && std::is_unsigned_v<U>)
+        {
+            switch (type())
+            {
+                case Type::integer:
+                {
                     return _integer >= 0 && uint64_t(_integer) <= std::numeric_limits<U>::max();
                 }
-                case Type::unsigner: {
-                    if constexpr (std::is_same_v<U, uint64_t>) {
+                case Type::unsigner:
+                {
+                    if constexpr (std::is_same_v<U, uint64_t>)
+                    {
                         return true;
                     }
-                    else {
+                    else
+                    {
                         return _unsigner <= std::numeric_limits<U>::max();
                     }
                 }
-                case Type::floater: {
+                case Type::floater:
+                {
                     return _floater >= 0.0 && double(U(_floater)) == _floater;
                 }
-                default: {
+                default:
+                {
                     return false;
                 }
             }
         }
         // Floater
-        else if constexpr (std::is_floating_point_v<U>) {
+        else if constexpr (std::is_floating_point_v<U>)
+        {
             return isNumber();
         }
         // Other
-        else {
+        else
+        {
             return false;
         }
     }
@@ -1098,37 +1146,45 @@ namespace qc::json
         static_assert(!std::is_same_v<U, char *>, "Mutable char pointer may not be accessed by const function. Use `qc::json::Value::asString` or `qc::json::Value::to<const char *>` instead");
 
         // String
-        if constexpr (std::is_same_v<U, string> || std::is_same_v<U, string_view>) {
+        if constexpr (std::is_same_v<U, string> || std::is_same_v<U, string_view>)
+        {
             return asString<safety>();
         }
-        else if constexpr (std::is_same_v<U, const char *>) {
+        else if constexpr (std::is_same_v<U, const char *>)
+        {
             return asString<safety>().c_str();
         }
         // Character
-        else if constexpr (std::is_same_v<U, char>) {
+        else if constexpr (std::is_same_v<U, char>)
+        {
             if constexpr (safety == safe) if (!is<char>()) throw TypeError{};
             return asString<unsafe>().front();
         }
         // Boolean
-        else if constexpr (std::is_same_v<U, bool>) {
+        else if constexpr (std::is_same_v<U, bool>)
+        {
             return asBoolean<safety>();
         }
         // Number
-        else if constexpr (std::is_arithmetic_v<U>) {
+        else if constexpr (std::is_arithmetic_v<U>)
+        {
             if constexpr (safety == safe) if (!is<U>()) throw TypeError{};
-            switch (type()) {
+            switch (type())
+            {
                 case Type::integer: return U(_integer);
                 case Type::unsigner: return U(_unsigner);
                 case Type::floater: return U(_floater);
                 default: return {};
             }
         }
-        else if constexpr (std::is_same_v<U, nullptr_t>) {
+        else if constexpr (std::is_same_v<U, nullptr_t>)
+        {
             if constexpr (safety == safe) if (!isNull()) throw TypeError{};
             return nullptr;
         }
         // Other
-        else {
+        else
+        {
             static_assert(ValueToAble<T>, "Must specialize `qc::json::ValueTo` to convert to custom type");
             return ::qc::json::ValueTo<U>{}(*this);
         }
@@ -1168,10 +1224,12 @@ namespace qc::json
     inline void Value::_setComment(T && str)
     {
         string * const comment{this->comment()};
-        if (comment) {
+        if (comment)
+        {
             *comment = std::forward<T>(str);
         }
-        else {
+        else
+        {
             _typeAndComment &= 0b111u;
             _typeAndComment |= reinterpret_cast<uintptr_t>(new string{std::move(str)});
         }
@@ -1186,7 +1244,8 @@ namespace qc::json
 
     inline bool Value::operator==(const Value & other) const noexcept
     {
-        switch (other.type()) {
+        switch (other.type())
+        {
             case Type::null: return *this == other._null;
             case Type::object: return *this == other.asObject<unsafe>();
             case Type::array: return *this == other.asArray<unsafe>();
@@ -1231,7 +1290,8 @@ namespace qc::json
 
     inline bool Value::operator==(const int64_t val) const noexcept
     {
-        switch (type()) {
+        switch (type())
+        {
             case Type::integer: return _integer == val;
             case Type::unsigner: return val >= 0 && _unsigner == uint64_t(val);
             case Type::floater: return _floater == double(val) && int64_t(_floater) == val;
@@ -1256,7 +1316,8 @@ namespace qc::json
 
     inline bool Value::operator==(const uint64_t val) const noexcept
     {
-        switch (type()) {
+        switch (type())
+        {
             case Type::integer: return _integer >= 0 && uint64_t(_integer) == val;
             case Type::unsigner: return _unsigner == val;
             case Type::floater: return _floater == double(val) && uint64_t(_floater) == val;
@@ -1281,7 +1342,8 @@ namespace qc::json
 
     inline bool Value::operator==(const double val) const noexcept
     {
-        switch (type()) {
+        switch (type())
+        {
             case Type::integer: return double(_integer) == val && _integer == int64_t(val);
             case Type::unsigner: return double(_unsigner) == val && _unsigner == uint64_t(val);
             case Type::floater: return _floater == val;
@@ -1312,7 +1374,8 @@ namespace qc::json
 
     inline void Value::_deleteValue()
     {
-        switch (type()) {
+        switch (type())
+        {
             case Type::object: delete &asObject<unsafe>(); break;
             case Type::array: delete &asArray<unsafe>(); break;
             case Type::string: delete _string; break;
@@ -1323,7 +1386,8 @@ namespace qc::json
     inline void Value::_deleteComment()
     {
         string * const comment{this->comment()};
-        if (comment) {
+        if (comment)
+        {
             delete comment;
         }
     }
@@ -1332,7 +1396,8 @@ namespace qc::json
     inline void _makeObjectHelper(Object & obj, K && key, V && val, MoreKVs &&... moreKVs)
     {
         obj.emplace(std::forward<K>(key), std::forward<V>(val));
-        if constexpr (sizeof...(moreKVs) > 0) {
+        if constexpr (sizeof...(moreKVs))
+        {
             _makeObjectHelper(obj, std::forward<MoreKVs>(moreKVs)...);
         }
     }
@@ -1340,7 +1405,7 @@ namespace qc::json
     template <typename K, typename V, typename... MoreKVs>
     inline Object makeObject(K && key, V && val, MoreKVs &&... moreKVs)
     {
-        static_assert(sizeof...(moreKVs) % 2 == 0, "Must provide an even number of arguments alternating between key and value");
+        static_assert(sizeof...(moreKVs) % 2u == 0u, "Must provide an even number of arguments alternating between key and value");
         Object obj{};
         _makeObjectHelper(obj, std::forward<K>(key), std::forward<V>(val), std::forward<MoreKVs>(moreKVs)...);
         return obj;
@@ -1378,19 +1443,25 @@ namespace qc::json
 
     inline Encoder & operator<<(Encoder & encoder, const Value & val)
     {
-        if (val.hasComment() && encoder.container() != Container::object) {
+        if (val.hasComment() && encoder.container() != Container::object)
+        {
             encoder << comment(*val.comment());
         }
 
-        switch (val.type()) {
-            case Type::null: {
+        switch (val.type())
+        {
+            case Type::null:
+            {
                 encoder << nullptr;
                 break;
             }
-            case Type::object: {
+            case Type::object:
+            {
                 encoder << object(val.density());
-                for (const auto & [key, v] : val.asObject<unsafe>()) {
-                    if (v.hasComment()) {
+                for (const auto & [key, v] : val.asObject<unsafe>())
+                {
+                    if (v.hasComment())
+                    {
                         encoder << comment(*v.comment());
                     }
                     encoder << key << v;
@@ -1398,31 +1469,38 @@ namespace qc::json
                 encoder << end;
                 break;
             }
-            case Type::array: {
+            case Type::array:
+            {
                 encoder << array(val.density());
-                for (const auto & v : val.asArray<unsafe>()) {
+                for (const auto & v : val.asArray<unsafe>())
+                {
                     encoder << v;
                 }
                 encoder << end;
                 break;
             }
-            case Type::string: {
+            case Type::string:
+            {
                 encoder << val.asString<unsafe>();
                 break;
             }
-            case Type::integer: {
+            case Type::integer:
+            {
                 encoder << val.asInteger<unsafe>();
                 break;
             }
-            case Type::unsigner: {
+            case Type::unsigner:
+            {
                 encoder << val.asUnsigner<unsafe>();
                 break;
             }
-            case Type::floater: {
+            case Type::floater:
+            {
                 encoder << val.asFloater<unsafe>();
                 break;
             }
-            case Type::boolean: {
+            case Type::boolean:
+            {
                 encoder << val.asBoolean<unsafe>();
                 break;
             }

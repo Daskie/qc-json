@@ -159,11 +159,13 @@ namespace qc::json
             _skipSpaceAndIngestComments(initialState);
 
             // Allow trailing comma
-            if (_tryConsumeChar(',')) {
+            if (_tryConsumeChar(','))
+            {
                 _skipSpaceAndIngestComments(initialState);
             }
 
-            if (_pos != _end) {
+            if (_pos != _end)
+            {
                 throw DecodeError{"Extraneous content"sv, size_t(_pos - _start)};
             }
         }
@@ -182,13 +184,16 @@ namespace qc::json
         {
             Density density{Density::nospace};
 
-            while (_pos < _end) {
-                if (std::isspace(uchar(*_pos))) {
+            while (_pos < _end)
+            {
+                if (std::isspace(uchar(*_pos)))
+                {
                     if (*_pos == '\n') density &= Density::multiline;
                     else density &= Density::uniline;
                     ++_pos;
                 }
-                else {
+                else
+                {
                     break;
                 }
             }
@@ -203,23 +208,27 @@ namespace qc::json
             const char * commentStart{_pos};
 
             // Seek to end of line
-            while (_pos < _end && *_pos != '\n') {
+            while (_pos < _end && *_pos != '\n')
+            {
                 ++_pos;
             }
             const char * commentEnd{_pos};
 
             // Trim space after `//`
-            if (commentStart < commentEnd && *commentStart == ' ') {
+            if (commentStart < commentEnd && *commentStart == ' ')
+            {
                 ++commentStart;
             }
 
             // Trim `\r` from end
-            if (commentEnd[-1] == '\r') {
+            if (commentEnd[-1] == '\r')
+            {
                 --commentEnd;
             }
 
             // If this is a continuation, add it to the buffer
-            if (concat) {
+            if (concat)
+            {
                 _stringBuffer.push_back('\n');
                 _stringBuffer.append(commentStart, commentEnd);
             }
@@ -229,32 +238,39 @@ namespace qc::json
             Density density{Density::nospace};
 
             // This comment ended with a newline (as opposed to the end of the json)
-            if (_pos < _end) {
+            if (_pos < _end)
+            {
                 // Skip newline
                 ++_pos;
                 density = Density::multiline;
 
                 // There are no additional newlines
-                if (_skipWhitespace() > Density::multiline) {
+                if (_skipWhitespace() > Density::multiline)
+                {
                     isContinuation = _pos + 2 < _end && _pos[0] == '/' && _pos[1] == '/';
                 }
             }
 
             // There is more comment to come
-            if (isContinuation) {
-                if (!concat) {
+            if (isContinuation)
+            {
+                if (!concat)
+                {
                     _stringBuffer.assign(commentStart, commentEnd);
                 }
 
                 _ingestLineComment(true, state);
 
-                if (!concat) {
+                if (!concat)
+                {
                     _composer.comment(string_view{_stringBuffer}, state);
                 }
             }
             // This is the end of the comment
-            else {
-                if (!concat) {
+            else
+            {
+                if (!concat)
+                {
                     _composer.comment(string_view{commentStart, size_t(commentEnd - commentStart)}, state);
                 }
             }
@@ -269,28 +285,33 @@ namespace qc::json
             const char * commentStart{_pos};
 
             // Seek to `*/`
-            while (_pos + 1 < _end && !(_pos[0] == '*' && _pos[1] == '/')) {
+            while (_pos + 1 < _end && !(_pos[0] == '*' && _pos[1] == '/'))
+            {
                 ++_pos;
             }
 
             // If `*/` found
-            if (_pos + 1 < _end) {
+            if (_pos + 1 < _end)
+            {
                 const char * commentEnd{_pos};
                 _pos += 2;
 
                 // Trim space after `/*`
-                if (*commentStart == ' ') {
+                if (*commentStart == ' ')
+                {
                     ++commentStart;
                 }
 
                 // Trim space before `*/`
-                if (commentEnd > commentStart && commentEnd[-1] == ' ') {
+                if (commentEnd > commentStart && commentEnd[-1] == ' ')
+                {
                     --commentEnd;
                 }
 
                 _composer.comment(string_view{commentStart, size_t(commentEnd - commentStart)}, state);
             }
-            else {
+            else
+            {
                 throw DecodeError{"Block comment is unterminated"sv, size_t(commentStart - 2 - _start)};
             }
         }
@@ -300,17 +321,21 @@ namespace qc::json
             // Skip whitespace
             Density density{_skipWhitespace()};
 
-            while (true) {
+            while (true)
+            {
                 // Check for comment
-                if (_pos + 1 < _end && _pos[0] == '/') {
+                if (_pos + 1 < _end && _pos[0] == '/')
+                {
                     // Ingest line comment
-                    if (_pos[1] == '/') {
+                    if (_pos[1] == '/')
+                    {
                         density &= _ingestLineComment(false, state);
                         // `_ingesetLineComment` skips trailing whitespace already
                         continue;
                     }
                     // Ingest block comment
-                    else if (_pos[1] == '*') {
+                    else if (_pos[1] == '*')
+                    {
                         _ingestBlockComment(state);
                         // Skip whitespace
                         density &= _skipWhitespace();
@@ -326,48 +351,57 @@ namespace qc::json
 
         bool _tryConsumeChar(const char c)
         {
-            if (_pos < _end && *_pos == c) {
+            if (_pos < _end && *_pos == c)
+            {
                 ++_pos;
                 return true;
             }
-            else {
+            else
+            {
                 return false;
             }
         }
 
         void _consumeChar(const char c)
         {
-            if (!_tryConsumeChar(c)) {
+            if (!_tryConsumeChar(c))
+            {
                 throw DecodeError{("Expected `"s += c) += '`', size_t(_pos - _start)};
             }
         }
 
         bool _tryConsumeChars(const string_view str)
         {
-            if (size_t(_end - _pos) >= str.length()) {
-                for (size_t i{0u}; i < str.length(); ++i) {
-                    if (_pos[i] != str[i]) {
+            if (size_t(_end - _pos) >= str.length())
+            {
+                for (size_t i{0u}; i < str.length(); ++i)
+                {
+                    if (_pos[i] != str[i])
+                    {
                         return false;
                     }
                 }
                 _pos += str.length();
                 return true;
             }
-            else {
+            else
+            {
                 return false;
             }
         }
 
         void _consumeChars(const string_view str)
         {
-            if (!_tryConsumeChars(str)) {
+            if (!_tryConsumeChars(str))
+            {
                 throw DecodeError{("Expected `"s += str) += '`', size_t(_pos - _start)};
             }
         }
 
         void _ingestValue(State & state)
         {
-            if (_pos >= _end) {
+            if (_pos >= _end)
+            {
                 throw DecodeError{"Expected value"sv, size_t(_pos - _start)};
             }
 
@@ -375,20 +409,25 @@ namespace qc::json
 
             // First check for typical easy values
 
-            switch (c) {
-                case '{': {
+            switch (c)
+            {
+                case '{':
+                {
                     _ingestObject(state);
                     return;
                 }
-                case '[': {
+                case '[':
+                {
                     _ingestArray(state);
                     return;
                 }
-                case '"': {
+                case '"':
+                {
                     _ingestString('"', state);
                     return;
                 }
-                case '\'': {
+                case '\'':
+                {
                     _ingestString('\'', state);
                     return;
                 }
@@ -397,25 +436,31 @@ namespace qc::json
             // Now determine whether there is a +/- sign to narrow it down to numbers or not
 
             const int sign{(c == '+') - (c == '-')};
-            if (sign) {
+            if (sign)
+            {
                 // There was a sign, so we'll keep track of that and increment our position
                 ++_pos;
-                if (_pos >= _end) {
+                if (_pos >= _end)
+                {
                     throw DecodeError{"Expected number"sv, size_t(_pos - _start)};
                 }
                 c = *_pos;
             }
-            else {
+            else
+            {
                 // There was no sign, so we can check the non-number keywords
-                if (_tryConsumeChars("true"sv)) {
+                if (_tryConsumeChars("true"sv))
+                {
                     _composer.val(true, state);
                     return;
                 }
-                else if (_tryConsumeChars("false"sv)) {
+                else if (_tryConsumeChars("false"sv))
+                {
                     _composer.val(false, state);
                     return;
                 }
-                else if (_tryConsumeChars("null"sv)) {
+                else if (_tryConsumeChars("null"sv))
+                {
                     _composer.val(nullptr, state);
                     return;
                 }
@@ -423,15 +468,18 @@ namespace qc::json
 
             // At this point, we know it is a number (or invalid)
 
-            if (std::isdigit(uchar(c)) || (c == '.' && _pos + 1 < _end && std::isdigit(_pos[1]))) {
+            if (std::isdigit(uchar(c)) || (c == '.' && _pos + 1 < _end && std::isdigit(_pos[1])))
+            {
                 _ingestNumber(sign, state);
                 return;
             }
-            else if (_tryConsumeChars("nan"sv) || _tryConsumeChars("NaN"sv)) {
+            else if (_tryConsumeChars("nan"sv) || _tryConsumeChars("NaN"sv))
+            {
                 _composer.val(std::numeric_limits<double>::quiet_NaN(), state);
                 return;
             }
-            else if (_tryConsumeChars("inf"sv) || _tryConsumeChars("Infinity"sv)){
+            else if (_tryConsumeChars("inf"sv) || _tryConsumeChars("Infinity"sv))
+            {
                 _composer.val(sign < 0 ? -std::numeric_limits<double>::infinity() : std::numeric_limits<double>::infinity(), state);
                 return;
             }
@@ -447,11 +495,14 @@ namespace qc::json
             ++_pos; // We already know we have `{`
             Density density{_skipSpaceAndIngestComments(innerState)};
 
-            if (!_tryConsumeChar('}')) {
-                while (true) {
+            if (!_tryConsumeChar('}'))
+            {
+                while (true)
+                {
                     // Parse key
-                    if (_pos >= _end) {
-                        throw DecodeError{"Expected key"sv, size_t(_pos -_start)};
+                    if (_pos >= _end)
+                    {
+                        throw DecodeError{"Expected key"sv, size_t(_pos - _start)};
                     }
                     const char c{*_pos};
                     const string_view key{(c == '"' || c == '\'') ? _consumeString(c) : _consumeIdentifier()};
@@ -464,15 +515,18 @@ namespace qc::json
                     _ingestValue(innerState);
                     density &= _skipSpaceAndIngestComments(innerState);
 
-                    if (_tryConsumeChar('}')) {
+                    if (_tryConsumeChar('}'))
+                    {
                         break;
                     }
-                    else {
+                    else
+                    {
                         _consumeChar(',');
                         density &= _skipSpaceAndIngestComments(innerState);
 
                         // Allow trailing comma
-                        if (_tryConsumeChar('}')) {
+                        if (_tryConsumeChar('}'))
+                        {
                             break;
                         }
                     }
@@ -489,20 +543,25 @@ namespace qc::json
             ++_pos; // We already know we have `[`
             Density density{_skipSpaceAndIngestComments(innerState)};
 
-            if (!_tryConsumeChar(']')) {
-                while (true) {
+            if (!_tryConsumeChar(']'))
+            {
+                while (true)
+                {
                     _ingestValue(innerState);
                     density &= _skipSpaceAndIngestComments(innerState);
 
-                    if (_tryConsumeChar(']')) {
+                    if (_tryConsumeChar(']'))
+                    {
                         break;
                     }
-                    else {
+                    else
+                    {
                         _consumeChar(',');
                         density &= _skipSpaceAndIngestComments(innerState);
 
                         // Allow trailing comma
-                        if (_tryConsumeChar(']')) {
+                        if (_tryConsumeChar(']'))
+                        {
                             break;
                         }
                     }
@@ -523,35 +582,44 @@ namespace qc::json
 
             ++_pos; // We already know we have `"` or `'`
 
-            while (true) {
-                if (_pos >= _end) {
+            while (true)
+            {
+                if (_pos >= _end)
+                {
                     throw DecodeError{"Expected end quote"sv, size_t(_pos - _start)};
                 }
 
                 const char c{*_pos};
-                if (c == quote) {
+                if (c == quote)
+                {
                     ++_pos;
                     return _stringBuffer;
                 }
-                else if (c == '\\') {
+                else if (c == '\\')
+                {
                     ++_pos;
 
                     // Check for escaped newline
-                    if (*_pos == '\n') {
+                    if (*_pos == '\n')
+                    {
                         ++_pos;
                     }
-                    else if (*_pos == '\r' && _pos + 1 < _end && _pos[1] == '\n') {
+                    else if (*_pos == '\r' && _pos + 1 < _end && _pos[1] == '\n')
+                    {
                         _pos += 2;
                     }
-                    else {
+                    else
+                    {
                         _stringBuffer.push_back(_consumeEscaped());
                     }
                 }
-                else if (std::isprint(uchar(c))) {
+                else if (std::isprint(uchar(c)))
+                {
                     _stringBuffer.push_back(c);
                     ++_pos;
                 }
-                else {
+                else
+                {
                     throw DecodeError{"Invalid string content"sv, size_t(_pos - _start)};
                 }
             }
@@ -559,14 +627,16 @@ namespace qc::json
 
         char _consumeEscaped()
         {
-            if (_pos >= _end) {
+            if (_pos >= _end)
+            {
                 throw DecodeError{"Expected escape sequence"sv, size_t(_pos - _start)};
             }
 
             const char c{*_pos};
             ++_pos;
 
-            switch (c) {
+            switch (c)
+            {
                 case '0': return '\0';
                 case 'b': return '\b';
                 case 't': return '\t';
@@ -578,10 +648,12 @@ namespace qc::json
                 case 'u': return _consumeCodePoint(4);
                 case 'U': return _consumeCodePoint(8);
                 default:
-                    if (std::isprint(uchar(c))) {
+                    if (std::isprint(uchar(c)))
+                    {
                         return c;
                     }
-                    else {
+                    else
+                    {
                         throw DecodeError{"Invalid escape sequence"sv, size_t(_pos - _start - 1)};
                     }
             }
@@ -589,13 +661,15 @@ namespace qc::json
 
         char _consumeCodePoint(const int digits)
         {
-            if (_end - _pos < digits) {
+            if (_end - _pos < digits)
+            {
                 throw DecodeError{("Expected "s += std::to_string(digits)) += " code point digits"sv, size_t(_pos - _start)};
             }
 
             uint32_t val;
             const std::from_chars_result res{std::from_chars(_pos, _pos + digits, val, 16)};
-            if (res.ec != std::errc{}) {
+            if (res.ec != std::errc{})
+            {
                 throw DecodeError{"Invalid code point"sv, size_t(_pos - _start)};
             }
 
@@ -610,25 +684,31 @@ namespace qc::json
 
             // Ensure identifier is at least one character long
             char c{*_pos};
-            if (std::isalnum(uchar(c)) || c == '_') {
+            if (std::isalnum(uchar(c)) || c == '_')
+            {
                 _stringBuffer.push_back(c);
                 ++_pos;
             }
-            else {
+            else
+            {
                 throw DecodeError{"Expected identifier"sv, size_t(_pos - _start)};
             }
 
-            while (true) {
-                if (_pos >= _end) {
+            while (true)
+            {
+                if (_pos >= _end)
+                {
                     return _stringBuffer;
                 }
 
                 c = *_pos;
-                if (std::isalnum(uchar(c)) || c == '_') {
+                if (std::isalnum(uchar(c)) || c == '_')
+                {
                     _stringBuffer.push_back(c);
                     ++_pos;
                 }
-                else {
+                else
+                {
                     return _stringBuffer;
                 }
             }
@@ -641,29 +721,35 @@ namespace qc::json
             // Skip all leading digits
             while (pos < _end && std::isdigit(uchar(*pos))) ++pos;
             // If that's it, we're an integer
-            if (pos >= _end) {
+            if (pos >= _end)
+            {
                 return pos - _pos;
             }
             // If instead there is a decimal point...
-            else if (*pos == '.') {
+            else if (*pos == '.')
+            {
                 ++pos;
                 // Skip all zeroes
                 while (pos < _end && *pos == '0') ++pos;
                 // If there's a digit or an exponent, we must be a floater
-                if (pos < _end && (std::isdigit(uchar(*pos)) || *pos == 'e' || *pos == 'E')) {
+                if (pos < _end && (std::isdigit(uchar(*pos)) || *pos == 'e' || *pos == 'E'))
+                {
                     return 0;
                 }
                 // Otherwise, we're an integer
-                else {
+                else
+                {
                     return pos - _pos;
                 }
             }
             // If instead there is an exponent, we must be a floater
-            else if (*pos == 'e' || *pos == 'E') {
+            else if (*pos == 'e' || *pos == 'E')
+            {
                 return 0;
             }
             // Otherwise, that's the end of the number, and we're an integer
-            else {
+            else
+            {
                 return pos - _pos;
             }
         }
@@ -671,16 +757,20 @@ namespace qc::json
         void _ingestNumber(const int sign, State & state)
         {
             // Check if hex/octal/binary
-            if (*_pos == '0' && _pos + 1 < _end) {
+            if (*_pos == '0' && _pos + 1 < _end)
+            {
                 int base{0};
-                switch (_pos[1]) {
+                switch (_pos[1])
+                {
                     case 'x': case 'X': base = 16; break;
-                    case 'o': case 'O': base = 8; break;
-                    case 'b': case 'B': base = 2; break;
+                    case 'o': case 'O': base =  8; break;
+                    case 'b': case 'B': base =  2; break;
                 }
 
-                if (base) {
-                    if (sign) {
+                if (base)
+                {
+                    if (sign)
+                    {
                         throw DecodeError{"Hex, octal, and binary numbers must not be signed"sv, size_t(_pos - _start)};
                     }
                     _pos += 2;
@@ -690,15 +780,19 @@ namespace qc::json
             }
 
             // Determine if integer or floater
-            if (size_t length{_isInteger()}; length) {
-                if (sign < 0) {
+            if (size_t length{_isInteger()}; length)
+            {
+                if (sign < 0)
+                {
                     _ingestInteger<true>(length, state);
                 }
-                else {
+                else
+                {
                     _ingestInteger<false>(length, state);
                 }
             }
-            else {
+            else
+            {
                 _ingestFloater(sign < 0, state);
             }
         }
@@ -709,7 +803,8 @@ namespace qc::json
             const std::from_chars_result res{std::from_chars(_pos, _end, val, base)};
 
             // There was an issue parsing
-            if (res.ec != std::errc{}) {
+            if (res.ec != std::errc{})
+            {
                 throw DecodeError{base == 2 ? "Invalid binary"sv : base == 8 ? "Invalid octal"sv : "Invalid hex"sv, size_t(_pos - _start)};
             }
 
@@ -724,21 +819,26 @@ namespace qc::json
             std::conditional_t<negative, int64_t, uint64_t> val;
 
             // Edge case that `.0` should evaluate to the integer `0`
-            if (*_pos == '.') {
+            if (*_pos == '.')
+            {
                 val = 0;
             }
-            else {
+            else
+            {
                 const std::from_chars_result res{std::from_chars(_pos - negative, _end, val)};
 
                 // There was an issue parsing
-                if (res.ec != std::errc{}) {
+                if (res.ec != std::errc{})
+                {
                     // If too large, parse as a floater instead
-                    if (res.ec == std::errc::result_out_of_range) {
+                    if (res.ec == std::errc::result_out_of_range)
+                    {
                         _ingestFloater(negative, state);
                         return;
                     }
                     // Some other issue
-                    else {
+                    else
+                    {
                         throw DecodeError{"Invalid integer"sv, size_t(_pos - _start)};
                     }
                 }
@@ -747,8 +847,10 @@ namespace qc::json
             _pos += length;
 
             // If unsigned and the most significant bit is not set, we default to reporting it as signed
-            if constexpr (!negative) {
-                if (!(val & 0x8000000000000000u)) {
+            if constexpr (!negative)
+            {
+                if (!(val & 0x8000000000000000u))
+                {
                     _composer.val(int64_t(val), state);
                     return;
                 }
@@ -763,7 +865,8 @@ namespace qc::json
             const std::from_chars_result res{std::from_chars(_pos - negative, _end, val)};
 
             // There was an issue parsing
-            if (res.ec != std::errc{}) {
+            if (res.ec != std::errc{})
+            {
                 throw DecodeError{"Invalid floater"sv, size_t(_pos - _start)};
             }
 

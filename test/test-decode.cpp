@@ -78,7 +78,8 @@ class ExpectantComposer
 
     std::deque<Element> m_sequence;
 
-    void assertNextIs(const Element & e) {
+    void assertNextIs(const Element & e)
+    {
         EXPECT_FALSE(m_sequence.empty());
         EXPECT_EQ(m_sequence.front(), e);
         m_sequence.pop_front();
@@ -245,8 +246,10 @@ TEST(decode, string)
     }
     { // All non-printable
         std::string decodeStr{R"(" ")"};
-        for (int i{0}; i < 256; ++i) {
-            if (!std::isprint(i)) {
+        for (int i{0}; i < 256; ++i)
+        {
+            if (!std::isprint(i))
+            {
                 decodeStr[1] = char(i);
                 EXPECT_THROW(decode(decodeStr, dummyComposer, nullptr), DecodeError);
             }
@@ -273,7 +276,8 @@ TEST(decode, string)
         std::string decodeStr(1 + 256 * 4 + 1, '\0');
         decodeStr.front() = '"';
         decodeStr.back() = '"';
-        for (int i{0}; i < 256; ++i) {
+        for (int i{0}; i < 256; ++i)
+        {
             expectedStr[i] = char(i);
             std::format_to_n(&decodeStr[1 + 4 * i], 4, "\\x{:02X}"sv, i);
         }
@@ -287,7 +291,8 @@ TEST(decode, string)
         std::string decodeStr(1 + 256 * 6 + 1, '\0');
         decodeStr.front() = '"';
         decodeStr.back() = '"';
-        for (int i{0}; i < 256; ++i) {
+        for (int i{0}; i < 256; ++i)
+        {
             expectedStr[i] = char(i);
             std::format_to_n(&decodeStr[1 + 6 * i], 6, "\\u{:04X}"sv, i);
         }
@@ -955,8 +960,10 @@ TEST(decode, identifiers)
         EXPECT_TRUE(composer.isDone());
     }
     { // All invalid characters
-        for (int i{0}; i < 256; ++i) {
-            if (!std::isalnum(i) && i != '_') {
+        for (int i{0}; i < 256; ++i)
+        {
+            if (!std::isalnum(i) && i != '_')
+            {
                 EXPECT_THROW(decode("{"s + char(i) + ":0}"s, dummyComposer, nullptr), DecodeError);
             }
         }

@@ -93,7 +93,7 @@ TEST(encode, object)
     { // Null key
         Encoder encoder{};
         encoder << object;
-        EXPECT_THROW(encoder << nullptr , EncodeError);
+        EXPECT_THROW(encoder << nullptr, EncodeError);
     }
     { // Dangling key
         Encoder encoder{};
@@ -173,15 +173,18 @@ TEST(encode, string)
         expectedStr.front() = '"';
         expectedStr.back() = '"';
         int i{0};
-        for (int cp{1}; cp < 8; ++cp, ++i) {
+        for (int cp{1}; cp < 8; ++cp, ++i)
+        {
             decodeStr[i] = char(cp);
             std::format_to_n(&expectedStr[1 + 4 * i], 6, "\\x{:02X}"sv, cp);
         }
-        for (int cp{14}; cp < 32; ++cp, ++i) {
+        for (int cp{14}; cp < 32; ++cp, ++i)
+        {
             decodeStr[i] = char(cp);
             std::format_to_n(&expectedStr[1 + 4 * i], 6, "\\x{:02X}"sv, cp);
         }
-        for (int cp{127}; cp < 256; ++cp, ++i) {
+        for (int cp{127}; cp < 256; ++cp, ++i)
+        {
             decodeStr[i] = char(cp);
             std::format_to_n(&expectedStr[1 + 4 * i], 6, "\\x{:02X}"sv, cp);
         }
@@ -577,7 +580,8 @@ TEST(encode, density)
     }
 }
 
-TEST(encode, identifiers) {
+TEST(encode, identifiers)
+{
     { // Valid identifiers
         Encoder encoder{Density::uniline, 4u, false, true};
         encoder << object << "a" << "v" << end;
