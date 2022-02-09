@@ -822,8 +822,10 @@ namespace qc::json
     {
         // We're hand rolling this because `std::to_chars` doesn't support uppercase hex
         static constexpr char hexTable[16u]{
-            '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'
-        };
+            '0', '1', '2', '3',
+            '4', '5', '6', '7',
+            '8', '9', 'A', 'B',
+            'C', 'D', 'E', 'F'};
 
         uint64_t val{v.val};
         char buffer[18u];
