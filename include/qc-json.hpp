@@ -20,6 +20,7 @@
 
 #include <algorithm>
 #include <concepts>
+#include <map>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -1396,7 +1397,7 @@ namespace qc::json
     inline void _makeObjectHelper(Object & obj, K && key, V && val, MoreKVs &&... moreKVs)
     {
         obj.emplace(std::forward<K>(key), std::forward<V>(val));
-        if constexpr (sizeof...(moreKVs))
+        if constexpr (sizeof...(moreKVs) > 0u)
         {
             _makeObjectHelper(obj, std::forward<MoreKVs>(moreKVs)...);
         }
