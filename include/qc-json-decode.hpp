@@ -1,11 +1,11 @@
 #pragma once
 
 ///
-/// QC JSON 2.0.0
+/// QC JSON 2.0.2
 ///
 /// Quick and clean JSON5 header library for C++20
 ///
-/// Austin Quick : 2019 - 2021
+/// Austin Quick : 2019 - 2022
 ///
 /// https://github.com/daskie/qc-json
 ///
