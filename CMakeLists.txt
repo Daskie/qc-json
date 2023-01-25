@@ -7,14 +7,8 @@ include(FetchContent)
 FetchContent_Declare(qc-cmake GIT_REPOSITORY https://github.com/Daskie/qc-cmake.git)
 FetchContent_MakeAvailable(qc-cmake)
 
-### QC-JSON ####################################################################
-
 qc_setup_target(qc-json INTERFACE_LIBRARY)
 
-### SUBDIRECTORIES #############################################################
-
-add_subdirectory(test EXCLUDE_FROM_ALL)
-
-### INSTALL ####################################################################
+add_subdirectory(test)
 
 qc_setup_install(TARGETS qc-json)

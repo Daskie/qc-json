@@ -276,10 +276,10 @@ TEST(decode, string)
         std::string decodeStr(1 + 256 * 4 + 1, '\0');
         decodeStr.front() = '"';
         decodeStr.back() = '"';
-        for (int i{0}; i < 256; ++i)
+        for (size_t i{0u}; i < 256u; ++i)
         {
             expectedStr[i] = char(i);
-            std::format_to_n(&decodeStr[1 + 4 * i], 4, "\\x{:02X}"sv, i);
+            std::format_to_n(&decodeStr[1u + 4u * i], 4, "\\x{:02X}"sv, i);
         }
         composer.expectString(expectedStr);
         decode(decodeStr, composer, nullptr);
@@ -291,10 +291,10 @@ TEST(decode, string)
         std::string decodeStr(1 + 256 * 6 + 1, '\0');
         decodeStr.front() = '"';
         decodeStr.back() = '"';
-        for (int i{0}; i < 256; ++i)
+        for (size_t i{0u}; i < 256u; ++i)
         {
             expectedStr[i] = char(i);
-            std::format_to_n(&decodeStr[1 + 6 * i], 6, "\\u{:04X}"sv, i);
+            std::format_to_n(&decodeStr[1u + 6u * i], 6, "\\u{:04X}"sv, i);
         }
         composer.expectString(expectedStr);
         decode(decodeStr, composer, nullptr);

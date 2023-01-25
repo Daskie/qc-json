@@ -723,7 +723,7 @@ namespace qc::json
             // If that's it, we're an integer
             if (pos >= _end)
             {
-                return pos - _pos;
+                return size_t(pos - _pos);
             }
             // If instead there is a decimal point...
             else if (*pos == '.')
@@ -739,7 +739,7 @@ namespace qc::json
                 // Otherwise, we're an integer
                 else
                 {
-                    return pos - _pos;
+                    return size_t(pos - _pos);
                 }
             }
             // If instead there is an exponent, we must be a floater
@@ -750,7 +750,7 @@ namespace qc::json
             // Otherwise, that's the end of the number, and we're an integer
             else
             {
-                return pos - _pos;
+                return size_t(pos - _pos);
             }
         }
 

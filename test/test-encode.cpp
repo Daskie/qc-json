@@ -172,21 +172,21 @@ TEST(encode, string)
         std::string expectedStr(1 + 154 * 4 + 1, '\0');
         expectedStr.front() = '"';
         expectedStr.back() = '"';
-        int i{0};
-        for (int cp{1}; cp < 8; ++cp, ++i)
+        size_t i{0u};
+        for (size_t cp{1u}; cp < 8u; ++cp, ++i)
         {
             decodeStr[i] = char(cp);
-            std::format_to_n(&expectedStr[1 + 4 * i], 6, "\\x{:02X}"sv, cp);
+            std::format_to_n(&expectedStr[1u + 4u * i], 6, "\\x{:02X}"sv, cp);
         }
-        for (int cp{14}; cp < 32; ++cp, ++i)
+        for (size_t cp{14u}; cp < 32u; ++cp, ++i)
         {
             decodeStr[i] = char(cp);
-            std::format_to_n(&expectedStr[1 + 4 * i], 6, "\\x{:02X}"sv, cp);
+            std::format_to_n(&expectedStr[1u + 4u * i], 6, "\\x{:02X}"sv, cp);
         }
-        for (int cp{127}; cp < 256; ++cp, ++i)
+        for (size_t cp{127u}; cp < 256u; ++cp, ++i)
         {
             decodeStr[i] = char(cp);
-            std::format_to_n(&expectedStr[1 + 4 * i], 6, "\\x{:02X}"sv, cp);
+            std::format_to_n(&expectedStr[1u + 4u * i], 6, "\\x{:02X}"sv, cp);
         }
         Encoder encoder{};
         encoder << decodeStr;
@@ -332,13 +332,13 @@ TEST(encode, hex)
     }
     { // Min signed
         Encoder encoder{};
-        encoder << hex(std::numeric_limits<int64_t>::min());
+        encoder << hex(uint64_t(std::numeric_limits<int64_t>::min()));
         EXPECT_EQ(R"(0x8000000000000000)"s, encoder.finish());
     }
     { // -1
         Encoder encoder{};
         #pragma warning(suppress: 4245)
-        encoder << hex(-1);
+        encoder << hex(uint64_t(int64_t(-1)));
         EXPECT_EQ(R"(0xFFFFFFFFFFFFFFFF)"s, encoder.finish());
     }
 }
@@ -362,13 +362,13 @@ TEST(encode, octal)
     }
     { // Min signed
         Encoder encoder{};
-        encoder << octal(std::numeric_limits<int64_t>::min());
+        encoder << octal(uint64_t(std::numeric_limits<int64_t>::min()));
         EXPECT_EQ(R"(0o1000000000000000000000)"s, encoder.finish());
     }
     { // -1
         Encoder encoder{};
         #pragma warning(suppress: 4245)
-        encoder << octal(-1);
+        encoder << octal(uint64_t(int64_t(-1)));
         EXPECT_EQ(R"(0o1777777777777777777777)"s, encoder.finish());
     }
 }
@@ -392,13 +392,13 @@ TEST(encode, binary)
     }
     { // Min signed
         Encoder encoder{};
-        encoder << binary(std::numeric_limits<int64_t>::min());
+        encoder << binary(uint64_t(std::numeric_limits<int64_t>::min()));
         EXPECT_EQ(R"(0b1000000000000000000000000000000000000000000000000000000000000000)"s, encoder.finish());
     }
     { // -1
         Encoder encoder{};
         #pragma warning(suppress: 4245)
-        encoder << binary(-1);
+        encoder << binary(uint64_t(int64_t(-1)));
         EXPECT_EQ(R"(0b1111111111111111111111111111111111111111111111111111111111111111)"s, encoder.finish());
     }
 }
