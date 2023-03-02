@@ -2,6 +2,8 @@
 
 ###### Quick and clean JSON5 header library for C++20
 
+## *** Depreciated in favor of [QCON](https://github.com/daskie/qcon) ***
+
 ### Contents
 - [Description](#description)
 - [Setup](#setup)
